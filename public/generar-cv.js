@@ -16,23 +16,32 @@ function obtenerValor(id) {
     return elemento ? elemento.value.trim() : '';
 }
 
-// Añadimos un parámetro 'esHabilidad' para saber si debemos aplicar columnas
-function formatearTextoMultilinea(texto, esHabilidad = false) {
+// Formateador estándar para Experiencia y Educación
+function formatearTextoNormal(texto) {
     if (!texto) return '';
     const lineas = texto.split('\n').filter(l => l.trim() !== '');
     
     if (lineas.length === 1) return `<p>${lineas[0]}</p>`;
 
-    // Si es la sección de habilidades, le aplicamos la clase especial de columnas
-    let claseUl = esHabilidad ? 'class="lista-habilidades"' : 'class="lista-normal"';
-    let html = `<ul ${claseUl}>`;
-    
+    let html = '<ul>';
     lineas.forEach(linea => {
         let textoLimpio = linea.replace(/^[-•*·]\s*/, '').trim();
         if (textoLimpio) html += `<li>${textoLimpio}</li>`;
     });
     html += '</ul>';
     return html;
+}
+
+// EL GRAN TRUCO ATS PARA AHORRAR ESPACIO: Bloque horizontal de palabras clave
+function formatearHabilidades(texto) {
+    if (!texto) return '';
+    // Separa por líneas, limpia las viñetas y elimina líneas vacías
+    const lineas = texto.split('\n')
+        .map(l => l.replace(/^[-•*·]\s*/, '').trim())
+        .filter(l => l !== '');
+    
+    // Une todas las habilidades en un solo párrafo separadas por un punto grueso
+    return `<p class="bloque-habilidades">${lineas.join(' • ')}</p>`;
 }
 
 function generarPDFATS(evento) {
@@ -59,21 +68,21 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* DISEÑO ULTRA COMPACTO - OPTIMIZADO PARA 1 PÁGINA */
+            /* COMPRESIÓN MÁXIMA PARA 1 PÁGINA */
             @page {
                 size: A4;
-                margin: 8mm 10mm; /* Márgenes súper ajustados (Arriba-Abajo / Lados) */
+                margin: 8mm; /* Margen mínimo absoluto */
             }
             body {
-                font-family: 'Arial', 'Helvetica', sans-serif;
-                font-size: 9pt; /* Letra más pequeña pero legible */
-                line-height: 1.15; /* Elimina el aire extra entre líneas */
+                font-family: 'Arial', sans-serif; /* Arial es la más segura para ATS */
+                font-size: 8.5pt; /* Reducido para máxima compresión, sigue siendo legible */
+                line-height: 1.15;
                 color: #000;
                 margin: 0;
                 padding: 0;
             }
             h1 {
-                font-size: 16pt;
+                font-size: 14pt;
                 text-align: center;
                 margin: 0 0 2px 0;
                 text-transform: uppercase;
@@ -81,54 +90,54 @@ function generarPDFATS(evento) {
             }
             .puesto {
                 text-align: center;
-                font-size: 10.5pt;
+                font-size: 10pt;
                 font-weight: bold;
                 margin: 0 0 4px 0;
                 color: #222;
             }
             .contacto {
                 text-align: center;
-                font-size: 8.5pt;
+                font-size: 8pt;
                 margin-bottom: 6px;
                 padding-bottom: 4px;
                 border-bottom: 1px solid #000;
             }
             .contacto span {
-                margin: 0 5px;
+                margin: 0 4px;
             }
             h2 {
-                font-size: 10.5pt;
+                font-size: 10pt;
                 text-transform: uppercase;
-                border-bottom: 1px solid #999;
-                margin: 8px 0 4px 0; /* Casi pegado al texto para no desperdiciar espacio */
+                border-bottom: 1px solid #000;
+                margin: 6px 0 3px 0; /* Sin espacios en blanco innecesarios */
                 padding-bottom: 1px;
                 color: #111;
             }
             .seccion {
-                margin-bottom: 6px;
+                margin-bottom: 4px;
             }
             p {
-                margin: 0 0 3px 0;
+                margin: 0 0 2px 0;
                 text-align: justify;
             }
             ul {
-                margin: 0 0 4px 0;
+                margin: 0 0 2px 0;
                 padding-left: 14px;
             }
             li {
-                margin-bottom: 2px;
+                margin-bottom: 1px; /* Viñetas super pegadas */
                 text-align: justify;
             }
             
-            /* TRUCO ATS: Divide la lista larga en 2 columnas visuales */
-            .lista-habilidades {
-                columns: 2; 
-                -webkit-columns: 2;
-                -moz-columns: 2;
-                column-gap: 15px;
+            /* Estilo específico para el bloque de habilidades */
+            .bloque-habilidades {
+                text-align: justify;
+                line-height: 1.4;
+                font-weight: 500;
+                color: #222;
             }
 
-            /* Evita cortes feos si excepcionalmente pasa a 2 páginas */
+            /* Evita cortes de página desastrosos si sobra un renglón */
             h2, .seccion {
                 page-break-after: avoid;
             }
@@ -158,29 +167,28 @@ function generarPDFATS(evento) {
         ${datos.experiencia ? `
         <div class="seccion">
             <h2>Experiencia Laboral</h2>
-            ${formatearTextoMultilinea(datos.experiencia)}
+            ${formatearTextoNormal(datos.experiencia)}
         </div>
         ` : ''}
 
         ${datos.educacion ? `
         <div class="seccion">
             <h2>Educación y Cursos</h2>
-            ${formatearTextoMultilinea(datos.educacion)}
+            ${formatearTextoNormal(datos.educacion)}
         </div>
         ` : ''}
 
         ${datos.habilidades ? `
         <div class="seccion">
             <h2>Habilidades Técnicas y Competencias</h2>
-            <!-- Mandamos 'true' para activar las 2 columnas -->
-            ${formatearTextoMultilinea(datos.habilidades, true)}
+            ${formatearHabilidades(datos.habilidades)}
         </div>
         ` : ''}
 
         ${datos.adicional ? `
         <div class="seccion">
             <h2>Información Adicional</h2>
-            ${formatearTextoMultilinea(datos.adicional)}
+            ${formatearTextoNormal(datos.adicional)}
         </div>
         ` : ''}
     </body>

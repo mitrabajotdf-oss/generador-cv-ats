@@ -1,223 +1,195 @@
-let postulantesLocales = [];
-let fotoBase64Actual = '';
+// --- generar-cv.js ---
 
 document.addEventListener('DOMContentLoaded', () => {
-  actualizarListaPostulantes();
+    // Busca automáticamente el botón que dice "Generar PDF Final ATS"
+    const botones = document.querySelectorAll('button');
+    let btnGenerar = Array.from(botones).find(btn => btn.textContent.includes('Generar PDF'));
+
+    if(btnGenerar) {
+        btnGenerar.addEventListener('click', generarPDFATS);
+    } else {
+        console.warn("No se encontró el botón de generar PDF. Revisa tu HTML.");
+    }
 });
 
-async function actualizarListaPostulantes() {
-  try {
-    const res = await fetch('/api/postulantes');
-    postulantesLocales = await res.json();
+// Función auxiliar para obtener los valores del formulario de manera segura
+function obtenerValor(id) {
+    const elemento = document.getElementById(id);
+    return elemento ? elemento.value.trim() : '';
+}
+
+// Función clave para ATS: Convierte el texto plano con guiones en listas reales (<ul><li>)
+// Los ATS leen mucho mejor las listas HTML estructuradas que los párrafos largos.
+function formatearTextoMultilinea(texto) {
+    if (!texto) return '';
+    const lineas = texto.split('\n').filter(l => l.trim() !== '');
     
-    const select = document.getElementById('selectPostulante');
-    select.innerHTML = '<option value="">-- Nuevo Postulante --</option>';
+    if (lineas.length === 1) return `<p>${lineas[0]}</p>`;
 
-    postulantesLocales.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = `${p.nombre} (${p.titulo || 'Sin título'})`;
-      select.appendChild(opt);
+    let html = '<ul>';
+    lineas.forEach(linea => {
+        // Limpia guiones, viñetas o puntos al inicio de la línea
+        let textoLimpio = linea.replace(/^[-•*·]\s*/, '').trim();
+        if (textoLimpio) html += `<li>${textoLimpio}</li>`;
     });
-  } catch (err) {
-    console.error('Error al obtener postulantes:', err);
-  }
+    html += '</ul>';
+    return html;
 }
 
-function cargarPostulanteSeleccionado() {
-  const id = document.getElementById('selectPostulante').value;
-  if (!id) {
-    limpiarFormulario();
-    return;
-  }
+// Función principal que genera el PDF compacto
+function generarPDFATS(evento) {
+    if(evento) evento.preventDefault();
 
-  const p = postulantesLocales.find(item => item.id === id);
-  if (p) {
-    llenarFormulario(p);
-  }
-}
+    // 1. Recopilar datos (Asegúrate de que tus campos en el HTML tengan estos IDs)
+    const datos = {
+        nombre: obtenerValor('nombre') || 'Nombre del Postulante',
+        puesto: obtenerValor('puesto') || '',
+        email: obtenerValor('email') || '',
+        telefono: obtenerValor('telefono') || '',
+        ubicacion: obtenerValor('ubicacion') || '',
+        linkedin: obtenerValor('linkedin') || '',
+        resumen: obtenerValor('resumen') || '',
+        experiencia: obtenerValor('experiencia') || '',
+        educacion: obtenerValor('educacion') || '',
+        habilidades: obtenerValor('habilidades') || '',
+        adicional: obtenerValor('adicional') || ''
+    };
 
-function llenarFormulario(d) {
-  document.getElementById('postulanteId').value = d.id || '';
-  document.getElementById('nombre').value = d.nombre || '';
-  document.getElementById('titulo').value = d.titulo || '';
-  document.getElementById('email').value = d.email || '';
-  document.getElementById('telefono').value = d.telefono || '';
-  document.getElementById('ubicacion').value = d.ubicacion || '';
-  document.getElementById('disponibilidad').value = d.disponibilidad || '';
-  document.getElementById('linkedin').value = d.linkedin || '';
+    // 2. Construir la plantilla HTML oculta y estricta
+    const htmlPlantilla = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
+        <style>
+            /* CONFIGURACIÓN ESTRICTA PARA 1 O 2 PÁGINAS MÁXIMO */
+            @page {
+                size: A4;
+                margin: 12mm 15mm; /* Márgenes reducidos para maximizar espacio */
+            }
+            body {
+                font-family: 'Arial', 'Helvetica', sans-serif; /* Fuentes estándar, favoritas de los ATS */
+                font-size: 10pt; /* Tamaño óptimo para comprimir sin perder legibilidad */
+                line-height: 1.35; /* Interlineado ajustado */
+                color: #000;
+                background: #fff;
+                margin: 0;
+                padding: 0;
+            }
+            h1 {
+                font-size: 18pt;
+                text-align: center;
+                margin: 0 0 5px 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .puesto {
+                text-align: center;
+                font-size: 12pt;
+                font-weight: bold;
+                margin: 0 0 10px 0;
+                color: #333;
+            }
+            .contacto {
+                text-align: center;
+                font-size: 9pt;
+                margin-bottom: 12px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid #000;
+            }
+            .contacto span {
+                margin: 0 8px;
+            }
+            h2 {
+                font-size: 11.5pt;
+                text-transform: uppercase;
+                border-bottom: 1px solid #ccc;
+                margin: 15px 0 8px 0;
+                padding-bottom: 2px;
+                color: #222;
+            }
+            .seccion {
+                margin-bottom: 12px;
+            }
+            p {
+                margin: 0 0 6px 0;
+                text-align: justify;
+            }
+            ul {
+                margin: 0 0 8px 0;
+                padding-left: 18px;
+            }
+            li {
+                margin-bottom: 4px;
+                text-align: justify;
+            }
+            /* REGLAS PARA EVITAR QUE SE CORTEN LOS PÁRRAFOS ENTRE PÁGINAS */
+            h2, .seccion {
+                page-break-after: avoid;
+            }
+            li, p {
+                page-break-inside: avoid;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>${datos.nombre}</h1>
+        ${datos.puesto ? `<div class="puesto">${datos.puesto}</div>` : ''}
 
-  document.getElementById('resumen').value = d.resumen || '';
-  document.getElementById('experiencia').value = d.experiencia || '';
-  document.getElementById('educacion').value = d.educacion || '';
-  document.getElementById('habilidades').value = d.habilidades || '';
-  document.getElementById('informacion_adicional').value = d.informacion_adicional || '';
+        <div class="contacto">
+            ${datos.email ? `<span>${datos.email}</span>` : ''}
+            ${datos.telefono ? `| <span>${datos.telefono}</span>` : ''}
+            ${datos.ubicacion ? `| <span>${datos.ubicacion}</span>` : ''}
+            ${datos.linkedin ? `| <span>${datos.linkedin}</span>` : ''}
+        </div>
 
-  fotoBase64Actual = d.fotoBase64 || '';
-  const imgPreview = document.getElementById('imgPreview');
-  if (fotoBase64Actual) {
-    imgPreview.src = fotoBase64Actual;
-    imgPreview.style.display = 'block';
-  } else {
-    imgPreview.style.display = 'none';
-  }
-}
+        ${datos.resumen ? `
+        <div class="seccion">
+            <h2>Resumen Profesional</h2>
+            <p>${datos.resumen}</p>
+        </div>
+        ` : ''}
 
-function limpiarFormulario() {
-  document.getElementById('postulanteId').value = '';
-  document.getElementById('selectPostulante').value = '';
-  document.getElementById('nombre').value = '';
-  document.getElementById('titulo').value = '';
-  document.getElementById('email').value = '';
-  document.getElementById('telefono').value = '';
-  document.getElementById('ubicacion').value = '';
-  document.getElementById('disponibilidad').value = '';
-  document.getElementById('linkedin').value = '';
-  document.getElementById('resumen').value = '';
-  document.getElementById('experiencia').value = '';
-  document.getElementById('educacion').value = '';
-  document.getElementById('habilidades').value = '';
-  document.getElementById('informacion_adicional').value = '';
-  fotoBase64Actual = '';
-  document.getElementById('imgPreview').style.display = 'none';
-}
+        ${datos.experiencia ? `
+        <div class="seccion">
+            <h2>Experiencia Laboral</h2>
+            ${formatearTextoMultilinea(datos.experiencia)}
+        </div>
+        ` : ''}
 
-async function subirYProcesarCV() {
-  const fileInput = document.getElementById('cvFile');
-  if (!fileInput.files || fileInput.files.length === 0) {
-    alert('Por favor selecciona un archivo PDF o Word.');
-    return;
-  }
+        ${datos.educacion ? `
+        <div class="seccion">
+            <h2>Educación y Cursos</h2>
+            ${formatearTextoMultilinea(datos.educacion)}
+        </div>
+        ` : ''}
 
-  const formData = new FormData();
-  formData.append('cvFile', fileInput.files[0]);
+        ${datos.habilidades ? `
+        <div class="seccion">
+            <h2>Habilidades Técnicas y Competencias</h2>
+            ${formatearTextoMultilinea(datos.habilidades)}
+        </div>
+        ` : ''}
 
-  try {
-    const response = await fetch('/api/parse-cv', {
-      method: 'POST',
-      body: formData
-    });
+        ${datos.adicional ? `
+        <div class="seccion">
+            <h2>Información Adicional</h2>
+            ${formatearTextoMultilinea(datos.adicional)}
+        </div>
+        ` : ''}
+    </body>
+    </html>
+    `;
 
-    const result = await response.json();
+    // 3. Abrir plantilla en ventana invisible/nueva y llamar a la impresión nativa
+    const ventana = window.open('', '_blank');
+    ventana.document.write(htmlPlantilla);
+    ventana.document.close();
 
-    if (result.error) {
-      alert(result.error);
-      return;
-    }
-
-    llenarFormulario(result.postulante);
-    await actualizarListaPostulantes();
-    document.getElementById('selectPostulante').value = result.postulante.id;
-
-    alert('¡Postulante creado y datos extraídos exitosamente!');
-
-  } catch (err) {
-    console.error(err);
-    alert('Error al leer el archivo.');
-  }
-}
-
-function previewFoto(event) {
-  const input = event.target;
-  const preview = document.getElementById('imgPreview');
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      fotoBase64Actual = e.target.result;
-      preview.src = fotoBase64Actual;
-      preview.style.display = 'block';
-    }
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-
-async function guardarPostulante() {
-  const datos = obtenerDatosFormulario();
-  try {
-    const res = await fetch('/api/guardar-postulante', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos)
-    });
-    const result = await res.json();
-    alert('¡Ficha del postulante guardada correctamente!');
-    await actualizarListaPostulantes();
-    document.getElementById('selectPostulante').value = result.id;
-  } catch (e) {
-    alert('Error al guardar datos.');
-  }
-}
-
-function obtenerDatosFormulario() {
-  return {
-    id: document.getElementById('postulanteId').value || '',
-    nombre: document.getElementById('nombre').value || '',
-    titulo: document.getElementById('titulo').value || '',
-    email: document.getElementById('email').value || '',
-    telefono: document.getElementById('telefono').value || '',
-    ubicacion: document.getElementById('ubicacion').value || '',
-    disponibilidad: document.getElementById('disponibilidad').value || '',
-    linkedin: document.getElementById('linkedin').value || '',
-    resumen: document.getElementById('resumen').value || '',
-    experiencia: document.getElementById('experiencia').value || '',
-    educacion: document.getElementById('educacion').value || '',
-    habilidades: document.getElementById('habilidades').value || '',
-    informacion_adicional: document.getElementById('informacion_adicional').value || '',
-    fotoBase64: fotoBase64Actual
-  };
-}
-
-async function generarPDF() {
-  const datos = obtenerDatosFormulario();
-
-  try {
-    const response = await fetch('/generar-cv', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos)
-    });
-
-    if (response.ok) {
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } else {
-      alert('Error al generar el PDF.');
-    }
-  } catch (err) {
-    alert('Error de conexión.');
-  }
-}
-
-function evaluarATS() {
-  const oferta = document.getElementById('ofertaLaboral').value.toLowerCase();
-  const textoCV = (document.getElementById('habilidades').value + " " + document.getElementById('experiencia').value).toLowerCase();
-
-  if (!oferta.trim()) {
-    alert('Pega la descripción del puesto de trabajo para evaluar la compatibilidad.');
-    return;
-  }
-
-  const palabras = oferta.match(/\b[a-záéíóúñ]{4,}\b/gi) || [];
-  const unicas = [...new Set(palabras)];
-  let coincidencias = 0;
-
-  unicas.forEach(p => {
-    if (textoCV.includes(p)) coincidencias++;
-  });
-
-  const score = Math.min(100, Math.round((coincidencias / (unicas.length || 1)) * 100 * 2.2));
-  
-  const resDiv = document.getElementById('resultadoATS');
-  resDiv.style.display = 'block';
-  document.getElementById('puntuacionATS').innerText = score + '%';
-
-  const msg = document.getElementById('mensajeATS');
-  if (score >= 65) {
-    msg.innerText = '¡Excelente coincidencia ATS para este postulante!';
-  } else if (score >= 35) {
-    msg.innerText = 'Coincidencia media. Se sugiere agregar más competencias del aviso.';
-  } else {
-    msg.innerText = 'Coincidencia baja. Ajusta el vocabulario técnico de la experiencia laboral.';
-  }
+    // Pequeña pausa para asegurar que se carguen los estilos antes de imprimir
+    setTimeout(() => {
+        ventana.focus();
+        ventana.print();
+    }, 500);
 }

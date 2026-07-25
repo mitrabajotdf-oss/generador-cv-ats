@@ -1,7 +1,6 @@
 // --- generar-cv.js ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Busca automáticamente el botón que dice "Generar PDF Final ATS"
     const botones = document.querySelectorAll('button');
     let btnGenerar = Array.from(botones).find(btn => btn.textContent.includes('Generar PDF'));
 
@@ -12,23 +11,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Función auxiliar para obtener los valores del formulario de manera segura
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
     return elemento ? elemento.value.trim() : '';
 }
 
-// Función clave para ATS: Convierte el texto plano con guiones en listas reales (<ul><li>)
-// Los ATS leen mucho mejor las listas HTML estructuradas que los párrafos largos.
-function formatearTextoMultilinea(texto) {
+// Añadimos un parámetro 'esHabilidad' para saber si debemos aplicar columnas
+function formatearTextoMultilinea(texto, esHabilidad = false) {
     if (!texto) return '';
     const lineas = texto.split('\n').filter(l => l.trim() !== '');
     
     if (lineas.length === 1) return `<p>${lineas[0]}</p>`;
 
-    let html = '<ul>';
+    // Si es la sección de habilidades, le aplicamos la clase especial de columnas
+    let claseUl = esHabilidad ? 'class="lista-habilidades"' : 'class="lista-normal"';
+    let html = `<ul ${claseUl}>`;
+    
     lineas.forEach(linea => {
-        // Limpia guiones, viñetas o puntos al inicio de la línea
         let textoLimpio = linea.replace(/^[-•*·]\s*/, '').trim();
         if (textoLimpio) html += `<li>${textoLimpio}</li>`;
     });
@@ -36,11 +35,9 @@ function formatearTextoMultilinea(texto) {
     return html;
 }
 
-// Función principal que genera el PDF compacto
 function generarPDFATS(evento) {
     if(evento) evento.preventDefault();
 
-    // 1. Recopilar datos (Asegúrate de que tus campos en el HTML tengan estos IDs)
     const datos = {
         nombre: obtenerValor('nombre') || 'Nombre del Postulante',
         puesto: obtenerValor('puesto') || '',
@@ -55,7 +52,6 @@ function generarPDFATS(evento) {
         adicional: obtenerValor('adicional') || ''
     };
 
-    // 2. Construir la plantilla HTML oculta y estricta
     const htmlPlantilla = `
     <!DOCTYPE html>
     <html lang="es">
@@ -63,68 +59,76 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* CONFIGURACIÓN ESTRICTA PARA 1 O 2 PÁGINAS MÁXIMO */
+            /* DISEÑO ULTRA COMPACTO - OPTIMIZADO PARA 1 PÁGINA */
             @page {
                 size: A4;
-                margin: 12mm 15mm; /* Márgenes reducidos para maximizar espacio */
+                margin: 8mm 10mm; /* Márgenes súper ajustados (Arriba-Abajo / Lados) */
             }
             body {
-                font-family: 'Arial', 'Helvetica', sans-serif; /* Fuentes estándar, favoritas de los ATS */
-                font-size: 10pt; /* Tamaño óptimo para comprimir sin perder legibilidad */
-                line-height: 1.35; /* Interlineado ajustado */
+                font-family: 'Arial', 'Helvetica', sans-serif;
+                font-size: 9pt; /* Letra más pequeña pero legible */
+                line-height: 1.15; /* Elimina el aire extra entre líneas */
                 color: #000;
-                background: #fff;
                 margin: 0;
                 padding: 0;
             }
             h1 {
-                font-size: 18pt;
+                font-size: 16pt;
                 text-align: center;
-                margin: 0 0 5px 0;
+                margin: 0 0 2px 0;
                 text-transform: uppercase;
-                letter-spacing: 1px;
+                letter-spacing: 0.5px;
             }
             .puesto {
                 text-align: center;
-                font-size: 12pt;
+                font-size: 10.5pt;
                 font-weight: bold;
-                margin: 0 0 10px 0;
-                color: #333;
+                margin: 0 0 4px 0;
+                color: #222;
             }
             .contacto {
                 text-align: center;
-                font-size: 9pt;
-                margin-bottom: 12px;
-                padding-bottom: 12px;
+                font-size: 8.5pt;
+                margin-bottom: 6px;
+                padding-bottom: 4px;
                 border-bottom: 1px solid #000;
             }
             .contacto span {
-                margin: 0 8px;
+                margin: 0 5px;
             }
             h2 {
-                font-size: 11.5pt;
+                font-size: 10.5pt;
                 text-transform: uppercase;
-                border-bottom: 1px solid #ccc;
-                margin: 15px 0 8px 0;
-                padding-bottom: 2px;
-                color: #222;
+                border-bottom: 1px solid #999;
+                margin: 8px 0 4px 0; /* Casi pegado al texto para no desperdiciar espacio */
+                padding-bottom: 1px;
+                color: #111;
             }
             .seccion {
-                margin-bottom: 12px;
+                margin-bottom: 6px;
             }
             p {
-                margin: 0 0 6px 0;
+                margin: 0 0 3px 0;
                 text-align: justify;
             }
             ul {
-                margin: 0 0 8px 0;
-                padding-left: 18px;
+                margin: 0 0 4px 0;
+                padding-left: 14px;
             }
             li {
-                margin-bottom: 4px;
+                margin-bottom: 2px;
                 text-align: justify;
             }
-            /* REGLAS PARA EVITAR QUE SE CORTEN LOS PÁRRAFOS ENTRE PÁGINAS */
+            
+            /* TRUCO ATS: Divide la lista larga en 2 columnas visuales */
+            .lista-habilidades {
+                columns: 2; 
+                -webkit-columns: 2;
+                -moz-columns: 2;
+                column-gap: 15px;
+            }
+
+            /* Evita cortes feos si excepcionalmente pasa a 2 páginas */
             h2, .seccion {
                 page-break-after: avoid;
             }
@@ -168,7 +172,8 @@ function generarPDFATS(evento) {
         ${datos.habilidades ? `
         <div class="seccion">
             <h2>Habilidades Técnicas y Competencias</h2>
-            ${formatearTextoMultilinea(datos.habilidades)}
+            <!-- Mandamos 'true' para activar las 2 columnas -->
+            ${formatearTextoMultilinea(datos.habilidades, true)}
         </div>
         ` : ''}
 
@@ -182,12 +187,10 @@ function generarPDFATS(evento) {
     </html>
     `;
 
-    // 3. Abrir plantilla en ventana invisible/nueva y llamar a la impresión nativa
     const ventana = window.open('', '_blank');
     ventana.document.write(htmlPlantilla);
     ventana.document.close();
 
-    // Pequeña pausa para asegurar que se carguen los estilos antes de imprimir
     setTimeout(() => {
         ventana.focus();
         ventana.print();

@@ -8,7 +8,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ESTILOS MODERNOS UI/UX */
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 30px 15px; }
         .container { max-width: 900px; margin: 0 auto; }
         h1 { text-align: center; color: #111827; margin-bottom: 30px; font-weight: 700; }
@@ -45,7 +44,6 @@
             <div class="form-group" style="grid-column: span 2;">
                 <label>Extraer desde CV (PDF o Word):</label>
                 <input type="file" id="archivoCV" accept=".pdf,.doc,.docx">
-                <!-- LE AGREGAMOS EL ID btnProcesar A ESTE BOTON -->
                 <button class="btn-outline" id="btnProcesar" style="margin-top:10px; width:100%;">📄 Procesar Archivo</button>
             </div>
         </div>
@@ -77,10 +75,10 @@
     </div>
 </div>
 
-<!-- Librerías mágicas para leer PDF y Word -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="generar-cv.js"></script>
+<!-- ESTO OBLIGA A CARGAR EL NUEVO CÓDIGO -->
+<script src="generar-cv.js?v=10"></script>
 
 </body>
 </html>

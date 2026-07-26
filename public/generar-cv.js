@@ -1,6 +1,5 @@
 // --- generar-cv.js ---
 
-// Configuración de PDF.js
 if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 }
@@ -8,18 +7,14 @@ if (typeof pdfjsLib !== 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
     const botones = document.querySelectorAll('button');
     let btnGenerar = Array.from(botones).find(btn => btn.textContent.includes('Generar PDF'));
-    if(btnGenerar) {
-        btnGenerar.addEventListener('click', generarPDFATS);
-    }
+    if(btnGenerar) btnGenerar.addEventListener('click', generarPDFATS);
 
     const btnProcesar = document.getElementById('btnProcesar');
-    if(btnProcesar) {
-        btnProcesar.addEventListener('click', procesarArchivoCV);
-    }
+    if(btnProcesar) btnProcesar.addEventListener('click', procesarArchivoCV);
 });
 
 // ==========================================
-// 1. LECTOR Y ESCÁNER INTELIGENTE DE CV
+// LECTOR Y EXTRACTOR SUPREMO
 // ==========================================
 async function procesarArchivoCV(evento) {
     evento.preventDefault();
@@ -30,26 +25,21 @@ async function procesarArchivoCV(evento) {
         return;
     }
 
-    const archivo = inputArchivo.files[0];
     const btn = document.getElementById('btnProcesar');
-    btn.textContent = "⏳ Escaneando y Ordenando...";
+    btn.textContent = "⏳ Escaneando...";
 
     try {
         let textoExtraido = "";
+        const archivo = inputArchivo.files[0];
         if (archivo.type === "application/pdf") {
             textoExtraido = await extraerTextoPDF(archivo);
         } else if (archivo.name.endsWith(".docx")) {
             textoExtraido = await extraerTextoWord(archivo);
-        } else {
-            alert("Formato no soportado. Por favor sube un PDF o .docx");
-            btn.textContent = "📄 Procesar Archivo";
-            return;
         }
 
         analizarYCompletarFormulario(textoExtraido);
-
     } catch (error) {
-        console.error("Error al leer archivo:", error);
+        console.error(error);
         alert("Hubo un error al leer el archivo.");
     }
 
@@ -61,12 +51,10 @@ async function extraerTextoPDF(archivo) {
     const arrayBuffer = await archivo.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let textoCompleto = "";
-
     for (let i = 1; i <= pdf.numPages; i++) {
         const pagina = await pdf.getPage(i);
         const contenido = await pagina.getTextContent();
-        const textoPagina = contenido.items.map(item => item.str).join("\n");
-        textoCompleto += textoPagina + "\n";
+        textoCompleto += contenido.items.map(item => item.str).join("\n") + "\n";
     }
     return textoCompleto;
 }
@@ -77,56 +65,55 @@ async function extraerTextoWord(archivo) {
     return resultado.value;
 }
 
-// 🧠 CEREBRO V3: Extracción quirurgica y limpieza Unicode
 function analizarYCompletarFormulario(texto) {
-    // 1. Destruir símbolos extraños de codificación desde el inicio
-    let textoLimpioGlobal = texto.replace(/[ð·•●▪]/g, '');
+    // 1. Limpieza Nuclear de Emojis y Símbolos (incluyendo el molesto ð y ·)
+    let textoLimpioGlobal = texto.replace(/ð/g, '').replace(/·/g, '').replace(/[•●▪]/g, '');
+    
+    // Convertimos todo en un solo bloque sin espacios para encontrar datos ocultos
+    let textoSinEspacios = textoLimpioGlobal.replace(/\s+/g, '');
 
-    // 2. Extraer Email (tolerando espacios) y RECORTARLO del texto
-    const regexEmail = /([a-zA-Z0-9._-]+)\s*@\s*([a-zA-Z0-9.-]+)\.\s*([a-zA-Z]{2,6})/;
-    const matchEmail = textoLimpioGlobal.match(regexEmail);
+    // 2. Extraer Email Perfecto
+    const matchEmail = textoSinEspacios.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
     if (matchEmail) {
-        // Armamos el email limpio (sin pedazos de otras palabras como "PER")
-        let emailReal = (matchEmail[1] + "@" + matchEmail[2] + "." + matchEmail[3]).replace(/\s+/g, '');
-        document.getElementById('email').value = emailReal;
-        // Lo fulminamos del texto gigante para que no vaya al resumen
-        textoLimpioGlobal = textoLimpioGlobal.replace(matchEmail[0], '');
+        document.getElementById('email').value = matchEmail[0];
+        // Crear una trampa para borrar el email original sin importar cuantos espacios tenga
+        let regexBorrarEmail = new RegExp(matchEmail[0].split('').join('\\s*'), 'i');
+        textoLimpioGlobal = textoLimpioGlobal.replace(regexBorrarEmail, '');
     }
 
-    // 3. Extraer Teléfono y RECORTARLO del texto
-    const regexTel = /(?:\+?54\s?9\s?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}|\b\d{4}[\s-]\d{6}\b|\b\d{10}\b/;
-    const matchTel = textoLimpioGlobal.match(regexTel);
+    // 3. Extraer Teléfono Perfecto (Encuentra cualquier secuencia de 10 números)
+    const matchTel = textoSinEspacios.match(/(?:\+?549?)?\d{10}/);
     if (matchTel) {
-        document.getElementById('telefono').value = matchTel[0].trim();
-        textoLimpioGlobal = textoLimpioGlobal.replace(matchTel[0], '');
+        document.getElementById('telefono').value = matchTel[0];
+        // Trampa para borrar el teléfono original de la caja
+        let regexBorrarTel = new RegExp(matchTel[0].split('').join('\\s*[-.]?\\s*'), 'i');
+        textoLimpioGlobal = textoLimpioGlobal.replace(regexBorrarTel, '');
     }
 
-    // 4. Dividir en líneas, ahora que el contacto fue extraído
+    // 4. Procesar el texto restante línea por línea
     const lineas = textoLimpioGlobal.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 2);
 
-    // Primera línea suele ser el nombre
     if (lineas.length > 0) {
-        document.getElementById('nombre').value = lineas[0];
-        lineas.shift(); // Lo sacamos de la lista para que no vaya al resumen
+        // Obliga al nombre a empezar solo con letras
+        document.getElementById('nombre').value = lineas[0].replace(/^[^a-zA-ZáéíóúÁÉÍÓÚÑñ]+/, '').trim();
+        lineas.shift(); 
     }
 
-    // 5. Escáner de Secciones
     let seccionActual = "resumen"; 
     const secciones = { resumen: [], experiencia: [], educacion: [], habilidades: [], adicional: [] };
 
     const kwExperiencia = ["EXPERIENCIA", "TRAYECTORIA", "LABORAL"];
     const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "ACADÉMICA"];
-    const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS", "PRODUCTIVIDAD"];
+    const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS"];
     const kwPerfil = ["PERFIL", "RESUMEN", "SOBRE MÍ"];
 
     for (let i = 0; i < lineas.length; i++) {
         let linea = lineas[i];
         let lineaUpper = linea.toUpperCase();
 
-        // Extraer Ubicación y saltear
-        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO") || lineaUpper.includes("ARGENTINA")) {
+        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
             document.getElementById('ubicacion').value = linea.replace(/[📍,]/g, '').trim();
             continue; 
         }
@@ -138,9 +125,8 @@ function analizarYCompletarFormulario(texto) {
             if (kwPerfil.some(kw => lineaUpper.includes(kw))) { seccionActual = "resumen"; continue; }
         }
 
-        // Limpiar viñetas residuales sueltas
-        linea = linea.replace(/^[-•*●▪\s]+/, '').trim();
-        
+        // Obliga a que CADA línea empiece con una letra o número, borrando cualquier basura
+        linea = linea.replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚÑñ]+/, '').trim();
         if (linea.length > 0) {
             secciones[seccionActual].push(linea);
         }
@@ -153,7 +139,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// 2. LÓGICA DE CREACIÓN DEL PDF FINAL
+// CREACIÓN DEL PDF FINAL
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -167,8 +153,8 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Limpieza nuclear de símbolos para la impresión
-        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').replace(/[ð·•●▪]/g, '').trim();
+        // Última barrera de seguridad para el PDF: Elimina TODO lo que no sea texto al inicio
+        let textoLimpio = linea.replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚÑñ]+/, '').trim();
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();
             if (!unicas.has(textoMinusc)) {

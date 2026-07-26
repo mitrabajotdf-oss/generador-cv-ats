@@ -1,75 +1,74 @@
 // --- generar-cv.js ---
 
+let fotoPerfilBase64 = ""; // Guardará la foto para el PDF
+
 if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Generar PDF
     const btnGenerar = document.getElementById('btnGenerarPDF');
     if(btnGenerar) btnGenerar.addEventListener('click', generarPDFATS);
 
-    // Procesar CV
     const btnProcesar = document.getElementById('btnProcesar');
     if(btnProcesar) btnProcesar.addEventListener('click', procesarArchivoCV);
 
-    // NUEVO: Guardar y Evaluar ATS
     const btnGuardar = document.getElementById('btnGuardar');
     if(btnGuardar) btnGuardar.addEventListener('click', guardarPostulante);
 
-    // NUEVO: Cargar lista al abrir la página
+    // NUEVO: Escuchar cuando suban una foto
+    const inputFoto = document.getElementById('fotoPerfil');
+    if(inputFoto) {
+        inputFoto.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (archivo) {
+                const reader = new FileReader();
+                reader.onload = function(evento) {
+                    fotoPerfilBase64 = evento.target.result; // Convierte la foto a código para el PDF
+                };
+                reader.readAsDataURL(archivo);
+            } else {
+                fotoPerfilBase64 = "";
+            }
+        });
+    }
+
     mostrarPostulantes();
 });
 
 // ==========================================
-// 1. SISTEMA DE EVALUACIÓN Y GUARDADO (RECUPERADO)
+// 1. EVALUACIÓN ATS Y GUARDADO
 // ==========================================
-
 function calcularATS(datos) {
     let score = 0;
-    
-    // Verificaciones básicas (20 puntos)
     if (datos.nombre.length > 3) score += 5;
     if (datos.email.includes('@')) score += 10;
     if (datos.telefono.length > 5) score += 5;
-
-    // Volumen de contenido (Hasta 40 puntos)
     if (datos.experiencia.length > 100) score += 20;
     else if (datos.experiencia.length > 10) score += 10;
-
     if (datos.educacion.length > 50) score += 10;
     if (datos.habilidades.length > 20) score += 10;
 
-    // Compatibilidad con Puesto (Hasta 40 puntos)
     if (datos.puesto.length > 3) {
         let puestoPalabras = datos.puesto.toLowerCase().split(' ');
         let textoCompleto = (datos.resumen + " " + datos.experiencia + " " + datos.habilidades).toLowerCase();
-        
         let coincidencias = 0;
         puestoPalabras.forEach(palabra => {
-            if (palabra.length > 3 && textoCompleto.includes(palabra)) {
-                coincidencias++;
-            }
+            if (palabra.length > 3 && textoCompleto.includes(palabra)) coincidencias++;
         });
-
         if (coincidencias > 2) score += 40;
         else if (coincidencias > 0) score += 20;
     }
-
     return score > 100 ? 100 : score;
 }
 
 function guardarPostulante(evento) {
     evento.preventDefault();
-    
     const nombre = document.getElementById('nombre').value.trim();
-    if(!nombre) {
-        alert("Por favor, al menos ingresa el nombre del postulante.");
-        return;
-    }
+    if(!nombre) { alert("Por favor, al menos ingresa el nombre del postulante."); return; }
 
     const datos = {
-        id: Date.now(), // Identificador único
+        id: Date.now(),
         nombre: nombre,
         puesto: document.getElementById('puesto').value.trim(),
         email: document.getElementById('email').value.trim(),
@@ -80,25 +79,18 @@ function guardarPostulante(evento) {
         habilidades: document.getElementById('habilidades').value.trim()
     };
 
-    // Calcular el porcentaje ATS
     const puntajeAts = calcularATS(datos);
     datos.ats = puntajeAts;
 
-    // Guardar en el navegador
     let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
     postulantes.push(datos);
     localStorage.setItem('postulantesATS', JSON.stringify(postulantes));
 
-    // Mostrar el cartelito con el porcentaje
     const divResultado = document.getElementById('resultadoAts');
     divResultado.style.display = 'block';
     divResultado.innerHTML = `🌟 Postulante Guardado. <br>Compatibilidad ATS estimada: <strong>${puntajeAts}%</strong>`;
 
-    setTimeout(() => {
-        divResultado.style.display = 'none';
-    }, 5000);
-
-    // Actualizar la lista de abajo
+    setTimeout(() => { divResultado.style.display = 'none'; }, 5000);
     mostrarPostulantes();
 }
 
@@ -107,17 +99,14 @@ function mostrarPostulantes() {
     if (!contenedor) return;
 
     let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
-    
     if (postulantes.length === 0) {
-        contenedor.innerHTML = '<p style="color:#6b7280; text-align:center;">No hay postulantes guardados aún. Extrae un CV o llena los datos para guardar tu primero.</p>';
+        contenedor.innerHTML = '<p style="color:#6b7280; text-align:center;">No hay postulantes guardados aún.</p>';
         return;
     }
 
     let html = '';
     postulantes.forEach(p => {
-        // Asignar color según el puntaje
         let claseAts = p.ats >= 70 ? 'ats-high' : (p.ats >= 40 ? 'ats-medium' : 'ats-low');
-        
         html += `
         <div class="postulante-item">
             <div class="postulante-info">
@@ -130,13 +119,11 @@ function mostrarPostulantes() {
             </div>
         </div>`;
     });
-    
     contenedor.innerHTML = html;
 }
 
-// Función global para que el botón "Eliminar" la encuentre
 window.eliminarPostulante = function(id) {
-    if(confirm("¿Seguro que deseas eliminar este postulante de tu base de datos?")) {
+    if(confirm("¿Seguro que deseas eliminar este postulante?")) {
         let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
         postulantes = postulantes.filter(p => p.id !== id);
         localStorage.setItem('postulantesATS', JSON.stringify(postulantes));
@@ -144,35 +131,29 @@ window.eliminarPostulante = function(id) {
     }
 }
 
-
 // ==========================================
-// 2. LECTOR Y EXTRACTOR SUPREMO DE PDFs
+// 2. EXTRACTOR DE CV
 // ==========================================
 async function procesarArchivoCV(evento) {
     evento.preventDefault();
     const inputArchivo = document.getElementById('archivoCV');
-    
     if (!inputArchivo.files || inputArchivo.files.length === 0) {
         alert("Por favor, selecciona un archivo PDF o Word primero.");
         return;
     }
-
     const btn = document.getElementById('btnProcesar');
     btn.textContent = "⏳ Escaneando...";
 
     try {
         let textoExtraido = "";
         const archivo = inputArchivo.files[0];
-        if (archivo.type === "application/pdf") {
-            textoExtraido = await extraerTextoPDF(archivo);
-        } else if (archivo.name.endsWith(".docx")) {
-            textoExtraido = await extraerTextoWord(archivo);
-        }
+        if (archivo.type === "application/pdf") textoExtraido = await extraerTextoPDF(archivo);
+        else if (archivo.name.endsWith(".docx")) textoExtraido = await extraerTextoWord(archivo);
 
         analizarYCompletarFormulario(textoExtraido);
     } catch (error) {
-        console.error("Detalle del error:", error);
-        alert("Hubo un error al leer el archivo. Revisa la consola.");
+        console.error(error);
+        alert("Hubo un error al leer el archivo.");
     }
 
     btn.textContent = "✅ ¡Archivo Procesado!";
@@ -215,10 +196,7 @@ function analizarYCompletarFormulario(texto) {
         document.getElementById('telefono').value = telEncontrado;
     }
 
-    const lineas = textoLimpioGlobal.split('\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 2);
-
+    const lineas = textoLimpioGlobal.split('\n').map(l => l.trim()).filter(l => l.length > 2);
     if (lineas.length > 0) {
         document.getElementById('nombre').value = lineas[0].replace(/^[^a-zA-ZáéíóúÁÉÍÓÚÑñ]+/, '').trim();
         lineas.shift(); 
@@ -226,7 +204,6 @@ function analizarYCompletarFormulario(texto) {
 
     let seccionActual = "resumen"; 
     const secciones = { resumen: [], experiencia: [], educacion: [], habilidades: [], adicional: [] };
-
     const kwExperiencia = ["EXPERIENCIA", "TRAYECTORIA", "LABORAL"];
     const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "ACADÉMICA"];
     const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS"];
@@ -239,12 +216,10 @@ function analizarYCompletarFormulario(texto) {
 
         if (emailEncontrado && lineaSinEsp.includes(emailEncontrado)) continue;
         if (telEncontrado && lineaSinEsp.includes(telEncontrado)) continue;
-
         if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
             document.getElementById('ubicacion').value = linea.replace(/[📍,]/g, '').trim();
             continue; 
         }
-
         if (lineaUpper.length < 40) {
             if (kwExperiencia.some(kw => lineaUpper.includes(kw))) { seccionActual = "experiencia"; continue; }
             if (kwEducacion.some(kw => lineaUpper.includes(kw))) { seccionActual = "educacion"; continue; }
@@ -253,9 +228,7 @@ function analizarYCompletarFormulario(texto) {
         }
 
         linea = linea.replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚÑñ]+/, '').trim();
-        if (linea.length > 0) {
-            secciones[seccionActual].push(linea);
-        }
+        if (linea.length > 0) secciones[seccionActual].push(linea);
     }
 
     document.getElementById('resumen').value = secciones.resumen.join('\n');
@@ -265,7 +238,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// 3. CREACIÓN DEL PDF FINAL ATS
+// 3. GENERADOR DE PDF CON FOTO
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -326,12 +299,18 @@ function generarPDFATS(evento) {
         <style>
             @page { size: A4; margin: 10mm; }
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9pt; color: #2b2b2b; margin: 0; padding: 0; line-height: 1.35; }
-            header { text-align: left; margin-bottom: 12px; }
+            
+            /* Ajuste del Encabezado para que entre la foto */
+            header { display: flex; align-items: center; gap: 20px; text-align: left; margin-bottom: 12px; }
+            .foto-cv { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 2px solid #2c3e50; flex-shrink: 0; }
+            .info-cabecera { flex: 1; }
+            
             h1 { font-size: 22pt; color: #2c3e50; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px; }
             .puesto { font-size: 11pt; font-weight: bold; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
             .contacto-horizontal { font-size: 9pt; color: #555; padding-bottom: 12px; border-bottom: 2px solid #2c3e50; }
             .contacto-horizontal span { margin: 0 6px; }
             .contacto-horizontal span:first-child { margin-left: 0; }
+            
             h2 { font-size: 11pt; color: #2c3e50; border-bottom: 1px solid #ecf0f1; margin: 0 0 8px 0; padding-bottom: 4px; text-transform: uppercase; }
             .seccion { margin-bottom: 15px; }
             .contenedor-columnas { display: flex; flex-direction: row; width: 100%; justify-content: space-between; }
@@ -345,22 +324,20 @@ function generarPDFATS(evento) {
     </head>
     <body>
         <header>
-            <h1>${datos.nombre}</h1>
-            ${datos.puesto ? `<div class="puesto">${datos.puesto}</div>` : ''}
-            <div class="contacto-horizontal">
-                ${datos.email ? `<span>${datos.email}</span>` : ''}
-                ${datos.telefono ? `${datos.email ? '|' : ''} <span>${datos.telefono}</span>` : ''}
-                ${datos.ubicacion ? `${datos.email || datos.telefono ? '|' : ''} <span>${datos.ubicacion}</span>` : ''}
-                ${datos.linkedin ? `${datos.email || datos.telefono || datos.ubicacion ? '|' : ''} <span>${datos.linkedin}</span>` : ''}
+            ${fotoPerfilBase64 ? `<img src="${fotoPerfilBase64}" class="foto-cv" alt="Foto de Perfil">` : ''}
+            <div class="info-cabecera">
+                <h1>${datos.nombre}</h1>
+                ${datos.puesto ? `<div class="puesto">${datos.puesto}</div>` : ''}
+                <div class="contacto-horizontal">
+                    ${datos.email ? `<span>${datos.email}</span>` : ''}
+                    ${datos.telefono ? `${datos.email ? '|' : ''} <span>${datos.telefono}</span>` : ''}
+                    ${datos.ubicacion ? `${datos.email || datos.telefono ? '|' : ''} <span>${datos.ubicacion}</span>` : ''}
+                    ${datos.linkedin ? `${datos.email || datos.telefono || datos.ubicacion ? '|' : ''} <span>${datos.linkedin}</span>` : ''}
+                </div>
             </div>
         </header>
 
-        ${datos.resumen ? `
-        <div class="seccion">
-            <h2>Resumen Profesional</h2>
-            <p>${datos.resumen}</p>
-        </div>
-        ` : ''}
+        ${datos.resumen ? `<div class="seccion"><h2>Resumen Profesional</h2><p>${datos.resumen}</p></div>` : ''}
 
         <div class="contenedor-columnas">
             <div class="columna-izq">
@@ -379,9 +356,5 @@ function generarPDFATS(evento) {
     const ventana = window.open('', '_blank');
     ventana.document.write(htmlPlantilla);
     ventana.document.close();
-
-    setTimeout(() => {
-        ventana.focus();
-        ventana.print();
-    }, 500);
+    setTimeout(() => { ventana.focus(); ventana.print(); }, 500);
 }

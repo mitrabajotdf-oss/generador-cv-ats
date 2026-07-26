@@ -16,7 +16,7 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-size: 0.875rem; font-weight: 600; color: #4b5563; margin-bottom: 5px; }
-        input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+        input[type="text"], input[type="email"], input[type="tel"], textarea, select, input[type="file"] {
             width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.95rem; background-color: #f9fafb; box-sizing: border-box;
         }
         input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); background-color: #ffffff; }
@@ -34,7 +34,6 @@
         
         #resultadoAts { margin-top: 15px; padding: 15px; border-radius: 6px; background-color: #eff6ff; color: #1e3a8a; font-weight: 600; display: none; text-align: center; font-size: 1.1rem; border: 1px solid #bfdbfe;}
         
-        /* Estilos para la lista de postulantes */
         .postulante-item { background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .postulante-info h3 { margin: 0 0 5px 0; color: #111827; font-size: 1.1rem; }
         .postulante-info p { margin: 0; color: #4b5563; font-size: 0.9rem; }
@@ -65,6 +64,12 @@
     <div class="card">
         <h2>👤 Datos Personales</h2>
         <div class="grid-2">
+            <!-- AGREGADO: CAMPO DE FOTO -->
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Foto de Perfil (Opcional)</label>
+                <input type="file" id="fotoPerfil" accept="image/png, image/jpeg, image/jpg">
+            </div>
+            
             <div class="form-group"><label>Nombre Completo *</label><input type="text" id="nombre"></div>
             <div class="form-group"><label>Puesto u Objetivo *</label><input type="text" id="puesto"></div>
             <div class="form-group"><label>Correo Electrónico *</label><input type="email" id="email"></div>
@@ -82,7 +87,6 @@
         <div class="form-group"><label>Habilidades Técnicas</label><textarea id="habilidades"></textarea></div>
         <div class="form-group"><label>Información Adicional</label><textarea id="adicional"></textarea></div>
         
-        <!-- Aquí aparecerá el porcentaje ATS -->
         <div id="resultadoAts"></div>
 
         <div class="btn-group">
@@ -91,18 +95,15 @@
         </div>
     </div>
 
-    <!-- SECCIÓN RECUPERADA: POSTULANTES GUARDADOS -->
     <div class="card">
         <h2>📂 Base de Datos de Postulantes</h2>
-        <div id="listaPostulantes">
-            <!-- JS inyectará los candidatos aquí -->
-        </div>
+        <div id="listaPostulantes"></div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="generar-cv.js?v=12"></script>
+<script src="generar-cv.js?v=13"></script>
 
 </body>
 </html>

@@ -77,58 +77,57 @@ async function extraerTextoWord(archivo) {
     return resultado.value;
 }
 
-// 🧠 EL CEREBRO MEJORADO: Encuentra datos difíciles y limpia la basura
+// 🧠 CEREBRO V3: Extracción quirurgica y limpieza Unicode
 function analizarYCompletarFormulario(texto) {
-    // Limpieza global de basura de PDF
-    let textoLimpioGlobal = texto.replace(/[ð·]/g, '');
+    // 1. Destruir símbolos extraños de codificación desde el inicio
+    let textoLimpioGlobal = texto.replace(/[ð·•●▪]/g, '');
 
-    // 1. Extraer Email (Incluso si el PDF le metió espacios en el medio)
-    let textoSinEspacios = textoLimpioGlobal.replace(/\s+/g, '');
-    const regexEmail = /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/;
-    const matchEmail = textoSinEspacios.match(regexEmail);
-    let emailEncontrado = "";
+    // 2. Extraer Email (tolerando espacios) y RECORTARLO del texto
+    const regexEmail = /([a-zA-Z0-9._-]+)\s*@\s*([a-zA-Z0-9.-]+)\.\s*([a-zA-Z]{2,6})/;
+    const matchEmail = textoLimpioGlobal.match(regexEmail);
     if (matchEmail) {
-        emailEncontrado = matchEmail[0];
-        document.getElementById('email').value = emailEncontrado;
+        // Armamos el email limpio (sin pedazos de otras palabras como "PER")
+        let emailReal = (matchEmail[1] + "@" + matchEmail[2] + "." + matchEmail[3]).replace(/\s+/g, '');
+        document.getElementById('email').value = emailReal;
+        // Lo fulminamos del texto gigante para que no vaya al resumen
+        textoLimpioGlobal = textoLimpioGlobal.replace(matchEmail[0], '');
     }
 
-    // 2. Extraer Teléfono (Soporta formatos tipo 2964 659057)
+    // 3. Extraer Teléfono y RECORTARLO del texto
     const regexTel = /(?:\+?54\s?9\s?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}|\b\d{4}[\s-]\d{6}\b|\b\d{10}\b/;
     const matchTel = textoLimpioGlobal.match(regexTel);
-    let telEncontrado = "";
     if (matchTel) {
-        telEncontrado = matchTel[0].trim();
-        document.getElementById('telefono').value = telEncontrado;
+        document.getElementById('telefono').value = matchTel[0].trim();
+        textoLimpioGlobal = textoLimpioGlobal.replace(matchTel[0], '');
     }
 
+    // 4. Dividir en líneas, ahora que el contacto fue extraído
     const lineas = textoLimpioGlobal.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 2);
 
+    // Primera línea suele ser el nombre
     if (lineas.length > 0) {
         document.getElementById('nombre').value = lineas[0];
+        lineas.shift(); // Lo sacamos de la lista para que no vaya al resumen
     }
 
-    // 3. Escáner de Secciones por Palabras Clave
+    // 5. Escáner de Secciones
     let seccionActual = "resumen"; 
     const secciones = { resumen: [], experiencia: [], educacion: [], habilidades: [], adicional: [] };
 
     const kwExperiencia = ["EXPERIENCIA", "TRAYECTORIA", "LABORAL"];
-    const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "CAPACITACIONES", "ACADÉMICA"];
-    const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS", "PRODUCTIVIDAD", "INTELIGENCIA ARTIFICIAL"];
+    const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "ACADÉMICA"];
+    const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS", "PRODUCTIVIDAD"];
     const kwPerfil = ["PERFIL", "RESUMEN", "SOBRE MÍ"];
 
-    for (let i = 1; i < lineas.length; i++) {
+    for (let i = 0; i < lineas.length; i++) {
         let linea = lineas[i];
         let lineaUpper = linea.toUpperCase();
-        let lineaSinEspacios = linea.replace(/\s+/g, '');
 
-        // EVITAR DUPLICADOS: Si la línea es el email, el teléfono o la ubicación, NO la pongas en el Resumen
-        if (emailEncontrado && lineaSinEspacios.includes(emailEncontrado)) continue;
-        if (telEncontrado && lineaSinEspacios.includes(telEncontrado.replace(/\s+/g, ''))) continue;
-        
-        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
-            document.getElementById('ubicacion').value = linea.replace(/[📍]/g, '').trim();
+        // Extraer Ubicación y saltear
+        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO") || lineaUpper.includes("ARGENTINA")) {
+            document.getElementById('ubicacion').value = linea.replace(/[📍,]/g, '').trim();
             continue; 
         }
 
@@ -139,7 +138,8 @@ function analizarYCompletarFormulario(texto) {
             if (kwPerfil.some(kw => lineaUpper.includes(kw))) { seccionActual = "resumen"; continue; }
         }
 
-        linea = linea.replace(/^[-•*●]\s*/, '').trim();
+        // Limpiar viñetas residuales sueltas
+        linea = linea.replace(/^[-•*●▪\s]+/, '').trim();
         
         if (linea.length > 0) {
             secciones[seccionActual].push(linea);
@@ -167,8 +167,8 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Doble filtro anti-basura para que los "ð·" no salgan jamás en el PDF
-        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').replace(/[ð·]/g, '').trim();
+        // Limpieza nuclear de símbolos para la impresión
+        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').replace(/[ð·•●▪]/g, '').trim();
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();
             if (!unicas.has(textoMinusc)) {

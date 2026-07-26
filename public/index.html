@@ -64,7 +64,6 @@
     <div class="card">
         <h2>👤 Datos Personales</h2>
         <div class="grid-2">
-            <!-- AGREGADO: CAMPO DE FOTO -->
             <div class="form-group" style="grid-column: span 2;">
                 <label>Foto de Perfil (Opcional)</label>
                 <input type="file" id="fotoPerfil" accept="image/png, image/jpeg, image/jpg">
@@ -95,15 +94,20 @@
         </div>
     </div>
 
+    <!-- SECCIÓN CON FILTRO PARA EMPRESAS -->
     <div class="card">
-        <h2>📂 Base de Datos de Postulantes</h2>
+        <h2>📂 Base de Datos y Filtro ATS para Empresas</h2>
+        <div class="form-group">
+            <label>🔍 Filtrar por Puesto o Requisito solicitado por la empresa:</label>
+            <input type="text" id="filtroPuesto" placeholder="Ej. Administrativo, Ventas, Sistemas...">
+        </div>
         <div id="listaPostulantes"></div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="generar-cv.js?v=13"></script>
+<script src="generar-cv.js?v=14"></script>
 
 </body>
 </html>

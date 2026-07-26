@@ -16,19 +16,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGuardar = document.getElementById('btnGuardar');
     if(btnGuardar) btnGuardar.addEventListener('click', guardarPostulante);
 
+    // NUEVO: Escuchar el buscador en tiempo real para empresas
+    const inputFiltro = document.getElementById('filtroPuesto');
+    if(inputFiltro) {
+        inputFiltro.addEventListener('input', mostrarPostulantes);
+    }
+
     const inputFoto = document.getElementById('fotoPerfil');
     if(inputFoto) {
         inputFoto.addEventListener('change', function(e) {
             const archivo = e.target.files[0];
             if (archivo) {
                 const reader = new FileReader();
-                reader.onload = function(evento) {
-                    fotoPerfilBase64 = evento.target.result; 
-                };
+                reader.onload = function(evento) { fotoPerfilBase64 = evento.target.result; };
                 reader.readAsDataURL(archivo);
-            } else {
-                fotoPerfilBase64 = "";
-            }
+            } else { fotoPerfilBase64 = ""; }
         });
     }
 
@@ -93,31 +95,52 @@ function guardarPostulante(evento) {
     mostrarPostulantes();
 }
 
+// MOSTRAR Y FILTRAR POSTULANTES PARA EMPRESAS
 function mostrarPostulantes() {
     const contenedor = document.getElementById('listaPostulantes');
     if (!contenedor) return;
 
     let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
+    
     if (postulantes.length === 0) {
         contenedor.innerHTML = '<p style="color:#6b7280; text-align:center;">No hay postulantes guardados aún.</p>';
         return;
     }
 
+    // Obtener lo que escribió la empresa en el buscador
+    const textoFiltro = document.getElementById('filtroPuesto') ? document.getElementById('filtroPuesto').value.toLowerCase().trim() : "";
+
+    // Filtrar si hay texto escrito
+    let postulantesFiltrados = postulantes.filter(p => {
+        if (!textoFiltro) return true;
+        let infoTotal = (p.nombre + " " + p.puesto + " " + p.habilidades + " " + p.resumen).toLowerCase();
+        return infoTotal.includes(textoFiltro);
+    });
+
+    // ORDENAR AUTOMÁTICAMENTE: Del mayor puntaje ATS al menor (Lo que una empresa necesita)
+    postulantesFiltrados.sort((a, b) => b.ats - a.ats);
+
+    if (postulantesFiltrados.length === 0) {
+        contenedor.innerHTML = '<p style="color:#6b7280; text-align:center;">No se encontraron postulantes que coincidan con ese filtro.</p>';
+        return;
+    }
+
     let html = '';
-    postulantes.forEach(p => {
+    postulantesFiltrados.forEach(p => {
         let claseAts = p.ats >= 70 ? 'ats-high' : (p.ats >= 40 ? 'ats-medium' : 'ats-low');
         html += `
         <div class="postulante-item">
             <div class="postulante-info">
                 <h3>${p.nombre}</h3>
                 <p>💼 ${p.puesto || 'Sin puesto definido'} | ✉️ ${p.email || 'Sin email'}</p>
-                <div class="ats-badge ${claseAts}">Score ATS: ${p.ats}%</div>
+                <div class="ats-badge ${claseAts}">Score ATS: ${p.ats}% de compatibilidad</div>
             </div>
             <div>
                 <button onclick="eliminarPostulante(${p.id})" class="btn-danger">Eliminar</button>
             </div>
         </div>`;
     });
+    
     contenedor.innerHTML = html;
 }
 
@@ -263,7 +286,6 @@ function procesarLineasUnicas(texto) {
     return resultado;
 }
 
-// Lista tradicional (para Experiencia y Educación)
 function formatearLista(texto) {
     const lineas = procesarLineasUnicas(texto);
     if (lineas.length === 0) return '';
@@ -273,7 +295,6 @@ function formatearLista(texto) {
     return html;
 }
 
-// NUEVO: Compresor Inteligente para Habilidades
 function formatearHabilidadesCompactas(texto) {
     let lineas = procesarLineasUnicas(texto);
     if (lineas.length === 0) return '';
@@ -281,16 +302,13 @@ function formatearHabilidadesCompactas(texto) {
     let tieneWord = false, tieneExcel = false, tienePowerPoint = false;
     let lineasFiltradas = [];
 
-    // Agrupar elementos de Microsoft Office
     lineas.forEach(l => {
         let low = l.toLowerCase();
         if (low.includes('word')) tieneWord = true;
         else if (low.includes('excel')) tieneExcel = true;
         else if (low.includes('powerpoint') || low.includes('power point')) tienePowerPoint = true;
-        else if (low === 'microsoft' || low === 'office' || low === 'microsoft office') { /* Omitir basura suelta */ }
-        else {
-            lineasFiltradas.push(l); // Mantener el resto de las habilidades intactas
-        }
+        else if (low === 'microsoft' || low === 'office' || low === 'microsoft office') {}
+        else { lineasFiltradas.push(l); }
     });
 
     let officeItems = [];
@@ -298,12 +316,10 @@ function formatearHabilidadesCompactas(texto) {
     if(tieneExcel) officeItems.push('Excel');
     if(tienePowerPoint) officeItems.push('PowerPoint');
 
-    // Si encontró alguno, agrega la etiqueta resumida
     if(officeItems.length > 0) {
         lineasFiltradas.push(`Microsoft Office (${officeItems.join(', ')})`);
     }
 
-    // Devolver como un párrafo horizontal separado por puntitos para ahorrar espacio
     return `<p class="etiquetas-compactas">${lineasFiltradas.join(' • ')}</p>`;
 }
 
@@ -354,8 +370,6 @@ function generarPDFATS(evento) {
             p { margin: 0 0 5px 0; text-align: justify; }
             ul { margin: 0; padding-left: 14px; }
             li { margin-bottom: 2px; text-align: left; }
-
-            /* ESTILO PARA LAS HABILIDADES COMPACTAS */
             .etiquetas-compactas { line-height: 1.6; font-weight: 500; color: #34495e; }
         </style>
     </head>
@@ -379,8 +393,6 @@ function generarPDFATS(evento) {
         <div class="contenedor-columnas">
             <div class="columna-izq">
                 ${datos.educacion ? `<div class="seccion"><h2>Educación</h2>${formatearLista(datos.educacion)}</div>` : ''}
-                
-                <!-- ACÁ APLICAMOS EL COMPRESOR DE HABILIDADES -->
                 ${datos.habilidades ? `<div class="seccion"><h2>Habilidades</h2>${formatearHabilidadesCompactas(datos.habilidades)}</div>` : ''}
             </div>
             <div class="columna-der">

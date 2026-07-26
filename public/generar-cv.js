@@ -6,14 +6,12 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Botón para generar PDF
     const botones = document.querySelectorAll('button');
     let btnGenerar = Array.from(botones).find(btn => btn.textContent.includes('Generar PDF'));
     if(btnGenerar) {
         btnGenerar.addEventListener('click', generarPDFATS);
     }
 
-    // Botón para leer Archivo
     const btnProcesar = document.getElementById('btnProcesar');
     if(btnProcesar) {
         btnProcesar.addEventListener('click', procesarArchivoCV);
@@ -21,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// 1. LÓGICA PARA LEER ARCHIVOS (PDF / WORD)
+// 1. LECTOR Y ESCÁNER INTELIGENTE DE CV
 // ==========================================
 async function procesarArchivoCV(evento) {
     evento.preventDefault();
@@ -34,11 +32,10 @@ async function procesarArchivoCV(evento) {
 
     const archivo = inputArchivo.files[0];
     const btn = document.getElementById('btnProcesar');
-    btn.textContent = "⏳ Procesando...";
+    btn.textContent = "⏳ Escaneando y Ordenando...";
 
     try {
         let textoExtraido = "";
-        
         if (archivo.type === "application/pdf") {
             textoExtraido = await extraerTextoPDF(archivo);
         } else if (archivo.name.endsWith(".docx")) {
@@ -49,6 +46,7 @@ async function procesarArchivoCV(evento) {
             return;
         }
 
+        // Llama a la nueva función que ordena todo
         analizarYCompletarFormulario(textoExtraido);
 
     } catch (error) {
@@ -60,7 +58,6 @@ async function procesarArchivoCV(evento) {
     setTimeout(() => { btn.textContent = "📄 Procesar Archivo"; }, 3000);
 }
 
-// Lector de PDF
 async function extraerTextoPDF(archivo) {
     const arrayBuffer = await archivo.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -69,45 +66,87 @@ async function extraerTextoPDF(archivo) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const pagina = await pdf.getPage(i);
         const contenido = await pagina.getTextContent();
-        const textoPagina = contenido.items.map(item => item.str).join(" ");
+        const textoPagina = contenido.items.map(item => item.str).join("\n"); // Mejor separación por salto de línea
         textoCompleto += textoPagina + "\n";
     }
     return textoCompleto;
 }
 
-// Lector de Word (Docx)
 async function extraerTextoWord(archivo) {
     const arrayBuffer = await archivo.arrayBuffer();
     const resultado = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
     return resultado.value;
 }
 
-// Analizador de Texto (Busca correos, teléfonos y nombres)
+// 🧠 EL CEREBRO: Clasifica y acomoda el texto en los textareas
 function analizarYCompletarFormulario(texto) {
-    // 1. Buscar Email con Regex
+    // 1. Extraer Email y Teléfono
     const regexEmail = /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) document.getElementById('email').value = matchEmail[0];
 
-    // 2. Buscar Teléfono (Busca patrones comunes de números)
     const regexTel = /(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/;
     const matchTel = texto.match(regexTel);
     if (matchTel) document.getElementById('telefono').value = matchTel[0].trim();
 
-    // 3. Obtener Nombre (Toma la primera línea que tenga texto)
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+    // Dividimos el texto en líneas limpiando basura extrema de PDFs (como los ð·)
+    const lineas = texto.split('\n')
+        .map(l => l.replace(/[ð·]/g, '').trim()) // Elimina el símbolo extraño en cualquier lado
+        .filter(l => l.length > 2);
+
     if (lineas.length > 0) {
-        // Asumimos que la primera línea relevante es el nombre
-        document.getElementById('nombre').value = lineas[0];
+        document.getElementById('nombre').value = lineas[0]; // La línea 1 suele ser el nombre
     }
 
-    // 4. Volcar el resto del texto en Resumen para acomodarlo a mano
-    document.getElementById('resumen').value = texto;
+    // 2. Escáner de Secciones por Palabras Clave
+    let seccionActual = "resumen"; // Todo va al resumen hasta que detecte un título
+    const secciones = { resumen: [], experiencia: [], educacion: [], habilidades: [], adicional: [] };
+
+    // Diccionarios de palabras clave (en mayúsculas para comparar)
+    const kwExperiencia = ["EXPERIENCIA", "TRAYECTORIA", "LABORAL"];
+    const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "CAPACITACIONES", "ACADÉMICA"];
+    const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS", "PRODUCTIVIDAD", "INTELIGENCIA ARTIFICIAL"];
+    const kwPerfil = ["PERFIL", "RESUMEN", "SOBRE MÍ"];
+
+    // Recorremos las líneas a partir de la línea 1 (omitiendo el nombre)
+    for (let i = 1; i < lineas.length; i++) {
+        let linea = lineas[i];
+        let lineaUpper = linea.toUpperCase();
+
+        // Omitimos líneas que sean el email, teléfono o la ubicación (para no duplicar en el texto)
+        if (matchEmail && linea.includes(matchEmail[0])) continue;
+        if (matchTel && linea.includes(matchTel[0])) continue;
+        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
+            document.getElementById('ubicacion').value = linea.replace(/[📍]/g, '').trim();
+            continue;
+        }
+
+        // DETECTAMOS CAMBIOS DE SECCIÓN (Títulos cortos)
+        if (lineaUpper.length < 40) {
+            if (kwExperiencia.some(kw => lineaUpper.includes(kw))) { seccionActual = "experiencia"; continue; }
+            if (kwEducacion.some(kw => lineaUpper.includes(kw))) { seccionActual = "educacion"; continue; }
+            if (kwHabilidades.some(kw => lineaUpper.includes(kw))) { seccionActual = "habilidades"; continue; }
+            if (kwPerfil.some(kw => lineaUpper.includes(kw))) { seccionActual = "resumen"; continue; }
+        }
+
+        // Limpieza de viñetas estándar al principio de la línea
+        linea = linea.replace(/^[-•*●]\s*/, '').trim();
+        
+        // Agregar a la caja correspondiente
+        if (linea.length > 0) {
+            secciones[seccionActual].push(linea);
+        }
+    }
+
+    // 3. Volcar los arreglos a sus respectivas cajas de texto en el HTML
+    document.getElementById('resumen').value = secciones.resumen.join('\n');
+    document.getElementById('experiencia').value = secciones.experiencia.join('\n');
+    document.getElementById('educacion').value = secciones.educacion.join('\n');
+    document.getElementById('habilidades').value = secciones.habilidades.join('\n');
 }
 
-
 // ==========================================
-// 2. LÓGICA PARA GENERAR EL PDF FINAL
+// 2. LÓGICA DE CREACIÓN DEL PDF FINAL (Mantenemos tu diseño a dos columnas)
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -121,7 +160,8 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').trim();
+        // Doble filtro anti-basura por si acaso
+        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').replace(/[ð·]/g, '').trim();
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();
             if (!unicas.has(textoMinusc)) {

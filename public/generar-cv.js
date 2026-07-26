@@ -16,10 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGuardar = document.getElementById('btnGuardar');
     if(btnGuardar) btnGuardar.addEventListener('click', guardarPostulante);
 
-    // NUEVO: Escuchar el buscador en tiempo real para empresas
     const inputFiltro = document.getElementById('filtroPuesto');
     if(inputFiltro) {
         inputFiltro.addEventListener('input', mostrarPostulantes);
+    }
+
+    // NUEVO: Botón de aceptación de Términos y Condiciones
+    const btnAceptar = document.getElementById('btnAceptarTerminos');
+    if(btnAceptar) {
+        btnAceptar.addEventListener('click', aceptarTerminosEmpresa);
     }
 
     const inputFoto = document.getElementById('fotoPerfil');
@@ -36,6 +41,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     mostrarPostulantes();
 });
+
+// ACEPTAR TÉRMINOS EMPRESA
+function aceptarTerminosEmpresa(evento) {
+    evento.preventDefault();
+    const nombreEmpresa = document.getElementById('empresaNombre').value.trim();
+    if(!nombreEmpresa) {
+        alert("Por favor, ingresa el nombre de tu empresa o representante antes de aceptar.");
+        return;
+    }
+
+    const fechaHoy = new Date().toLocaleString();
+    const registro = {
+        empresa: nombreEmpresa,
+        fecha: fechaHoy
+    };
+
+    // Guardar en el navegador la constancia de aceptación
+    let aceptaciones = JSON.parse(localStorage.getItem('terminosAceptados')) || [];
+    aceptaciones.push(registro);
+    localStorage.setItem('terminosAceptados', JSON.stringify(aceptaciones));
+
+    const msg = document.getElementById('mensajeAceptacion');
+    msg.style.display = 'block';
+    msg.innerHTML = `🎉 ¡Muchas gracias, <strong>${nombreEmpresa}</strong>! Términos y condiciones aceptados correctamente el ${fechaHoy}. Ya podemos avanzar con la prueba piloto.`;
+}
 
 // ==========================================
 // 1. EVALUACIÓN ATS Y GUARDADO
@@ -95,7 +125,6 @@ function guardarPostulante(evento) {
     mostrarPostulantes();
 }
 
-// MOSTRAR Y FILTRAR POSTULANTES PARA EMPRESAS
 function mostrarPostulantes() {
     const contenedor = document.getElementById('listaPostulantes');
     if (!contenedor) return;
@@ -107,17 +136,14 @@ function mostrarPostulantes() {
         return;
     }
 
-    // Obtener lo que escribió la empresa en el buscador
     const textoFiltro = document.getElementById('filtroPuesto') ? document.getElementById('filtroPuesto').value.toLowerCase().trim() : "";
 
-    // Filtrar si hay texto escrito
     let postulantesFiltrados = postulantes.filter(p => {
         if (!textoFiltro) return true;
         let infoTotal = (p.nombre + " " + p.puesto + " " + p.habilidades + " " + p.resumen).toLowerCase();
         return infoTotal.includes(textoFiltro);
     });
 
-    // ORDENAR AUTOMÁTICAMENTE: Del mayor puntaje ATS al menor (Lo que una empresa necesita)
     postulantesFiltrados.sort((a, b) => b.ats - a.ats);
 
     if (postulantesFiltrados.length === 0) {

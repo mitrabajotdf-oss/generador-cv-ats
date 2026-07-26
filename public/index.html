@@ -42,6 +42,10 @@
         .ats-medium { background-color: #fef3c7; color: #92400e; }
         .ats-low { background-color: #fee2e2; color: #991b1b; }
 
+        /* Estilos para Términos y Condiciones */
+        .terminos-box { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; height: 120px; overflow-y: scroll; font-size: 0.85rem; color: #475569; margin-bottom: 15px; }
+        #mensajeAceptacion { margin-top: 10px; padding: 12px; border-radius: 6px; background-color: #dcfce7; color: #166534; font-weight: 600; display: none; text-align: center; border: 1px solid #bbf7d0; }
+
         @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .btn-group { flex-direction: column; } .postulante-item { flex-direction: column; align-items: flex-start; gap: 10px; } }
     </style>
 </head>
@@ -94,7 +98,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN CON FILTRO PARA EMPRESAS -->
+    <!-- SECCIÓN FILTRO EMPRESAS -->
     <div class="card">
         <h2>📂 Base de Datos y Filtro ATS para Empresas</h2>
         <div class="form-group">
@@ -103,11 +107,32 @@
         </div>
         <div id="listaPostulantes"></div>
     </div>
+
+    <!-- SECCIÓN TÉRMINOS Y CONDICIONES INTERACTIVOS PARA EMPRESAS -->
+    <div class="card" id="seccionTerminos">
+        <h2>📜 Términos y Condiciones - Prueba Piloto Gratuita</h2>
+        <p style="font-size: 0.9rem; color: #4b5563;">Estimada empresa, por favor lea los términos del servicio antes de iniciar la prueba piloto:</p>
+        
+        <div class="terminos-box">
+            <strong>1. Objeto del Servicio:</strong> Filtrado, procesamiento y análisis técnico de los currículums provistos por la Empresa mediante software ATS para la búsqueda de un puesto determinado, entregando una terna con los perfiles de mayor puntaje.<br><br>
+            <strong>2. Carácter Gratuito:</strong> Durante esta etapa de prueba piloto, el servicio se otorga de forma 100% gratuita.<br><br>
+            <strong>3. Privacidad y Confidencialidad:</strong> Ambas partes se comprometen a tratar la información de los postulantes bajo estricta confidencialidad, cumpliendo con la normativa de protección de datos personales.<br><br>
+            <strong>4. Limitación de Responsabilidad:</strong> La plataforma provee una herramienta de soporte y cálculo objetivo. La decisión final de contratación y entrevistas es exclusiva de la Empresa.
+        </div>
+
+        <div class="form-group">
+            <label>Nombre de la Empresa o Representante *</label>
+            <input type="text" id="empresaNombre" placeholder="Ej. Comercio Río Grande S.R.L.">
+        </div>
+
+        <button class="btn-success" id="btnAceptarTerminos">✅ Acepto los Términos y Condiciones</button>
+        <div id="mensajeAceptacion"></div>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="generar-cv.js?v=14"></script>
+<script src="generar-cv.js?v=15"></script>
 
 </body>
 </html>

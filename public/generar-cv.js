@@ -16,34 +16,50 @@ function obtenerValor(id) {
     return elemento ? elemento.value.trim() : '';
 }
 
-// Formateador para Experiencia y Educación (Viñetas limpias)
+// 🧠 FILTRO INTELIGENTE: Limpia símbolos raros y elimina frases duplicadas
+function procesarLineasUnicas(texto) {
+    if (!texto) return [];
+    const lineas = texto.split('\n');
+    const unicas = new Set();
+    const resultado = [];
+
+    lineas.forEach(linea => {
+        // Limpia cualquier símbolo raro, incluyendo el ð· que apareció en tu texto
+        let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').trim();
+        
+        if (textoLimpio) {
+            let textoMinusc = textoLimpio.toLowerCase();
+            // Solo lo agrega si no está repetido
+            if (!unicas.has(textoMinusc)) {
+                unicas.add(textoMinusc);
+                resultado.push(textoLimpio);
+            }
+        }
+    });
+    return resultado;
+}
+
+// Formateador para Experiencia y Educación (Viñetas limpias sin repetidos)
 function formatearTextoNormal(texto) {
-    if (!texto) return '';
-    const lineas = texto.split('\n').filter(l => l.trim() !== '');
-    
+    const lineas = procesarLineasUnicas(texto);
+    if (lineas.length === 0) return '';
     if (lineas.length === 1) return `<p>${lineas[0]}</p>`;
 
     let html = '<ul class="lista-normal">';
     lineas.forEach(linea => {
-        let textoLimpio = linea.replace(/^[-•*·]\s*/, '').trim();
-        if (textoLimpio) html += `<li>${textoLimpio}</li>`;
+        html += `<li>${linea}</li>`;
     });
     html += '</ul>';
     return html;
 }
 
-// Formateador para Habilidades (3 Columnas ATS-Friendly)
+// Formateador para Habilidades (Bloque horizontal ultra compacto para ahorrar 1 página)
 function formatearHabilidades(texto) {
-    if (!texto) return '';
-    const lineas = texto.split('\n').filter(l => l.trim() !== '');
+    const lineas = procesarLineasUnicas(texto);
+    if (lineas.length === 0) return '';
     
-    let html = '<ul class="lista-habilidades">';
-    lineas.forEach(linea => {
-        let textoLimpio = linea.replace(/^[-•*·]\s*/, '').trim();
-        if (textoLimpio) html += `<li>${textoLimpio}</li>`;
-    });
-    html += '</ul>';
-    return html;
+    // Las une todas separadas por un punto y espacio, formando un solo párrafo continuo
+    return `<p class="bloque-habilidades">${lineas.join(' • ')}</p>`;
 }
 
 function generarPDFATS(evento) {
@@ -70,37 +86,37 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* DISEÑO ELEGANTE Y MODERNO - ATS FRIENDLY */
+            /* DISEÑO ELEGANTE Y ULTRA COMPACTO */
             @page {
                 size: A4;
-                margin: 12mm 15mm; /* Márgenes equilibrados que dan respiro */
+                margin: 10mm 12mm; /* Márgenes pequeños pero estéticos */
             }
             body {
-                font-family: 'Segoe UI', Arial, sans-serif; /* Fuentes modernas */
-                font-size: 9.5pt; 
-                line-height: 1.35;
-                color: #333333; /* Gris muy oscuro, más suave que el negro puro */
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 9pt; /* Letra un poco más chica para que entre todo */
+                line-height: 1.25;
+                color: #333333;
                 margin: 0;
                 padding: 0;
             }
             header {
                 text-align: center;
-                margin-bottom: 15px;
-                border-bottom: 2px solid #1e3a8a; /* Línea de acento azul elegante */
-                padding-bottom: 10px;
+                margin-bottom: 10px;
+                border-bottom: 2px solid #1e3a8a;
+                padding-bottom: 8px;
             }
             h1 {
-                font-size: 18pt;
+                font-size: 16pt;
                 color: #111827;
-                margin: 0 0 5px 0;
+                margin: 0 0 3px 0;
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
             .puesto {
-                font-size: 12pt;
+                font-size: 11pt;
                 font-weight: 600;
-                color: #1e3a8a; /* Azul elegante */
-                margin: 0 0 8px 0;
+                color: #1e3a8a;
+                margin: 0 0 6px 0;
             }
             .contacto {
                 font-size: 8.5pt;
@@ -110,46 +126,38 @@ function generarPDFATS(evento) {
                 margin: 0 6px;
             }
             h2 {
-                font-size: 11pt;
+                font-size: 10.5pt;
                 text-transform: uppercase;
-                color: #1e3a8a; /* Color para identificar secciones rápido */
+                color: #1e3a8a;
                 border-bottom: 1px solid #d1d5db;
-                margin: 15px 0 8px 0;
-                padding-bottom: 4px;
+                margin: 10px 0 6px 0;
+                padding-bottom: 2px;
             }
             .seccion {
-                margin-bottom: 12px;
+                margin-bottom: 8px;
             }
             p {
-                margin: 0 0 6px 0;
+                margin: 0 0 4px 0;
                 text-align: justify;
             }
             
-            /* Listas normales para Experiencia y Educación */
             .lista-normal {
-                margin: 0 0 8px 0;
-                padding-left: 18px;
+                margin: 0 0 6px 0;
+                padding-left: 15px;
             }
             .lista-normal li {
-                margin-bottom: 4px;
+                margin-bottom: 2px;
                 text-align: justify;
             }
 
-            /* 3 Columnas elegantes para Habilidades */
-            .lista-habilidades {
-                margin: 0;
-                padding-left: 15px;
-                columns: 3; 
-                -webkit-columns: 3;
-                -moz-columns: 3;
-                column-gap: 20px;
-            }
-            .lista-habilidades li {
-                margin-bottom: 4px;
-                page-break-inside: avoid; /* Evita que una habilidad se corte a la mitad */
+            /* Bloque horizontal de habilidades ATS */
+            .bloque-habilidades {
+                text-align: justify;
+                line-height: 1.4;
+                font-weight: 500;
+                color: #222;
             }
 
-            /* Prevención de cortes feos entre páginas */
             h2, .seccion, header {
                 page-break-after: avoid;
             }

@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 10000;
 
 // Configuración de usuario y contraseña privados para ti
 app.use(basicAuth({
-    users: { 'matias': 'tu_password_secreta_123' }, // Cambia 'matias' y la contraseña por los tuyos
+    users: { 'mitrabajotdf': 'empleorg' },
     challenge: true,
     realm: 'Acceso Privado - Gestor CV ATS'
 }));

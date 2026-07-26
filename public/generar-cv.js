@@ -24,7 +24,6 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Limpia cualquier símbolo extraño (incluyendo el ð·) y viñetas
         let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').trim();
         
         if (textoLimpio) {
@@ -51,13 +50,6 @@ function formatearLista(texto) {
     return html;
 }
 
-// Formateador para párrafos continuos
-function formatearParrafo(texto) {
-    const lineas = procesarLineasUnicas(texto);
-    if (lineas.length === 0) return '';
-    return `<p>${lineas.join('<br>')}</p>`;
-}
-
 function generarPDFATS(evento) {
     if(evento) evento.preventDefault();
 
@@ -82,10 +74,10 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* DISEÑO ELEGANTE DE 2 COLUMNAS (A LA PAR) */
+            /* DISEÑO: ENCABEZADO ANCHO + 2 COLUMNAS ABAJO */
             @page {
                 size: A4;
-                margin: 10mm; /* Márgenes óptimos */
+                margin: 10mm; 
             }
             body {
                 font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -93,19 +85,18 @@ function generarPDFATS(evento) {
                 color: #2b2b2b;
                 margin: 0;
                 padding: 0;
-                line-height: 1.3;
+                line-height: 1.35;
             }
-            /* Encabezado Principal */
+            
+            /* Encabezado y Contacto Horizontal */
             header {
                 text-align: left;
-                margin-bottom: 15px;
-                padding-bottom: 15px;
-                border-bottom: 2px solid #2c3e50;
+                margin-bottom: 12px;
             }
             h1 {
                 font-size: 22pt;
-                color: #2c3e50; /* Azul oscuro elegante */
-                margin: 0 0 5px 0;
+                color: #2c3e50;
+                margin: 0 0 4px 0;
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
@@ -115,33 +106,27 @@ function generarPDFATS(evento) {
                 color: #7f8c8d;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
+                margin-bottom: 6px;
             }
-            
-            /* Contenedor Flexbox para las dos columnas */
-            .contenedor-columnas {
-                display: flex;
-                flex-direction: row;
-                width: 100%;
-                justify-content: space-between;
+            .contacto-horizontal {
+                font-size: 9pt;
+                color: #555;
+                padding-bottom: 12px;
+                border-bottom: 2px solid #2c3e50;
             }
-            
-            /* Columna Izquierda (32% del ancho) - Datos cortos */
-            .columna-izq {
-                width: 32%;
-                padding-right: 15px;
-                border-right: 1px solid #bdc3c7;
+            .contacto-horizontal span {
+                margin: 0 6px;
             }
-            
-            /* Columna Derecha (64% del ancho) - Datos largos */
-            .columna-der {
-                width: 64%;
+            .contacto-horizontal span:first-child {
+                margin-left: 0;
             }
 
+            /* Títulos de sección */
             h2 {
                 font-size: 11pt;
                 color: #2c3e50;
                 border-bottom: 1px solid #ecf0f1;
-                margin: 0 0 10px 0;
+                margin: 0 0 8px 0;
                 padding-bottom: 4px;
                 text-transform: uppercase;
             }
@@ -149,16 +134,25 @@ function generarPDFATS(evento) {
             .seccion {
                 margin-bottom: 15px;
             }
-            
-            /* Estilos de Contacto */
-            .contacto-item {
-                margin-bottom: 6px;
-                font-size: 8.5pt;
-                word-wrap: break-word;
+
+            /* Contenedor Flexbox para las dos columnas inferiores */
+            .contenedor-columnas {
+                display: flex;
+                flex-direction: row;
+                width: 100%;
+                justify-content: space-between;
             }
-            .contacto-item strong {
-                display: block;
-                color: #2c3e50;
+            
+            /* Columna Izquierda (32%) */
+            .columna-izq {
+                width: 32%;
+                padding-right: 15px;
+                border-right: 1px solid #bdc3c7;
+            }
+            
+            /* Columna Derecha (64%) */
+            .columna-der {
+                width: 64%;
             }
 
             p {
@@ -176,27 +170,35 @@ function generarPDFATS(evento) {
                 text-align: left;
             }
 
-            /* Prevención de cortes de página */
             .seccion { page-break-inside: avoid; }
         </style>
     </head>
     <body>
+        <!-- ENCABEZADO Y CONTACTO HORIZONTAL -->
         <header>
             <h1>${datos.nombre}</h1>
             ${datos.puesto ? `<div class="puesto">${datos.puesto}</div>` : ''}
+            
+            <div class="contacto-horizontal">
+                ${datos.email ? `<span>${datos.email}</span>` : ''}
+                ${datos.telefono ? `${datos.email ? '|' : ''} <span>${datos.telefono}</span>` : ''}
+                ${datos.ubicacion ? `${datos.email || datos.telefono ? '|' : ''} <span>${datos.ubicacion}</span>` : ''}
+                ${datos.linkedin ? `${datos.email || datos.telefono || datos.ubicacion ? '|' : ''} <span>${datos.linkedin}</span>` : ''}
+            </div>
         </header>
 
+        <!-- RESUMEN PROFESIONAL A TODO LO ANCHO -->
+        ${datos.resumen ? `
+        <div class="seccion">
+            <h2>Resumen Profesional</h2>
+            <p>${datos.resumen}</p>
+        </div>
+        ` : ''}
+
+        <!-- COLUMNAS (Educación/Habilidades a la izq, Experiencia a la der) -->
         <div class="contenedor-columnas">
             <!-- COLUMNA IZQUIERDA -->
             <div class="columna-izq">
-                <div class="seccion">
-                    <h2>Contacto</h2>
-                    ${datos.email ? `<div class="contacto-item"><strong>Email</strong>${datos.email}</div>` : ''}
-                    ${datos.telefono ? `<div class="contacto-item"><strong>Teléfono</strong>${datos.telefono}</div>` : ''}
-                    ${datos.ubicacion ? `<div class="contacto-item"><strong>Ubicación</strong>${datos.ubicacion}</div>` : ''}
-                    ${datos.linkedin ? `<div class="contacto-item"><strong>LinkedIn/Web</strong>${datos.linkedin}</div>` : ''}
-                </div>
-
                 ${datos.educacion ? `
                 <div class="seccion">
                     <h2>Educación</h2>
@@ -214,13 +216,6 @@ function generarPDFATS(evento) {
 
             <!-- COLUMNA DERECHA -->
             <div class="columna-der">
-                ${datos.resumen ? `
-                <div class="seccion">
-                    <h2>Resumen Profesional</h2>
-                    <p>${datos.resumen}</p>
-                </div>
-                ` : ''}
-
                 ${datos.experiencia ? `
                 <div class="seccion">
                     <h2>Experiencia Laboral</h2>

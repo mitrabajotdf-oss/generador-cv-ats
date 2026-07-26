@@ -16,7 +16,7 @@ function obtenerValor(id) {
     return elemento ? elemento.value.trim() : '';
 }
 
-// 🧠 FILTRO INTELIGENTE: Limpia símbolos raros y elimina frases duplicadas
+// Filtro inteligente para limpiar viñetas raras y evitar repetidos
 function procesarLineasUnicas(texto) {
     if (!texto) return [];
     const lineas = texto.split('\n');
@@ -24,12 +24,11 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Limpia cualquier símbolo raro, incluyendo el ð· que apareció en tu texto
+        // Limpia cualquier símbolo extraño (incluyendo el ð·) y viñetas
         let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').trim();
         
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();
-            // Solo lo agrega si no está repetido
             if (!unicas.has(textoMinusc)) {
                 unicas.add(textoMinusc);
                 resultado.push(textoLimpio);
@@ -39,13 +38,12 @@ function procesarLineasUnicas(texto) {
     return resultado;
 }
 
-// Formateador para Experiencia y Educación (Viñetas limpias sin repetidos)
-function formatearTextoNormal(texto) {
+// Formateador para crear listas limpias
+function formatearLista(texto) {
     const lineas = procesarLineasUnicas(texto);
     if (lineas.length === 0) return '';
-    if (lineas.length === 1) return `<p>${lineas[0]}</p>`;
-
-    let html = '<ul class="lista-normal">';
+    
+    let html = '<ul>';
     lineas.forEach(linea => {
         html += `<li>${linea}</li>`;
     });
@@ -53,13 +51,11 @@ function formatearTextoNormal(texto) {
     return html;
 }
 
-// Formateador para Habilidades (Bloque horizontal ultra compacto para ahorrar 1 página)
-function formatearHabilidades(texto) {
+// Formateador para párrafos continuos
+function formatearParrafo(texto) {
     const lineas = procesarLineasUnicas(texto);
     if (lineas.length === 0) return '';
-    
-    // Las une todas separadas por un punto y espacio, formando un solo párrafo continuo
-    return `<p class="bloque-habilidades">${lineas.join(' • ')}</p>`;
+    return `<p>${lineas.join('<br>')}</p>`;
 }
 
 function generarPDFATS(evento) {
@@ -86,132 +82,160 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* DISEÑO ELEGANTE Y ULTRA COMPACTO */
+            /* DISEÑO ELEGANTE DE 2 COLUMNAS (A LA PAR) */
             @page {
                 size: A4;
-                margin: 10mm 12mm; /* Márgenes pequeños pero estéticos */
+                margin: 10mm; /* Márgenes óptimos */
             }
             body {
-                font-family: 'Segoe UI', Arial, sans-serif;
-                font-size: 9pt; /* Letra un poco más chica para que entre todo */
-                line-height: 1.25;
-                color: #333333;
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 9pt;
+                color: #2b2b2b;
                 margin: 0;
                 padding: 0;
+                line-height: 1.3;
             }
+            /* Encabezado Principal */
             header {
-                text-align: center;
-                margin-bottom: 10px;
-                border-bottom: 2px solid #1e3a8a;
-                padding-bottom: 8px;
+                text-align: left;
+                margin-bottom: 15px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid #2c3e50;
             }
             h1 {
-                font-size: 16pt;
-                color: #111827;
-                margin: 0 0 3px 0;
+                font-size: 22pt;
+                color: #2c3e50; /* Azul oscuro elegante */
+                margin: 0 0 5px 0;
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
             .puesto {
                 font-size: 11pt;
-                font-weight: 600;
-                color: #1e3a8a;
-                margin: 0 0 6px 0;
-            }
-            .contacto {
-                font-size: 8.5pt;
-                color: #555;
-            }
-            .contacto span {
-                margin: 0 6px;
-            }
-            h2 {
-                font-size: 10.5pt;
+                font-weight: bold;
+                color: #7f8c8d;
                 text-transform: uppercase;
-                color: #1e3a8a;
-                border-bottom: 1px solid #d1d5db;
-                margin: 10px 0 6px 0;
-                padding-bottom: 2px;
+                letter-spacing: 0.5px;
             }
+            
+            /* Contenedor Flexbox para las dos columnas */
+            .contenedor-columnas {
+                display: flex;
+                flex-direction: row;
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            /* Columna Izquierda (32% del ancho) - Datos cortos */
+            .columna-izq {
+                width: 32%;
+                padding-right: 15px;
+                border-right: 1px solid #bdc3c7;
+            }
+            
+            /* Columna Derecha (64% del ancho) - Datos largos */
+            .columna-der {
+                width: 64%;
+            }
+
+            h2 {
+                font-size: 11pt;
+                color: #2c3e50;
+                border-bottom: 1px solid #ecf0f1;
+                margin: 0 0 10px 0;
+                padding-bottom: 4px;
+                text-transform: uppercase;
+            }
+            
             .seccion {
-                margin-bottom: 8px;
+                margin-bottom: 15px;
             }
+            
+            /* Estilos de Contacto */
+            .contacto-item {
+                margin-bottom: 6px;
+                font-size: 8.5pt;
+                word-wrap: break-word;
+            }
+            .contacto-item strong {
+                display: block;
+                color: #2c3e50;
+            }
+
             p {
-                margin: 0 0 4px 0;
+                margin: 0 0 8px 0;
                 text-align: justify;
             }
             
-            .lista-normal {
-                margin: 0 0 6px 0;
-                padding-left: 15px;
+            ul {
+                margin: 0;
+                padding-left: 16px;
             }
-            .lista-normal li {
-                margin-bottom: 2px;
-                text-align: justify;
-            }
-
-            /* Bloque horizontal de habilidades ATS */
-            .bloque-habilidades {
-                text-align: justify;
-                line-height: 1.4;
-                font-weight: 500;
-                color: #222;
+            
+            li {
+                margin-bottom: 4px;
+                text-align: left;
             }
 
-            h2, .seccion, header {
-                page-break-after: avoid;
-            }
-            li, p {
-                page-break-inside: avoid;
-            }
+            /* Prevención de cortes de página */
+            .seccion { page-break-inside: avoid; }
         </style>
     </head>
     <body>
         <header>
             <h1>${datos.nombre}</h1>
             ${datos.puesto ? `<div class="puesto">${datos.puesto}</div>` : ''}
-            <div class="contacto">
-                ${datos.email ? `<span>${datos.email}</span>` : ''}
-                ${datos.telefono ? `| <span>${datos.telefono}</span>` : ''}
-                ${datos.ubicacion ? `| <span>${datos.ubicacion}</span>` : ''}
-                ${datos.linkedin ? `| <span>${datos.linkedin}</span>` : ''}
-            </div>
         </header>
 
-        ${datos.resumen ? `
-        <div class="seccion">
-            <h2>Resumen Profesional</h2>
-            <p>${datos.resumen}</p>
-        </div>
-        ` : ''}
+        <div class="contenedor-columnas">
+            <!-- COLUMNA IZQUIERDA -->
+            <div class="columna-izq">
+                <div class="seccion">
+                    <h2>Contacto</h2>
+                    ${datos.email ? `<div class="contacto-item"><strong>Email</strong>${datos.email}</div>` : ''}
+                    ${datos.telefono ? `<div class="contacto-item"><strong>Teléfono</strong>${datos.telefono}</div>` : ''}
+                    ${datos.ubicacion ? `<div class="contacto-item"><strong>Ubicación</strong>${datos.ubicacion}</div>` : ''}
+                    ${datos.linkedin ? `<div class="contacto-item"><strong>LinkedIn/Web</strong>${datos.linkedin}</div>` : ''}
+                </div>
 
-        ${datos.experiencia ? `
-        <div class="seccion">
-            <h2>Experiencia Laboral</h2>
-            ${formatearTextoNormal(datos.experiencia)}
-        </div>
-        ` : ''}
+                ${datos.educacion ? `
+                <div class="seccion">
+                    <h2>Educación</h2>
+                    ${formatearLista(datos.educacion)}
+                </div>
+                ` : ''}
 
-        ${datos.educacion ? `
-        <div class="seccion">
-            <h2>Educación y Cursos</h2>
-            ${formatearTextoNormal(datos.educacion)}
-        </div>
-        ` : ''}
+                ${datos.habilidades ? `
+                <div class="seccion">
+                    <h2>Habilidades</h2>
+                    ${formatearLista(datos.habilidades)}
+                </div>
+                ` : ''}
+            </div>
 
-        ${datos.habilidades ? `
-        <div class="seccion">
-            <h2>Habilidades Técnicas y Competencias</h2>
-            ${formatearHabilidades(datos.habilidades)}
-        </div>
-        ` : ''}
+            <!-- COLUMNA DERECHA -->
+            <div class="columna-der">
+                ${datos.resumen ? `
+                <div class="seccion">
+                    <h2>Resumen Profesional</h2>
+                    <p>${datos.resumen}</p>
+                </div>
+                ` : ''}
 
-        ${datos.adicional ? `
-        <div class="seccion">
-            <h2>Información Adicional</h2>
-            ${formatearTextoNormal(datos.adicional)}
+                ${datos.experiencia ? `
+                <div class="seccion">
+                    <h2>Experiencia Laboral</h2>
+                    ${formatearLista(datos.experiencia)}
+                </div>
+                ` : ''}
+
+                ${datos.adicional ? `
+                <div class="seccion">
+                    <h2>Adicional</h2>
+                    ${formatearLista(datos.adicional)}
+                </div>
+                ` : ''}
+            </div>
         </div>
-        ` : ''}
     </body>
     </html>
     `;

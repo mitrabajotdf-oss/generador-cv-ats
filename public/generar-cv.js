@@ -237,7 +237,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// 3. GENERADOR DE PDF (DISEÑO ULTRA-COMPACTO)
+// 3. GENERADOR DE PDF & COMPRESOR INTELIGENTE
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -263,6 +263,7 @@ function procesarLineasUnicas(texto) {
     return resultado;
 }
 
+// Lista tradicional (para Experiencia y Educación)
 function formatearLista(texto) {
     const lineas = procesarLineasUnicas(texto);
     if (lineas.length === 0) return '';
@@ -270,6 +271,40 @@ function formatearLista(texto) {
     lineas.forEach(linea => { html += `<li>${linea}</li>`; });
     html += '</ul>';
     return html;
+}
+
+// NUEVO: Compresor Inteligente para Habilidades
+function formatearHabilidadesCompactas(texto) {
+    let lineas = procesarLineasUnicas(texto);
+    if (lineas.length === 0) return '';
+
+    let tieneWord = false, tieneExcel = false, tienePowerPoint = false;
+    let lineasFiltradas = [];
+
+    // Agrupar elementos de Microsoft Office
+    lineas.forEach(l => {
+        let low = l.toLowerCase();
+        if (low.includes('word')) tieneWord = true;
+        else if (low.includes('excel')) tieneExcel = true;
+        else if (low.includes('powerpoint') || low.includes('power point')) tienePowerPoint = true;
+        else if (low === 'microsoft' || low === 'office' || low === 'microsoft office') { /* Omitir basura suelta */ }
+        else {
+            lineasFiltradas.push(l); // Mantener el resto de las habilidades intactas
+        }
+    });
+
+    let officeItems = [];
+    if(tieneWord) officeItems.push('Word');
+    if(tieneExcel) officeItems.push('Excel');
+    if(tienePowerPoint) officeItems.push('PowerPoint');
+
+    // Si encontró alguno, agrega la etiqueta resumida
+    if(officeItems.length > 0) {
+        lineasFiltradas.push(`Microsoft Office (${officeItems.join(', ')})`);
+    }
+
+    // Devolver como un párrafo horizontal separado por puntitos para ahorrar espacio
+    return `<p class="etiquetas-compactas">${lineasFiltradas.join(' • ')}</p>`;
 }
 
 function generarPDFATS(evento) {
@@ -296,12 +331,9 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            /* DISEÑO ULTRA-COMPACTO */
-            @page { size: A4; margin: 8mm 10mm; } /* Reduje los márgenes de impresión */
-            
+            @page { size: A4; margin: 8mm 10mm; } 
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #2b2b2b; margin: 0; padding: 0; line-height: 1.25; }
             
-            /* Encabezado ajustado */
             header { display: flex; align-items: center; gap: 15px; text-align: left; margin-bottom: 10px; }
             .foto-cv { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #2c3e50; flex-shrink: 0; }
             .info-cabecera { flex: 1; }
@@ -312,7 +344,6 @@ function generarPDFATS(evento) {
             .contacto-horizontal span { margin: 0 4px; }
             .contacto-horizontal span:first-child { margin-left: 0; }
             
-            /* Secciones más juntas */
             h2 { font-size: 10pt; color: #2c3e50; border-bottom: 1px solid #ecf0f1; margin: 0 0 5px 0; padding-bottom: 2px; text-transform: uppercase; }
             .seccion { margin-bottom: 10px; page-break-inside: avoid; }
             
@@ -320,10 +351,12 @@ function generarPDFATS(evento) {
             .columna-izq { width: 32%; padding-right: 15px; border-right: 1px solid #bdc3c7; }
             .columna-der { width: 64%; }
             
-            /* Textos y listas apretados */
             p { margin: 0 0 5px 0; text-align: justify; }
             ul { margin: 0; padding-left: 14px; }
             li { margin-bottom: 2px; text-align: left; }
+
+            /* ESTILO PARA LAS HABILIDADES COMPACTAS */
+            .etiquetas-compactas { line-height: 1.6; font-weight: 500; color: #34495e; }
         </style>
     </head>
     <body>
@@ -346,7 +379,9 @@ function generarPDFATS(evento) {
         <div class="contenedor-columnas">
             <div class="columna-izq">
                 ${datos.educacion ? `<div class="seccion"><h2>Educación</h2>${formatearLista(datos.educacion)}</div>` : ''}
-                ${datos.habilidades ? `<div class="seccion"><h2>Habilidades</h2>${formatearLista(datos.habilidades)}</div>` : ''}
+                
+                <!-- ACÁ APLICAMOS EL COMPRESOR DE HABILIDADES -->
+                ${datos.habilidades ? `<div class="seccion"><h2>Habilidades</h2>${formatearHabilidadesCompactas(datos.habilidades)}</div>` : ''}
             </div>
             <div class="columna-der">
                 ${datos.experiencia ? `<div class="seccion"><h2>Experiencia Laboral</h2>${formatearLista(datos.experiencia)}</div>` : ''}

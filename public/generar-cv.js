@@ -13,9 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnProcesar) btnProcesar.addEventListener('click', procesarArchivoCV);
 });
 
-// ==========================================
-// LECTOR Y EXTRACTOR SUPREMO
-// ==========================================
 async function procesarArchivoCV(evento) {
     evento.preventDefault();
     const inputArchivo = document.getElementById('archivoCV');
@@ -39,8 +36,8 @@ async function procesarArchivoCV(evento) {
 
         analizarYCompletarFormulario(textoExtraido);
     } catch (error) {
-        console.error(error);
-        alert("Hubo un error al leer el archivo.");
+        console.error("Detalle del error:", error);
+        alert("Hubo un error al leer el archivo. Revisa la consola.");
     }
 
     btn.textContent = "✅ ¡Archivo Procesado!";
@@ -65,38 +62,34 @@ async function extraerTextoWord(archivo) {
     return resultado.value;
 }
 
+// CEREBRO ANTI-CAÍDAS
 function analizarYCompletarFormulario(texto) {
-    // 1. Limpieza Nuclear de Emojis y Símbolos (incluyendo el molesto ð y ·)
+    // 1. Limpieza Nuclear de Emojis y Símbolos Raros
     let textoLimpioGlobal = texto.replace(/ð/g, '').replace(/·/g, '').replace(/[•●▪]/g, '');
-    
-    // Convertimos todo en un solo bloque sin espacios para encontrar datos ocultos
     let textoSinEspacios = textoLimpioGlobal.replace(/\s+/g, '');
 
-    // 2. Extraer Email Perfecto
+    // 2. Extracción Segura de Email
+    let emailEncontrado = "";
     const matchEmail = textoSinEspacios.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
     if (matchEmail) {
-        document.getElementById('email').value = matchEmail[0];
-        // Crear una trampa para borrar el email original sin importar cuantos espacios tenga
-        let regexBorrarEmail = new RegExp(matchEmail[0].split('').join('\\s*'), 'i');
-        textoLimpioGlobal = textoLimpioGlobal.replace(regexBorrarEmail, '');
+        emailEncontrado = matchEmail[0];
+        document.getElementById('email').value = emailEncontrado;
     }
 
-    // 3. Extraer Teléfono Perfecto (Encuentra cualquier secuencia de 10 números)
+    // 3. Extracción Segura de Teléfono
+    let telEncontrado = "";
     const matchTel = textoSinEspacios.match(/(?:\+?549?)?\d{10}/);
     if (matchTel) {
-        document.getElementById('telefono').value = matchTel[0];
-        // Trampa para borrar el teléfono original de la caja
-        let regexBorrarTel = new RegExp(matchTel[0].split('').join('\\s*[-.]?\\s*'), 'i');
-        textoLimpioGlobal = textoLimpioGlobal.replace(regexBorrarTel, '');
+        telEncontrado = matchTel[0];
+        document.getElementById('telefono').value = telEncontrado;
     }
 
-    // 4. Procesar el texto restante línea por línea
+    // 4. División de líneas
     const lineas = textoLimpioGlobal.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 2);
 
     if (lineas.length > 0) {
-        // Obliga al nombre a empezar solo con letras
         document.getElementById('nombre').value = lineas[0].replace(/^[^a-zA-ZáéíóúÁÉÍÓÚÑñ]+/, '').trim();
         lineas.shift(); 
     }
@@ -112,6 +105,11 @@ function analizarYCompletarFormulario(texto) {
     for (let i = 0; i < lineas.length; i++) {
         let linea = lineas[i];
         let lineaUpper = linea.toUpperCase();
+        let lineaSinEsp = linea.replace(/\s+/g, '');
+
+        // EVITAR DUPLICADOS DE FORMA SEGURA (Sin crashear el navegador)
+        if (emailEncontrado && lineaSinEsp.includes(emailEncontrado)) continue;
+        if (telEncontrado && lineaSinEsp.includes(telEncontrado)) continue;
 
         if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
             document.getElementById('ubicacion').value = linea.replace(/[📍,]/g, '').trim();
@@ -125,7 +123,6 @@ function analizarYCompletarFormulario(texto) {
             if (kwPerfil.some(kw => lineaUpper.includes(kw))) { seccionActual = "resumen"; continue; }
         }
 
-        // Obliga a que CADA línea empiece con una letra o número, borrando cualquier basura
         linea = linea.replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚÑñ]+/, '').trim();
         if (linea.length > 0) {
             secciones[seccionActual].push(linea);
@@ -153,7 +150,6 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Última barrera de seguridad para el PDF: Elimina TODO lo que no sea texto al inicio
         let textoLimpio = linea.replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚÑñ]+/, '').trim();
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();

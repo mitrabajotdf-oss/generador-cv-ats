@@ -5,180 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestor de Postulantes & Evaluador ATS</title>
     
-    <!-- Fuente moderna de Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         /* ESTILOS MODERNOS UI/UX */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Fondo gris muy claro y elegante */
-            color: #1f2937;
-            margin: 0;
-            padding: 30px 15px;
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 30px 15px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #111827; margin-bottom: 30px; font-weight: 700; }
+        h2 { font-size: 1.25rem; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; }
+        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 25px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.875rem; font-weight: 600; color: #4b5563; margin-bottom: 5px; }
+        input[type="text"], input[type="email"], input[type="tel"], textarea, select {
+            width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.95rem; background-color: #f9fafb; box-sizing: border-box;
         }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            text-align: center;
-            color: #111827;
-            margin-bottom: 30px;
-            font-weight: 700;
-        }
-
-        h2 {
-            font-size: 1.25rem;
-            color: #374151;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 10px;
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        /* Diseño de Tarjetas (Cards) */
-        .card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            padding: 25px;
-            margin-bottom: 25px;
-            transition: transform 0.2s ease;
-        }
-
-        /* Sistema de Cuadrícula (Columnas) */
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group.full-width {
-            grid-column: span 2;
-        }
-
-        label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #4b5563;
-            margin-bottom: 5px;
-        }
-
-        /* Entradas de texto modernas */
-        input[type="text"], 
-        input[type="email"], 
-        input[type="tel"], 
-        textarea, 
-        select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            background-color: #f9fafb;
-            box-sizing: border-box;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-            background-color: #ffffff;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        /* Botones estilo App */
-        .btn-group {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-        }
-
-        button:active {
-            transform: scale(0.98);
-        }
-
-        .btn-primary {
-            background-color: #2563eb;
-            color: white;
-            width: 100%;
-        }
-
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-        }
-
-        .btn-success {
-            background-color: #10b981;
-            color: white;
-            width: 100%;
-        }
-
-        .btn-success:hover {
-            background-color: #059669;
-        }
-
-        .btn-outline {
-            background-color: transparent;
-            color: #4b5563;
-            border: 1px solid #d1d5db;
-        }
-
-        .btn-outline:hover {
-            background-color: #f3f4f6;
-        }
-
-        /* Resultados ATS */
-        #resultadoAts {
-            margin-top: 15px;
-            padding: 15px;
-            border-radius: 6px;
-            background-color: #eff6ff;
-            color: #1e3a8a;
-            font-weight: 600;
-            display: none; /* Se muestra con JS */
-        }
-
-        /* Responsividad para celulares */
-        @media (max-width: 600px) {
-            .grid-2 {
-                grid-template-columns: 1fr;
-            }
-            .form-group.full-width {
-                grid-column: span 1;
-            }
-            .btn-group {
-                flex-direction: column;
-            }
-        }
+        input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); background-color: #ffffff; }
+        textarea { resize: vertical; min-height: 100px; }
+        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
+        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif; }
+        .btn-primary { background-color: #2563eb; color: white; width: 100%; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: #10b981; color: white; width: 100%; }
+        .btn-success:hover { background-color: #059669; }
+        .btn-outline { background-color: transparent; color: #4b5563; border: 1px solid #d1d5db; }
+        .btn-outline:hover { background-color: #f3f4f6; }
+        #resultadoAts { margin-top: 15px; padding: 15px; border-radius: 6px; background-color: #eff6ff; color: #1e3a8a; font-weight: 600; display: none; }
+        @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .btn-group { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -186,114 +39,48 @@
 <div class="container">
     <h1>📋 Gestor de CVs y Evaluación ATS</h1>
 
-    <!-- TARJETA 1: Acciones Rápidas -->
     <div class="card">
-        <h2>⚡ Extraer datos y Selección</h2>
+        <h2>⚡ Extraer datos del CV</h2>
         <div class="grid-2">
-            <div class="form-group">
-                <label for="selectorPostulantes">Postulantes Registrados:</label>
-                <select id="selectorPostulantes">
-                    <option value="">-- Nuevo Postulante --</option>
-                    <!-- Aquí JS cargará los postulantes -->
-                </select>
-            </div>
-            <div class="form-group">
+            <div class="form-group" style="grid-column: span 2;">
                 <label>Extraer desde CV (PDF o Word):</label>
                 <input type="file" id="archivoCV" accept=".pdf,.doc,.docx">
-                <button class="btn-outline" style="margin-top:10px; width:100%;">Procesar Archivo</button>
+                <!-- LE AGREGAMOS EL ID btnProcesar A ESTE BOTON -->
+                <button class="btn-outline" id="btnProcesar" style="margin-top:10px; width:100%;">📄 Procesar Archivo</button>
             </div>
         </div>
     </div>
 
-    <!-- TARJETA 2: Datos Personales (A 2 columnas) -->
     <div class="card">
         <h2>👤 Datos Personales</h2>
         <div class="grid-2">
-            <div class="form-group">
-                <label for="nombre">Nombre Completo *</label>
-                <input type="text" id="nombre" placeholder="Ej. Juan Pérez" required>
-            </div>
-            <div class="form-group">
-                <label for="puesto">Puesto u Objetivo Profesional *</label>
-                <input type="text" id="puesto" placeholder="Ej. Asistente Administrativo">
-            </div>
-            <div class="form-group">
-                <label for="email">Correo Electrónico *</label>
-                <input type="email" id="email" placeholder="correo@ejemplo.com">
-            </div>
-            <div class="form-group">
-                <label for="telefono">Teléfono *</label>
-                <input type="tel" id="telefono" placeholder="+54 9 11 1234 5678">
-            </div>
-            <div class="form-group">
-                <label for="ubicacion">Ubicación</label>
-                <input type="text" id="ubicacion" placeholder="Ciudad, Provincia">
-            </div>
-            <div class="form-group">
-                <label for="linkedin">Perfil LinkedIn / Web</label>
-                <input type="text" id="linkedin" placeholder="linkedin.com/in/usuario">
-            </div>
+            <div class="form-group"><label>Nombre Completo *</label><input type="text" id="nombre"></div>
+            <div class="form-group"><label>Puesto u Objetivo *</label><input type="text" id="puesto"></div>
+            <div class="form-group"><label>Correo Electrónico *</label><input type="email" id="email"></div>
+            <div class="form-group"><label>Teléfono *</label><input type="tel" id="telefono"></div>
+            <div class="form-group"><label>Ubicación</label><input type="text" id="ubicacion"></div>
+            <div class="form-group"><label>Perfil LinkedIn</label><input type="text" id="linkedin"></div>
         </div>
     </div>
 
-    <!-- TARJETA 3: Contenido del Curriculum -->
     <div class="card">
         <h2>📄 Contenido del Curriculum</h2>
-        
-        <div class="form-group">
-            <label for="resumen">Resumen Profesional</label>
-            <textarea id="resumen" placeholder="Breve descripción del perfil..."></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="experiencia">Experiencia Laboral</label>
-            <textarea id="experiencia" placeholder="Ej. Cargo - Empresa (Año - Año)&#10;- Tarea realizada..."></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="educacion">Educación y Cursos</label>
-            <textarea id="educacion" placeholder="Ej. Título - Institución (Año)"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="habilidades">Habilidades Técnicas y Competencias</label>
-            <textarea id="habilidades" placeholder="Ej. Microsoft Excel Avanzado, Liderazgo..."></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="adicional">Información Adicional (Opcional)</label>
-            <textarea id="adicional" placeholder="Disponibilidad, licencias, idiomas..."></textarea>
-        </div>
-
+        <div class="form-group"><label>Resumen / Contenido Extraído</label><textarea id="resumen"></textarea></div>
+        <div class="form-group"><label>Experiencia Laboral</label><textarea id="experiencia"></textarea></div>
+        <div class="form-group"><label>Educación y Cursos</label><textarea id="educacion"></textarea></div>
+        <div class="form-group"><label>Habilidades Técnicas</label><textarea id="habilidades"></textarea></div>
+        <div class="form-group"><label>Información Adicional</label><textarea id="adicional"></textarea></div>
         <div class="btn-group">
             <button class="btn-primary" id="btnGuardar">💾 Guardar Postulante</button>
             <button class="btn-success" id="btnGenerarPDF">🚀 Generar PDF Final ATS</button>
         </div>
     </div>
-
-    <!-- TARJETA 4: Evaluación ATS -->
-    <div class="card">
-        <h2>🤖 Evaluador de Compatibilidad ATS</h2>
-        <p style="font-size: 0.9rem; color: #6b7280; margin-top:0;">Compara las palabras clave de la oferta laboral con el perfil del postulante actual.</p>
-        
-        <div class="form-group">
-            <label for="requisitosPuesto">Descripción de la Vacante / Requisitos:</label>
-            <textarea id="requisitosPuesto" placeholder="Pega aquí los requisitos del puesto para evaluar..."></textarea>
-        </div>
-        
-        <button class="btn-outline" id="btnEvaluarATS">🔍 Evaluar Puntuación ATS</button>
-        
-        <div id="resultadoAts">
-            <!-- Aquí aparecerá el % de coincidencia -->
-            Score ATS: Evaluando...
-        </div>
-    </div>
-
 </div>
 
-<!-- Asegúrate de que el nombre de tus scripts JavaScript sea el correcto aquí -->
+<!-- Librerías mágicas para leer PDF y Word -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="generar-cv.js"></script>
-<!-- <script src="tu-otro-script-de-logica.js"></script> -->
 
 </body>
 </html>

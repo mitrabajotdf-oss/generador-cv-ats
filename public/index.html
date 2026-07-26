@@ -29,8 +29,21 @@
         .btn-success:hover { background-color: #059669; }
         .btn-outline { background-color: transparent; color: #4b5563; border: 1px solid #d1d5db; }
         .btn-outline:hover { background-color: #f3f4f6; }
-        #resultadoAts { margin-top: 15px; padding: 15px; border-radius: 6px; background-color: #eff6ff; color: #1e3a8a; font-weight: 600; display: none; }
-        @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .btn-group { flex-direction: column; } }
+        .btn-danger { background-color: #ef4444; color: white; padding: 6px 12px; font-size: 0.85rem; }
+        .btn-danger:hover { background-color: #dc2626; }
+        
+        #resultadoAts { margin-top: 15px; padding: 15px; border-radius: 6px; background-color: #eff6ff; color: #1e3a8a; font-weight: 600; display: none; text-align: center; font-size: 1.1rem; border: 1px solid #bfdbfe;}
+        
+        /* Estilos para la lista de postulantes */
+        .postulante-item { background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .postulante-info h3 { margin: 0 0 5px 0; color: #111827; font-size: 1.1rem; }
+        .postulante-info p { margin: 0; color: #4b5563; font-size: 0.9rem; }
+        .ats-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-top: 5px; font-size: 0.85rem; }
+        .ats-high { background-color: #d1fae5; color: #065f46; }
+        .ats-medium { background-color: #fef3c7; color: #92400e; }
+        .ats-low { background-color: #fee2e2; color: #991b1b; }
+
+        @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .btn-group { flex-direction: column; } .postulante-item { flex-direction: column; align-items: flex-start; gap: 10px; } }
     </style>
 </head>
 <body>
@@ -68,17 +81,28 @@
         <div class="form-group"><label>Educación y Cursos</label><textarea id="educacion"></textarea></div>
         <div class="form-group"><label>Habilidades Técnicas</label><textarea id="habilidades"></textarea></div>
         <div class="form-group"><label>Información Adicional</label><textarea id="adicional"></textarea></div>
+        
+        <!-- Aquí aparecerá el porcentaje ATS -->
+        <div id="resultadoAts"></div>
+
         <div class="btn-group">
-            <button class="btn-primary" id="btnGuardar">💾 Guardar Postulante</button>
+            <button class="btn-primary" id="btnGuardar">💾 Guardar y Evaluar ATS</button>
             <button class="btn-success" id="btnGenerarPDF">🚀 Generar PDF Final ATS</button>
+        </div>
+    </div>
+
+    <!-- SECCIÓN RECUPERADA: POSTULANTES GUARDADOS -->
+    <div class="card">
+        <h2>📂 Base de Datos de Postulantes</h2>
+        <div id="listaPostulantes">
+            <!-- JS inyectará los candidatos aquí -->
         </div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<!-- ESTO OBLIGA A CARGAR EL NUEVO CÓDIGO -->
-<script src="generar-cv.js?v=11"></script>
+<script src="generar-cv.js?v=12"></script>
 
 </body>
 </html>

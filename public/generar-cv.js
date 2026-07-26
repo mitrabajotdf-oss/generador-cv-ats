@@ -5,14 +5,149 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const botones = document.querySelectorAll('button');
-    let btnGenerar = Array.from(botones).find(btn => btn.textContent.includes('Generar PDF'));
+    // Generar PDF
+    const btnGenerar = document.getElementById('btnGenerarPDF');
     if(btnGenerar) btnGenerar.addEventListener('click', generarPDFATS);
 
+    // Procesar CV
     const btnProcesar = document.getElementById('btnProcesar');
     if(btnProcesar) btnProcesar.addEventListener('click', procesarArchivoCV);
+
+    // NUEVO: Guardar y Evaluar ATS
+    const btnGuardar = document.getElementById('btnGuardar');
+    if(btnGuardar) btnGuardar.addEventListener('click', guardarPostulante);
+
+    // NUEVO: Cargar lista al abrir la página
+    mostrarPostulantes();
 });
 
+// ==========================================
+// 1. SISTEMA DE EVALUACIÓN Y GUARDADO (RECUPERADO)
+// ==========================================
+
+function calcularATS(datos) {
+    let score = 0;
+    
+    // Verificaciones básicas (20 puntos)
+    if (datos.nombre.length > 3) score += 5;
+    if (datos.email.includes('@')) score += 10;
+    if (datos.telefono.length > 5) score += 5;
+
+    // Volumen de contenido (Hasta 40 puntos)
+    if (datos.experiencia.length > 100) score += 20;
+    else if (datos.experiencia.length > 10) score += 10;
+
+    if (datos.educacion.length > 50) score += 10;
+    if (datos.habilidades.length > 20) score += 10;
+
+    // Compatibilidad con Puesto (Hasta 40 puntos)
+    if (datos.puesto.length > 3) {
+        let puestoPalabras = datos.puesto.toLowerCase().split(' ');
+        let textoCompleto = (datos.resumen + " " + datos.experiencia + " " + datos.habilidades).toLowerCase();
+        
+        let coincidencias = 0;
+        puestoPalabras.forEach(palabra => {
+            if (palabra.length > 3 && textoCompleto.includes(palabra)) {
+                coincidencias++;
+            }
+        });
+
+        if (coincidencias > 2) score += 40;
+        else if (coincidencias > 0) score += 20;
+    }
+
+    return score > 100 ? 100 : score;
+}
+
+function guardarPostulante(evento) {
+    evento.preventDefault();
+    
+    const nombre = document.getElementById('nombre').value.trim();
+    if(!nombre) {
+        alert("Por favor, al menos ingresa el nombre del postulante.");
+        return;
+    }
+
+    const datos = {
+        id: Date.now(), // Identificador único
+        nombre: nombre,
+        puesto: document.getElementById('puesto').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        resumen: document.getElementById('resumen').value.trim(),
+        experiencia: document.getElementById('experiencia').value.trim(),
+        educacion: document.getElementById('educacion').value.trim(),
+        habilidades: document.getElementById('habilidades').value.trim()
+    };
+
+    // Calcular el porcentaje ATS
+    const puntajeAts = calcularATS(datos);
+    datos.ats = puntajeAts;
+
+    // Guardar en el navegador
+    let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
+    postulantes.push(datos);
+    localStorage.setItem('postulantesATS', JSON.stringify(postulantes));
+
+    // Mostrar el cartelito con el porcentaje
+    const divResultado = document.getElementById('resultadoAts');
+    divResultado.style.display = 'block';
+    divResultado.innerHTML = `🌟 Postulante Guardado. <br>Compatibilidad ATS estimada: <strong>${puntajeAts}%</strong>`;
+
+    setTimeout(() => {
+        divResultado.style.display = 'none';
+    }, 5000);
+
+    // Actualizar la lista de abajo
+    mostrarPostulantes();
+}
+
+function mostrarPostulantes() {
+    const contenedor = document.getElementById('listaPostulantes');
+    if (!contenedor) return;
+
+    let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
+    
+    if (postulantes.length === 0) {
+        contenedor.innerHTML = '<p style="color:#6b7280; text-align:center;">No hay postulantes guardados aún. Extrae un CV o llena los datos para guardar tu primero.</p>';
+        return;
+    }
+
+    let html = '';
+    postulantes.forEach(p => {
+        // Asignar color según el puntaje
+        let claseAts = p.ats >= 70 ? 'ats-high' : (p.ats >= 40 ? 'ats-medium' : 'ats-low');
+        
+        html += `
+        <div class="postulante-item">
+            <div class="postulante-info">
+                <h3>${p.nombre}</h3>
+                <p>💼 ${p.puesto || 'Sin puesto definido'} | ✉️ ${p.email || 'Sin email'}</p>
+                <div class="ats-badge ${claseAts}">Score ATS: ${p.ats}%</div>
+            </div>
+            <div>
+                <button onclick="eliminarPostulante(${p.id})" class="btn-danger">Eliminar</button>
+            </div>
+        </div>`;
+    });
+    
+    contenedor.innerHTML = html;
+}
+
+// Función global para que el botón "Eliminar" la encuentre
+window.eliminarPostulante = function(id) {
+    if(confirm("¿Seguro que deseas eliminar este postulante de tu base de datos?")) {
+        let postulantes = JSON.parse(localStorage.getItem('postulantesATS')) || [];
+        postulantes = postulantes.filter(p => p.id !== id);
+        localStorage.setItem('postulantesATS', JSON.stringify(postulantes));
+        mostrarPostulantes();
+    }
+}
+
+
+// ==========================================
+// 2. LECTOR Y EXTRACTOR SUPREMO DE PDFs
+// ==========================================
 async function procesarArchivoCV(evento) {
     evento.preventDefault();
     const inputArchivo = document.getElementById('archivoCV');
@@ -62,13 +197,10 @@ async function extraerTextoWord(archivo) {
     return resultado.value;
 }
 
-// CEREBRO ANTI-CAÍDAS
 function analizarYCompletarFormulario(texto) {
-    // 1. Limpieza Nuclear de Emojis y Símbolos Raros
     let textoLimpioGlobal = texto.replace(/ð/g, '').replace(/·/g, '').replace(/[•●▪]/g, '');
     let textoSinEspacios = textoLimpioGlobal.replace(/\s+/g, '');
 
-    // 2. Extracción Segura de Email
     let emailEncontrado = "";
     const matchEmail = textoSinEspacios.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/);
     if (matchEmail) {
@@ -76,7 +208,6 @@ function analizarYCompletarFormulario(texto) {
         document.getElementById('email').value = emailEncontrado;
     }
 
-    // 3. Extracción Segura de Teléfono
     let telEncontrado = "";
     const matchTel = textoSinEspacios.match(/(?:\+?549?)?\d{10}/);
     if (matchTel) {
@@ -84,7 +215,6 @@ function analizarYCompletarFormulario(texto) {
         document.getElementById('telefono').value = telEncontrado;
     }
 
-    // 4. División de líneas
     const lineas = textoLimpioGlobal.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 2);
@@ -107,7 +237,6 @@ function analizarYCompletarFormulario(texto) {
         let lineaUpper = linea.toUpperCase();
         let lineaSinEsp = linea.replace(/\s+/g, '');
 
-        // EVITAR DUPLICADOS DE FORMA SEGURA (Sin crashear el navegador)
         if (emailEncontrado && lineaSinEsp.includes(emailEncontrado)) continue;
         if (telEncontrado && lineaSinEsp.includes(telEncontrado)) continue;
 
@@ -136,7 +265,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// CREACIÓN DEL PDF FINAL
+// 3. CREACIÓN DEL PDF FINAL ATS
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);

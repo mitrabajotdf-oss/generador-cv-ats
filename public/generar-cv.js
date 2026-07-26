@@ -46,7 +46,6 @@ async function procesarArchivoCV(evento) {
             return;
         }
 
-        // Llama a la nueva función que ordena todo
         analizarYCompletarFormulario(textoExtraido);
 
     } catch (error) {
@@ -66,7 +65,7 @@ async function extraerTextoPDF(archivo) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const pagina = await pdf.getPage(i);
         const contenido = await pagina.getTextContent();
-        const textoPagina = contenido.items.map(item => item.str).join("\n"); // Mejor separación por salto de línea
+        const textoPagina = contenido.items.map(item => item.str).join("\n");
         textoCompleto += textoPagina + "\n";
     }
     return textoCompleto;
@@ -78,50 +77,61 @@ async function extraerTextoWord(archivo) {
     return resultado.value;
 }
 
-// 🧠 EL CEREBRO: Clasifica y acomoda el texto en los textareas
+// 🧠 EL CEREBRO MEJORADO: Encuentra datos difíciles y limpia la basura
 function analizarYCompletarFormulario(texto) {
-    // 1. Extraer Email y Teléfono
+    // Limpieza global de basura de PDF
+    let textoLimpioGlobal = texto.replace(/[ð·]/g, '');
+
+    // 1. Extraer Email (Incluso si el PDF le metió espacios en el medio)
+    let textoSinEspacios = textoLimpioGlobal.replace(/\s+/g, '');
     const regexEmail = /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/;
-    const matchEmail = texto.match(regexEmail);
-    if (matchEmail) document.getElementById('email').value = matchEmail[0];
+    const matchEmail = textoSinEspacios.match(regexEmail);
+    let emailEncontrado = "";
+    if (matchEmail) {
+        emailEncontrado = matchEmail[0];
+        document.getElementById('email').value = emailEncontrado;
+    }
 
-    const regexTel = /(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/;
-    const matchTel = texto.match(regexTel);
-    if (matchTel) document.getElementById('telefono').value = matchTel[0].trim();
+    // 2. Extraer Teléfono (Soporta formatos tipo 2964 659057)
+    const regexTel = /(?:\+?54\s?9\s?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}|\b\d{4}[\s-]\d{6}\b|\b\d{10}\b/;
+    const matchTel = textoLimpioGlobal.match(regexTel);
+    let telEncontrado = "";
+    if (matchTel) {
+        telEncontrado = matchTel[0].trim();
+        document.getElementById('telefono').value = telEncontrado;
+    }
 
-    // Dividimos el texto en líneas limpiando basura extrema de PDFs (como los ð·)
-    const lineas = texto.split('\n')
-        .map(l => l.replace(/[ð·]/g, '').trim()) // Elimina el símbolo extraño en cualquier lado
+    const lineas = textoLimpioGlobal.split('\n')
+        .map(l => l.trim())
         .filter(l => l.length > 2);
 
     if (lineas.length > 0) {
-        document.getElementById('nombre').value = lineas[0]; // La línea 1 suele ser el nombre
+        document.getElementById('nombre').value = lineas[0];
     }
 
-    // 2. Escáner de Secciones por Palabras Clave
-    let seccionActual = "resumen"; // Todo va al resumen hasta que detecte un título
+    // 3. Escáner de Secciones por Palabras Clave
+    let seccionActual = "resumen"; 
     const secciones = { resumen: [], experiencia: [], educacion: [], habilidades: [], adicional: [] };
 
-    // Diccionarios de palabras clave (en mayúsculas para comparar)
     const kwExperiencia = ["EXPERIENCIA", "TRAYECTORIA", "LABORAL"];
     const kwEducacion = ["FORMACIÓN", "EDUCACIÓN", "ESTUDIOS", "CURSOS", "CAPACITACIONES", "ACADÉMICA"];
     const kwHabilidades = ["COMPETENCIAS", "HABILIDADES", "CONOCIMIENTOS", "TECNOLOGÍAS", "PRODUCTIVIDAD", "INTELIGENCIA ARTIFICIAL"];
     const kwPerfil = ["PERFIL", "RESUMEN", "SOBRE MÍ"];
 
-    // Recorremos las líneas a partir de la línea 1 (omitiendo el nombre)
     for (let i = 1; i < lineas.length; i++) {
         let linea = lineas[i];
         let lineaUpper = linea.toUpperCase();
+        let lineaSinEspacios = linea.replace(/\s+/g, '');
 
-        // Omitimos líneas que sean el email, teléfono o la ubicación (para no duplicar en el texto)
-        if (matchEmail && linea.includes(matchEmail[0])) continue;
-        if (matchTel && linea.includes(matchTel[0])) continue;
+        // EVITAR DUPLICADOS: Si la línea es el email, el teléfono o la ubicación, NO la pongas en el Resumen
+        if (emailEncontrado && lineaSinEspacios.includes(emailEncontrado)) continue;
+        if (telEncontrado && lineaSinEspacios.includes(telEncontrado.replace(/\s+/g, ''))) continue;
+        
         if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
             document.getElementById('ubicacion').value = linea.replace(/[📍]/g, '').trim();
-            continue;
+            continue; 
         }
 
-        // DETECTAMOS CAMBIOS DE SECCIÓN (Títulos cortos)
         if (lineaUpper.length < 40) {
             if (kwExperiencia.some(kw => lineaUpper.includes(kw))) { seccionActual = "experiencia"; continue; }
             if (kwEducacion.some(kw => lineaUpper.includes(kw))) { seccionActual = "educacion"; continue; }
@@ -129,16 +139,13 @@ function analizarYCompletarFormulario(texto) {
             if (kwPerfil.some(kw => lineaUpper.includes(kw))) { seccionActual = "resumen"; continue; }
         }
 
-        // Limpieza de viñetas estándar al principio de la línea
         linea = linea.replace(/^[-•*●]\s*/, '').trim();
         
-        // Agregar a la caja correspondiente
         if (linea.length > 0) {
             secciones[seccionActual].push(linea);
         }
     }
 
-    // 3. Volcar los arreglos a sus respectivas cajas de texto en el HTML
     document.getElementById('resumen').value = secciones.resumen.join('\n');
     document.getElementById('experiencia').value = secciones.experiencia.join('\n');
     document.getElementById('educacion').value = secciones.educacion.join('\n');
@@ -146,7 +153,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// 2. LÓGICA DE CREACIÓN DEL PDF FINAL (Mantenemos tu diseño a dos columnas)
+// 2. LÓGICA DE CREACIÓN DEL PDF FINAL
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -160,7 +167,7 @@ function procesarLineasUnicas(texto) {
     const resultado = [];
 
     lineas.forEach(linea => {
-        // Doble filtro anti-basura por si acaso
+        // Doble filtro anti-basura para que los "ð·" no salgan jamás en el PDF
         let textoLimpio = linea.replace(/^[-•*·ð\s]+/, '').replace(/[ð·]/g, '').trim();
         if (textoLimpio) {
             let textoMinusc = textoLimpio.toLowerCase();

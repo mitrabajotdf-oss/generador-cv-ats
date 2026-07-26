@@ -1,6 +1,6 @@
 // --- generar-cv.js ---
 
-let fotoPerfilBase64 = ""; // Guardará la foto para el PDF
+let fotoPerfilBase64 = ""; 
 
 if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGuardar = document.getElementById('btnGuardar');
     if(btnGuardar) btnGuardar.addEventListener('click', guardarPostulante);
 
-    // NUEVO: Escuchar cuando suban una foto
     const inputFoto = document.getElementById('fotoPerfil');
     if(inputFoto) {
         inputFoto.addEventListener('change', function(e) {
@@ -24,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (archivo) {
                 const reader = new FileReader();
                 reader.onload = function(evento) {
-                    fotoPerfilBase64 = evento.target.result; // Convierte la foto a código para el PDF
+                    fotoPerfilBase64 = evento.target.result; 
                 };
                 reader.readAsDataURL(archivo);
             } else {
@@ -216,7 +215,7 @@ function analizarYCompletarFormulario(texto) {
 
         if (emailEncontrado && lineaSinEsp.includes(emailEncontrado)) continue;
         if (telEncontrado && lineaSinEsp.includes(telEncontrado)) continue;
-        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO")) {
+        if (lineaUpper.includes("RÍO GRANDE") || lineaUpper.includes("TIERRA DEL FUEGO") || lineaUpper.includes("ARGENTINA")) {
             document.getElementById('ubicacion').value = linea.replace(/[📍,]/g, '').trim();
             continue; 
         }
@@ -238,7 +237,7 @@ function analizarYCompletarFormulario(texto) {
 }
 
 // ==========================================
-// 3. GENERADOR DE PDF CON FOTO
+// 3. GENERADOR DE PDF (DISEÑO ULTRA-COMPACTO)
 // ==========================================
 function obtenerValor(id) {
     const elemento = document.getElementById(id);
@@ -297,29 +296,34 @@ function generarPDFATS(evento) {
         <meta charset="UTF-8">
         <title>CV_${datos.nombre.replace(/\s+/g, '_')}</title>
         <style>
-            @page { size: A4; margin: 10mm; }
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9pt; color: #2b2b2b; margin: 0; padding: 0; line-height: 1.35; }
+            /* DISEÑO ULTRA-COMPACTO */
+            @page { size: A4; margin: 8mm 10mm; } /* Reduje los márgenes de impresión */
             
-            /* Ajuste del Encabezado para que entre la foto */
-            header { display: flex; align-items: center; gap: 20px; text-align: left; margin-bottom: 12px; }
-            .foto-cv { width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 2px solid #2c3e50; flex-shrink: 0; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #2b2b2b; margin: 0; padding: 0; line-height: 1.25; }
+            
+            /* Encabezado ajustado */
+            header { display: flex; align-items: center; gap: 15px; text-align: left; margin-bottom: 10px; }
+            .foto-cv { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #2c3e50; flex-shrink: 0; }
             .info-cabecera { flex: 1; }
             
-            h1 { font-size: 22pt; color: #2c3e50; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 1px; }
-            .puesto { font-size: 11pt; font-weight: bold; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-            .contacto-horizontal { font-size: 9pt; color: #555; padding-bottom: 12px; border-bottom: 2px solid #2c3e50; }
-            .contacto-horizontal span { margin: 0 6px; }
+            h1 { font-size: 20pt; color: #2c3e50; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 1px; }
+            .puesto { font-size: 10pt; font-weight: bold; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+            .contacto-horizontal { font-size: 8.5pt; color: #555; padding-bottom: 8px; border-bottom: 2px solid #2c3e50; }
+            .contacto-horizontal span { margin: 0 4px; }
             .contacto-horizontal span:first-child { margin-left: 0; }
             
-            h2 { font-size: 11pt; color: #2c3e50; border-bottom: 1px solid #ecf0f1; margin: 0 0 8px 0; padding-bottom: 4px; text-transform: uppercase; }
-            .seccion { margin-bottom: 15px; }
+            /* Secciones más juntas */
+            h2 { font-size: 10pt; color: #2c3e50; border-bottom: 1px solid #ecf0f1; margin: 0 0 5px 0; padding-bottom: 2px; text-transform: uppercase; }
+            .seccion { margin-bottom: 10px; page-break-inside: avoid; }
+            
             .contenedor-columnas { display: flex; flex-direction: row; width: 100%; justify-content: space-between; }
             .columna-izq { width: 32%; padding-right: 15px; border-right: 1px solid #bdc3c7; }
             .columna-der { width: 64%; }
-            p { margin: 0 0 8px 0; text-align: justify; }
-            ul { margin: 0; padding-left: 16px; }
-            li { margin-bottom: 4px; text-align: left; }
-            .seccion { page-break-inside: avoid; }
+            
+            /* Textos y listas apretados */
+            p { margin: 0 0 5px 0; text-align: justify; }
+            ul { margin: 0; padding-left: 14px; }
+            li { margin-bottom: 2px; text-align: left; }
         </style>
     </head>
     <body>

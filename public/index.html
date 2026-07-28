@@ -1,3 +1,4 @@
+<script>
 document.getElementById('uploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = new FormData(this);
@@ -11,19 +12,31 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         const data = await response.json();
         
         if (data.success) {
-            // Mapeo completo y directo a los campos del formulario
-            document.getElementById('nombreInput').value = data.nombre || '';
-            document.getElementById('emailInput').value = data.email || '';
-            document.getElementById('telefonoInput').value = data.telefono || '';
-            document.getElementById('domicilioInput').value = data.domicilio || '';
-            document.getElementById('disponibilidadInput').value = data.disponibilidad || 'Inmediata';
+            // Función auxiliar para buscar el elemento por múltiples selectores y asignarle valor
+            const asignarValorFlexible = (selectors, valor) => {
+                for (let sel of selectors) {
+                    const el = document.querySelector(sel) || document.getElementById(sel);
+                    if (el) {
+                        el.value = valor || '';
+                        break;
+                    }
+                }
+            };
+
+            // Mapeo seguro para datos personales
+            asignarValorFlexible(['#nombreInput', '#nombre', 'input[name="nombre"]'], data.nombre);
+            asignarValorFlexible(['#emailInput', '#email', '#correo', 'input[name="email"]'], data.email);
+            asignarValorFlexible(['#telefonoInput', '#telefono', '#phone', 'input[name="telefono"]'], data.telefono);
+            asignarValorFlexible(['#domicilioInput', '#domicilio', '#direccion', 'input[name="domicilio"]'], data.domicilio);
+            asignarValorFlexible(['#disponibilidadInput', '#disponibilidad', 'input[name="disponibilidad"]'], data.disponibilidad || 'Inmediata');
             
-            // Asignar el texto completo sin recortes ni valores por defecto estáticos
+            // Texto completo extraído sin recortes para las secciones grandes
             const textoCompleto = data.rawText || data.resumen || '';
-            document.getElementById('resumenInput').value = textoCompleto;
-            document.getElementById('experienciaInput').value = data.rawText || data.experiencia || '';
-            document.getElementById('estudiosInput').value = data.rawText || data.estudios || '';
-            document.getElementById('habilidadesInput').value = data.rawText || data.habilidades || '';
+
+            asignarValorFlexible(['#resumenInput', '#resumen', 'textarea[name="resumen"]'], textoCompleto);
+            asignarValorFlexible(['#experienciaInput', '#experiencia', 'textarea[name="experiencia"]'], textoCompleto);
+            asignarValorFlexible(['#estudiosInput', '#estudios', '#educacion', 'textarea[name="estudios"]'], textoCompleto);
+            asignarValorFlexible(['#habilidadesInput', '#habilidades', '#skills', 'textarea[name="habilidades"]'], textoCompleto);
 
             alert('¡CV analizado y extraído correctamente!');
         } else {
@@ -34,3 +47,4 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         alert('Error interno al procesar el archivo.');
     }
 });
+</script>

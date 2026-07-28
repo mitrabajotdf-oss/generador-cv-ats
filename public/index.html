@@ -1,132 +1,35 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador y Gestor de CVs ATS - RRHH & Dev</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Generador y Gestor ATS de CVs</h1>
-            <p>Optimiza, estructura y evalúa perfiles profesionales con criterios estrictos de RRHH</p>
-        </header>
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
 
-        <main class="grid-layout">
-            <!-- Columna Izquierda: Formulario de Carga y Edición -->
-            <section class="form-section">
-                <h2>1. Importar y Editar Datos</h2>
-                <form id="cvForm">
-                    <!-- Subida de Archivo -->
-                    <div class="form-group">
-                        <label for="cvFile">Subir CV Original (PDF o Word .docx):</label>
-                        <input type="file" id="cvFile" accept=".pdf,.docx">
-                        <button type="button" id="btnUpload" class="btn-secondary">Analizar y Extraer Datos</button>
-                    </div>
+    try {
+        const response = await fetch('/api/upload-cv', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mapeo completo y directo a los campos del formulario
+            document.getElementById('nombreInput').value = data.nombre || '';
+            document.getElementById('emailInput').value = data.email || '';
+            document.getElementById('telefonoInput').value = data.telefono || '';
+            document.getElementById('domicilioInput').value = data.domicilio || '';
+            document.getElementById('disponibilidadInput').value = data.disponibilidad || 'Inmediata';
+            
+            // Asignar el texto completo a las secciones grandes para que no queden incompletas
+            document.getElementById('resumenInput').value = data.rawText ? data.rawText.substring(0, 600) : (data.resumen || '');
+            document.getElementById('experienciaInput').value = data.rawText || data.experiencia || '';
+            document.getElementById('estudiosInput').value = data.rawText || data.estudios || '';
+            document.getElementById('habilidadesInput').value = data.habilidades || 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas';
 
-                    <!-- Foto de Perfil -->
-                    <div class="form-group">
-                        <label for="profilePhoto">Foto de Perfil:</label>
-                        <input type="file" id="profilePhoto" accept="image/*">
-                    </div>
-
-                    <!-- Datos Personales y Disponibilidad -->
-                    <fieldset>
-                        <legend>Datos Personales y Disponibilidad</legend>
-                        <div class="input-row">
-                            <input type="text" id="nombre" placeholder="Nombre Completo" required>
-                            <input type="text" id="disponibilidad" placeholder="Disponibilidad (ej. Inmediata)" required>
-                        </div>
-                        <div class="input-row">
-                            <input type="text" id="domicilio" placeholder="Domicilio / Ciudad">
-                            <input type="tel" id="telefono" placeholder="Teléfono">
-                        </div>
-                        <input type="email" id="email" placeholder="Correo Electrónico">
-                    </fieldset>
-
-                    <!-- Resumen de Perfil -->
-                    <div class="form-group">
-                        <label for="resumen">Resumen de Perfil (Optimizado ATS):</label>
-                        <textarea id="resumen" rows="4" placeholder="Resumen profesional optimizado con palabras clave..."></textarea>
-                    </div>
-
-                    <!-- Experiencia Laboral -->
-                    <div class="form-group">
-                        <label>Experiencia Laboral:</label>
-                        <div id="experienciaContainer">
-                            <textarea class="exp-item" rows="2" placeholder="Puesto, Empresa, Fechas y Logros..."></textarea>
-                        </div>
-                        <button type="button" id="btnAddExp" class="btn-small">+ Añadir Experiencia</button>
-                    </div>
-
-                    <!-- Estudios y Cursos -->
-                    <div class="form-group">
-                        <label>Estudios, Cursos y Capacitaciones:</label>
-                        <div id="estudiosContainer">
-                            <textarea class="est-item" rows="2" placeholder="Título, Institución, Año..."></textarea>
-                        </div>
-                        <button type="button" id="btnAddEst" class="btn-small">+ Añadir Estudio/Curso</button>
-                    </div>
-
-                    <!-- Habilidades -->
-                    <div class="form-group">
-                        <label for="habilidades">Habilidades (Hard & Soft Skills separadas por comas):</label>
-                        <input type="text" id="habilidades" placeholder="JavaScript, Node.js, Liderazgo, Scrum...">
-                    </div>
-
-                    <button type="submit" class="btn-primary">Guardar y Calcular % ATS</button>
-                </form>
-            </section>
-
-            <!-- Columna Derecha: Vista Previa Formato ATS (Máx 2 Páginas) y Base de Datos CRM -->
-            <section class="preview-section">
-                <h2>2. Vista Previa Estilo ATS (Máx. 2 Páginas)</h2>
-                <div id="cvPreview" class="cv-page">
-                    <div class="cv-sidebar">
-                        <div class="preview-photo-container">
-                            <img id="prevPhoto" src="" alt="Foto" style="display:none;">
-                        </div>
-                        <h3>Contacto</h3>
-                        <p id="prevContacto">Domicilio, Tel, Email</p>
-                        <p><strong>Disponibilidad:</strong> <span id="prevDisponibilidad">-</span></p>
-                        <h3>Habilidades</h3>
-                        <ul id="prevHabilidades"></ul>
-                    </div>
-                    <div class="cv-main">
-                        <h2 id="prevNombre">Nombre del Candidato</h2>
-                        <hr>
-                        <h3>Resumen Profesional</h3>
-                        <p id="prevResumen">El resumen aparecerá aquí...</p>
-                        <h3>Experiencia Laboral</h3>
-                        <div id="prevExperiencia"></div>
-                        <h3>Estudios y Capacitaciones</h3>
-                        <div id="prevEstudios"></div>
-                    </div>
-                </div>
-
-                <div class="crm-database">
-                    <h2>3. Base de Datos de Candidatos (Filtros ATS)</h2>
-                    <div class="filter-box">
-                        <input type="text" id="filterCriteria" placeholder="Buscar por requisito o habilidad de la empresa...">
-                    </div>
-                    <table id="candidatesTable">
-                        <thead>
-                            <tr>
-                                <th>Candidato</th>
-                                <th>Puesto / Perfil</th>
-                                <th>% ATS</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="candidatesList">
-                            <!-- Los perfiles guardados se listarán aquí -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>
+            alert('¡CV analizado y extraído correctamente!');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error interno al procesar el archivo.');
+    }
+});

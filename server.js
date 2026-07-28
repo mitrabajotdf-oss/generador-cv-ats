@@ -68,7 +68,7 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             extractedText = result.value ? result.value.trim() : '';
         } else {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            return res.status(400).json({ error: 'Formato no soportado. Sube un PDF o Word (.docx).' });
+            return res.status(400).json({ error: 'Formato no soportado.' });
         }
 
         if (fs.existsSync(filePath)) {
@@ -76,18 +76,18 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
         }
 
         const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const nombreDetectado = lines.length > 0 && lines[0].length < 50 ? lines[0] : '';
+        const nombre = lines.length > 0 && lines[0].length < 50 ? lines[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
         const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
 
         res.json({
             success: true,
-            message: 'CV analizado correctamente',
+            message: 'CV procesado correctamente',
             rawText: extractedText,
-            nombre: nombreDetectado,
+            nombre: nombre,
             email: emailMatch ? emailMatch[0] : '',
             telefono: phoneMatch ? phoneMatch[0] : '',
-            domicilio: '',
+            domicilio: 'Tierra del Fuego, Argentina',
             disponibilidad: 'Inmediata',
             resumen: extractedText,
             experiencia: extractedText,

@@ -3,136 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Postulantes & Evaluador ATS</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 30px 15px; }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { text-align: center; color: #111827; margin-bottom: 30px; font-weight: 700; }
-        h2 { font-size: 1.25rem; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; }
-        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 25px; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 0.875rem; font-weight: 600; color: #4b5563; margin-bottom: 5px; }
-        input[type="text"], input[type="email"], input[type="tel"], textarea, select, input[type="file"] {
-            width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.95rem; background-color: #f9fafb; box-sizing: border-box;
-        }
-        input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); background-color: #ffffff; }
-        textarea { resize: vertical; min-height: 100px; }
-        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
-        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; font-family: 'Inter', sans-serif; }
-        .btn-primary { background-color: #2563eb; color: white; width: 100%; }
-        .btn-primary:hover { background-color: #1d4ed8; }
-        .btn-success { background-color: #10b981; color: white; width: 100%; }
-        .btn-success:hover { background-color: #059669; }
-        .btn-outline { background-color: transparent; color: #4b5563; border: 1px solid #d1d5db; }
-        .btn-outline:hover { background-color: #f3f4f6; }
-        .btn-danger { background-color: #ef4444; color: white; padding: 6px 12px; font-size: 0.85rem; }
-        .btn-danger:hover { background-color: #dc2626; }
-        
-        #resultadoAts { margin-top: 15px; padding: 15px; border-radius: 6px; background-color: #eff6ff; color: #1e3a8a; font-weight: 600; display: none; text-align: center; font-size: 1.1rem; border: 1px solid #bfdbfe;}
-        
-        .postulante-item { background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .postulante-info h3 { margin: 0 0 5px 0; color: #111827; font-size: 1.1rem; }
-        .postulante-info p { margin: 0; color: #4b5563; font-size: 0.9rem; }
-        .ats-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-top: 5px; font-size: 0.85rem; }
-        .ats-high { background-color: #d1fae5; color: #065f46; }
-        .ats-medium { background-color: #fef3c7; color: #92400e; }
-        .ats-low { background-color: #fee2e2; color: #991b1b; }
-
-        /* Estilos para Términos y Condiciones */
-        .terminos-box { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; height: 120px; overflow-y: scroll; font-size: 0.85rem; color: #475569; margin-bottom: 15px; }
-        #mensajeAceptacion { margin-top: 10px; padding: 12px; border-radius: 6px; background-color: #dcfce7; color: #166534; font-weight: 600; display: none; text-align: center; border: 1px solid #bbf7d0; }
-
-        @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .btn-group { flex-direction: column; } .postulante-item { flex-direction: column; align-items: flex-start; gap: 10px; } }
-    </style>
+    <title>Generador y Gestor de CVs ATS - RRHH & Dev</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>Generador y Gestor ATS de CVs</h1>
+            <p>Optimiza, estructura y evalúa perfiles profesionales con criterios estrictos de RRHH</p>
+        </header>
 
-<div class="container">
-    <h1>📋 Gestor de CVs y Evaluación ATS</h1>
+        <main class="grid-layout">
+            <!-- Columna Izquierda: Formulario de Carga y Edición -->
+            <section class="form-section">
+                <h2>1. Importar y Editar Datos</h2>
+                <form id="cvForm">
+                    <!-- Subida de Archivo -->
+                    <div class="form-group">
+                        <label for="cvFile">Subir CV Original (PDF o Word .docx):</label>
+                        <input type="file" id="cvFile" accept=".pdf,.docx">
+                        <button type="button" id="btnUpload" class="btn-secondary">Analizar y Extraer Datos</button>
+                    </div>
 
-    <div class="card">
-        <h2>⚡ Extraer datos del CV</h2>
-        <div class="grid-2">
-            <div class="form-group" style="grid-column: span 2;">
-                <label>Extraer desde CV (PDF o Word):</label>
-                <input type="file" id="archivoCV" accept=".pdf,.doc,.docx">
-                <button class="btn-outline" id="btnProcesar" style="margin-top:10px; width:100%;">📄 Procesar Archivo</button>
-            </div>
-        </div>
+                    <!-- Foto de Perfil -->
+                    <div class="form-group">
+                        <label for="profilePhoto">Foto de Perfil:</label>
+                        <input type="file" id="profilePhoto" accept="image/*">
+                    </div>
+
+                    <!-- Datos Personales y Disponibilidad -->
+                    <fieldset>
+                        <legend>Datos Personales y Disponibilidad</legend>
+                        <div class="input-row">
+                            <input type="text" id="nombre" placeholder="Nombre Completo" required>
+                            <input type="text" id="disponibilidad" placeholder="Disponibilidad (ej. Inmediata)" required>
+                        </div>
+                        <div class="input-row">
+                            <input type="text" id="domicilio" placeholder="Domicilio / Ciudad">
+                            <input type="tel" id="telefono" placeholder="Teléfono">
+                        </div>
+                        <input type="email" id="email" placeholder="Correo Electrónico">
+                    </fieldset>
+
+                    <!-- Resumen de Perfil -->
+                    <div class="form-group">
+                        <label for="resumen">Resumen de Perfil (Optimizado ATS):</label>
+                        <textarea id="resumen" rows="4" placeholder="Resumen profesional optimizado con palabras clave..."></textarea>
+                    </div>
+
+                    <!-- Experiencia Laboral -->
+                    <div class="form-group">
+                        <label>Experiencia Laboral:</label>
+                        <div id="experienciaContainer">
+                            <textarea class="exp-item" rows="2" placeholder="Puesto, Empresa, Fechas y Logros..."></textarea>
+                        </div>
+                        <button type="button" id="btnAddExp" class="btn-small">+ Añadir Experiencia</button>
+                    </div>
+
+                    <!-- Estudios y Cursos -->
+                    <div class="form-group">
+                        <label>Estudios, Cursos y Capacitaciones:</label>
+                        <div id="estudiosContainer">
+                            <textarea class="est-item" rows="2" placeholder="Título, Institución, Año..."></textarea>
+                        </div>
+                        <button type="button" id="btnAddEst" class="btn-small">+ Añadir Estudio/Curso</button>
+                    </div>
+
+                    <!-- Habilidades -->
+                    <div class="form-group">
+                        <label for="habilidades">Habilidades (Hard & Soft Skills separadas por comas):</label>
+                        <input type="text" id="habilidades" placeholder="JavaScript, Node.js, Liderazgo, Scrum...">
+                    </div>
+
+                    <button type="submit" class="btn-primary">Guardar y Calcular % ATS</button>
+                </form>
+            </section>
+
+            <!-- Columna Derecha: Vista Previa Formato ATS (Máx 2 Páginas) y Base de Datos CRM -->
+            <section class="preview-section">
+                <h2>2. Vista Previa Estilo ATS (Máx. 2 Páginas)</h2>
+                <div id="cvPreview" class="cv-page">
+                    <div class="cv-sidebar">
+                        <div class="preview-photo-container">
+                            <img id="prevPhoto" src="" alt="Foto" style="display:none;">
+                        </div>
+                        <h3>Contacto</h3>
+                        <p id="prevContacto">Domicilio, Tel, Email</p>
+                        <p><strong>Disponibilidad:</strong> <span id="prevDisponibilidad">-</span></p>
+                        <h3>Habilidades</h3>
+                        <ul id="prevHabilidades"></ul>
+                    </div>
+                    <div class="cv-main">
+                        <h2 id="prevNombre">Nombre del Candidato</h2>
+                        <hr>
+                        <h3>Resumen Profesional</h3>
+                        <p id="prevResumen">El resumen aparecerá aquí...</p>
+                        <h3>Experiencia Laboral</h3>
+                        <div id="prevExperiencia"></div>
+                        <h3>Estudios y Capacitaciones</h3>
+                        <div id="prevEstudios"></div>
+                    </div>
+                </div>
+
+                <div class="crm-database">
+                    <h2>3. Base de Datos de Candidatos (Filtros ATS)</h2>
+                    <div class="filter-box">
+                        <input type="text" id="filterCriteria" placeholder="Buscar por requisito o habilidad de la empresa...">
+                    </div>
+                    <table id="candidatesTable">
+                        <thead>
+                            <tr>
+                                <th>Candidato</th>
+                                <th>Puesto / Perfil</th>
+                                <th>% ATS</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="candidatesList">
+                            <!-- Los perfiles guardados se listarán aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
     </div>
-
-    <div class="card">
-        <h2>👤 Datos Personales</h2>
-        <div class="grid-2">
-            <div class="form-group" style="grid-column: span 2;">
-                <label>Foto de Perfil (Opcional)</label>
-                <input type="file" id="fotoPerfil" accept="image/png, image/jpeg, image/jpg">
-            </div>
-            
-            <div class="form-group"><label>Nombre Completo *</label><input type="text" id="nombre"></div>
-            <div class="form-group"><label>Puesto u Objetivo *</label><input type="text" id="puesto"></div>
-            <div class="form-group"><label>Correo Electrónico *</label><input type="email" id="email"></div>
-            <div class="form-group"><label>Teléfono *</label><input type="tel" id="telefono"></div>
-            <div class="form-group"><label>Ubicación</label><input type="text" id="ubicacion"></div>
-            <div class="form-group"><label>Perfil LinkedIn</label><input type="text" id="linkedin"></div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>📄 Contenido del Curriculum</h2>
-        <div class="form-group"><label>Resumen / Contenido Extraído</label><textarea id="resumen"></textarea></div>
-        <div class="form-group"><label>Experiencia Laboral</label><textarea id="experiencia"></textarea></div>
-        <div class="form-group"><label>Educación y Cursos</label><textarea id="educacion"></textarea></div>
-        <div class="form-group"><label>Habilidades Técnicas</label><textarea id="habilidades"></textarea></div>
-        <div class="form-group"><label>Información Adicional</label><textarea id="adicional"></textarea></div>
-        
-        <div id="resultadoAts"></div>
-
-        <div class="btn-group">
-            <button class="btn-primary" id="btnGuardar">💾 Guardar y Evaluar ATS</button>
-            <button class="btn-success" id="btnGenerarPDF">🚀 Generar PDF Final ATS</button>
-        </div>
-    </div>
-
-    <!-- SECCIÓN FILTRO EMPRESAS -->
-    <div class="card">
-        <h2>📂 Base de Datos y Filtro ATS para Empresas</h2>
-        <div class="form-group">
-            <label>🔍 Filtrar por Puesto o Requisito solicitado por la empresa:</label>
-            <input type="text" id="filtroPuesto" placeholder="Ej. Administrativo, Ventas, Sistemas...">
-        </div>
-        <div id="listaPostulantes"></div>
-    </div>
-
-    <!-- SECCIÓN TÉRMINOS Y CONDICIONES INTERACTIVOS PARA EMPRESAS -->
-    <div class="card" id="seccionTerminos">
-        <h2>📜 Términos y Condiciones - Prueba Piloto Gratuita</h2>
-        <p style="font-size: 0.9rem; color: #4b5563;">Estimada empresa, por favor lea los términos del servicio antes de iniciar la prueba piloto:</p>
-        
-        <div class="terminos-box">
-            <strong>1. Objeto del Servicio:</strong> Filtrado, procesamiento y análisis técnico de los currículums provistos por la Empresa mediante software ATS para la búsqueda de un puesto determinado, entregando una terna con los perfiles de mayor puntaje.<br><br>
-            <strong>2. Carácter Gratuito:</strong> Durante esta etapa de prueba piloto, el servicio se otorga de forma 100% gratuita.<br><br>
-            <strong>3. Privacidad y Confidencialidad:</strong> Ambas partes se comprometen a tratar la información de los postulantes bajo estricta confidencialidad, cumpliendo con la normativa de protección de datos personales.<br><br>
-            <strong>4. Limitación de Responsabilidad:</strong> La plataforma provee una herramienta de soporte y cálculo objetivo. La decisión final de contratación y entrevistas es exclusiva de la Empresa.
-        </div>
-
-        <div class="form-group">
-            <label>Nombre de la Empresa o Representante *</label>
-            <input type="text" id="empresaNombre" placeholder="Ej. Comercio Río Grande S.R.L.">
-        </div>
-
-        <button class="btn-success" id="btnAceptarTerminos">✅ Acepto los Términos y Condiciones</button>
-        <div id="mensajeAceptacion"></div>
-    </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="generar-cv.js?v=15"></script>
-
+    <script src="script.js"></script>
 </body>
 </html>

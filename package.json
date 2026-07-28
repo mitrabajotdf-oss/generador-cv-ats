@@ -7,8 +7,23 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "cors": "^2.8.6",
+    "express": "^4.22.2",
     "express-basic-auth": "^1.2.1",
-    "mammoth": "^1.6.0"
-  }
+    "mammoth": "^1.12.0",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mitrabajotdf-oss/generador-cv-ats.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mitrabajotdf-oss/generador-cv-ats/issues"
+  },
+  "homepage": "https://github.com/mitrabajotdf-oss/generador-cv-ats#readme"
 }

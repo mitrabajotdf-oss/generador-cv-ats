@@ -75,26 +75,22 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             fs.unlinkSync(filePath);
         }
 
-        // Extracción inteligente de datos de contacto del CV
-        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
-        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
         const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         const nombreDetectado = lines.length > 0 && lines[0].length < 50 ? lines[0] : 'Erika Beatriz Sosa';
+        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
+        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
 
-        // Estructura completa que alimenta simultáneamente cualquier versión de script cliente
         res.json({
             success: true,
-            message: 'CV analizado con éxito',
+            message: 'CV procesado correctamente',
             rawText: extractedText,
             text: extractedText,
-            content: extractedText,
             nombre: nombreDetectado,
-            nombreCompleto: nombreDetectado,
             email: emailMatch ? emailMatch[0] : '',
             telefono: phoneMatch ? phoneMatch[0] : '',
-            domicilio: 'Tierra del Fuego, Argentina',
             disponibilidad: 'Inmediata',
-            resumen: extractedText.substring(0, 400),
+            domicilio: 'Tierra del Fuego, Argentina',
+            resumen: extractedText.substring(0, 500),
             experiencia: extractedText,
             estudios: extractedText,
             habilidades: 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas'

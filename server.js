@@ -30,9 +30,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Motor de Filtrado ATS y Compatibilidad (Solo para tu panel de control)
+// Memoria temporal en el servidor para almacenar las postulaciones recibidas
+let listaCandidatos = [];
+
+// Motor de Filtrado ATS y Compatibilidad
 function calcularATS(texto) {
-    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia", "escrituración", "administrativa"];
+    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia", "escrituración"];
     const textoLower = texto.toLowerCase();
     
     let encontradas = 0;
@@ -63,14 +66,31 @@ function calcularATS(texto) {
     };
 }
 
-// 1. Endpoint para que el cliente cargue su CV y foto desde el link externo
+// 1. Recibir postulación desde el formulario externo y guardarla en la lista de candidatos
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
     try {
         const { nombre, dni, email, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
         const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
-        // Aquí guardas o procesas la postulación recibida por redes/WhatsApp
+        const nuevoCandidato = {
+            id: Date.now(),
+            nombre: nombre || 'Sin nombre',
+            dni: dni || '',
+            email: email || '',
+            direccion: direccion || '',
+            disponibilidad: disponibilidad || '',
+            resumen: resumen || '',
+            experiencia: experiencia || '',
+            estudios: estudios || '',
+            habilidades: habilidades || '',
+            cvUrl,
+            fotoUrl,
+            fecha: new Date().toLocaleString()
+        };
+
+        listaCandidatos.push(nuevoCandidato);
+
         res.json({
             success: true,
             message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!'
@@ -81,7 +101,12 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-// 2. Endpoint para que TÚ analices cualquier CV o documento recibido usando filtros ATS en tu panel principal
+// 2. Endpoint para ver la lista de candidatos en tu panel
+app.get('/api/candidatos', (req, res) => {
+    res.json({ success: true, candidatos: listaCandidatos });
+});
+
+// 3. Endpoint para analizar con ATS cualquier CV subido directamente por ti
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {

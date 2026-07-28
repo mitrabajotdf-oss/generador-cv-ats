@@ -30,30 +30,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-const DATA_FILE = path.join(__dirname, 'candidatos.json');
+// Almacenamiento en memoria RAM del servidor para acceso inmediato y sin bloqueos
+let listaCandidatos = [];
 
-// Obtener candidatos de forma segura
-function obtenerCandidatos() {
-    try {
-        if (fs.existsSync(DATA_FILE)) {
-            const data = fs.readFileSync(DATA_FILE, 'utf8');
-            return JSON.parse(data || '[]');
-        }
-    } catch (e) {
-        console.error("Error leyendo candidatos.json:", e);
-    }
-    return [];
-}
-
-function guardarCandidatosEnDisco(candidatos) {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(candidatos, null, 2), 'utf8');
-    } catch (e) {
-        console.error("Error guardando candidatos.json:", e);
-    }
-}
-
-// Motor de Síntesis y Optimización ATS
+// Motor de Síntesis y Optimización ATS estricta (1 sola página)
 function sintetizarATS(texto) {
     const palabrasClaveIdeal = [
         "Gestión documental", "Administración", "Escrituración", "Atención al cliente", 
@@ -91,7 +71,7 @@ function sintetizarATS(texto) {
     };
 }
 
-// Endpoint para recibir postulación
+// 1. Recibir postulación desde el link
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -118,9 +98,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             fecha: new Date().toLocaleString()
         };
 
-        let lista = obtenerCandidatos();
-        lista.push(nuevoCandidato);
-        guardarCandidatosEnDisco(lista);
+        listaCandidatos.push(nuevoCandidato);
 
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {
@@ -129,26 +107,23 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-// Endpoint para obtener lista de candidatos
+// 2. Obtener lista de candidatos al instante
 app.get('/api/candidatos', (req, res) => {
-    const lista = obtenerCandidatos();
-    res.json({ success: true, candidatos: lista });
+    res.json({ success: true, candidatos: listaCandidatos });
 });
 
-// Endpoint para eliminar candidato
+// 3. Eliminar candidato
 app.delete('/api/candidatos/:id', (req, res) => {
     try {
         const id = Number(req.params.id);
-        let lista = obtenerCandidatos();
-        lista = lista.filter(c => c.id !== id);
-        guardarCandidatosEnDisco(lista);
+        listaCandidatos = listaCandidatos.filter(c => c.id !== id);
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
         res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
     }
 });
 
-// Endpoint para analizar archivo individual
+// 4. Analizar archivo individual
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -173,7 +148,9 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             return res.status(400).json({ success: false, error: 'Formato no soportado.' });
         }
 
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
 
         const analisis = sintetizarATS(extractedText);
         const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';

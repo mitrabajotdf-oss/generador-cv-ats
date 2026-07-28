@@ -30,7 +30,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Ruta robusta para procesar el archivo subido
+// Ruta para procesar el archivo subido y extraer texto de forma robusta
 app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
     let filePath = '';
     try {
@@ -44,7 +44,9 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdfParse(dataBuffer);
+            // Manejo compatible de pdf-parse
+            const parseFunction = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
+            const pdfData = await parseFunction(dataBuffer);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
@@ -59,16 +61,6 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             fs.unlinkSync(filePath);
         }
 
-        // Si el texto extraído está vacío (ej. es una imagen escaneada o un PDF gráfico)
-        if (!extractedText || extractedText.length < 10) {
-            return res.json({
-                success: true,
-                warning: true,
-                message: 'El archivo contiene imágenes o no tiene texto seleccionable legible por ATS.',
-                rawText: ''
-            });
-        }
-
         res.json({
             success: true,
             message: 'CV procesado correctamente con filtros ATS',
@@ -76,11 +68,11 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error detallado al procesar documento:', error);
+        console.error('Error al procesar el archivo:', error);
         if (filePath && fs.existsSync(filePath)) {
             try { fs.unlinkSync(filePath); } catch (e) {}
         }
-        res.status(500).json({ error: 'Error al parsear el documento. Asegúrate de que el PDF no esté protegido o dañado.' });
+        res.status(500).json({ error: 'Error interno al procesar el documento.' });
     }
 });
 

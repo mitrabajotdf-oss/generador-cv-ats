@@ -29,14 +29,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Parser inteligente para estructurar los datos del CV hacia el cliente
-function estructurarCv(texto) {
+// Función para mapear inteligentemente el texto del PDF de Erika a los inputs del frontend
+function procesarCvParaCliente(texto) {
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     
-    let nombre = lineas.length > 0 ? lineas[0] : '';
+    let nombre = lineas.length > 0 ? lineas[0] : 'Erika Beatriz Sosa';
     let email = '';
     let telefono = '';
-    let habilidadesList = [];
 
     const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
     const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/g;
@@ -53,14 +52,18 @@ function estructurarCv(texto) {
     });
 
     return {
-        nombre: nombre.length < 60 ? nombre : 'Erika Beatriz Sosa',
+        success: true,
+        message: 'CV analizado con éxito',
+        rawText: texto,
+        text: texto,
+        nombre: nombre.length < 50 ? nombre : 'Erika Beatriz Sosa',
         disponibilidad: 'Inmediata',
         domicilio: 'Tierra del Fuego, Argentina',
         telefono: telefono || '',
         email: email || '',
-        resumen: 'Profesional proactiva con sólida experiencia orientada a resultados, adaptabilidad y cumplimiento de objetivos.',
-        experiencia: texto.length > 100 ? texto.substring(0, 1000) : 'Experiencia laboral general extraída del documento.',
-        estudios: 'Formación académica y capacitaciones registradas en el perfil.',
+        resumen: texto.length > 200 ? texto.substring(0, 300).replace(/\s+/g, ' ').trim() : 'Profesional con sólida experiencia y enfoque en resultados.',
+        experiencia: texto,
+        estudios: texto,
         habilidades: 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas, Trabajo en Equipo'
     };
 }
@@ -104,21 +107,15 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             extractedText = result.value ? result.value.trim() : '';
         } else {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            return res.status(400).json({ error: 'Formato no soportado.' });
+            return res.status(400).json({ error: 'Formato no soportado. Sube un PDF o Word (.docx).' });
         }
 
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }
 
-        const datosEstructurados = estructurarCv(extractedText);
-
-        res.json({
-            success: true,
-            message: 'CV analizado con éxito',
-            rawText: extractedText,
-            ...datosEstructurados
-        });
+        const respuestaCliente = procesarCvParaCliente(extractedText);
+        res.json(respuestaCliente);
 
     } catch (error) {
         console.error('Error al procesar el archivo:', error);

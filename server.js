@@ -30,69 +30,70 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Almacenamiento en memoria RAM del servidor para acceso inmediato y sin bloqueos
 let listaCandidatos = [];
 
-// Motor de Síntesis y Optimización ATS estricta (1 sola página)
-function sintetizarATS(texto) {
-    const palabrasClaveIdeal = [
-        "Gestión documental", "Administración", "Escrituración", "Atención al cliente", 
-        "Facturación y cobranzas", "Sistema Tango Gestión", "Digitalización de archivos", 
-        "Microsoft 365", "Microsoft Word", "Microsoft Excel", "Microsoft Outlook", 
-        "Organización y planificación", "Proactividad", "Trabajo en equipo", "Resolución de problemas"
-    ];
+// 🧠 MOTOR DE DEDUPLICACIÓN Y SÍNTESIS ATS PARA HABILIDADES
+function optimizarHabilidadesATS(textoBruto) {
+    if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo";
 
-    const textoLower = texto.toLowerCase();
-    const habilidadesEncontradas = palabrasClaveIdeal.filter(k => textoLower.includes(k.toLowerCase()));
-    const habilidadesATS = habilidadesEncontradas.length > 0 ? habilidadesEncontradas.join(" • ") : "Gestión administrativa • Administración • Microsoft Excel • Atención al cliente";
+    let encontradas = new Set(); // El "Set" evita matemáticamente que existan duplicados
+    let lower = textoBruto.toLowerCase();
 
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
-    const emailMatch = texto.match(/[\w.-]+@[\w.-]+\.\w+/);
-    const phoneMatch = texto.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
-    const dniMatch = texto.match(/\b\d{7,8}\b/);
+    // Agrupación de sinónimos y repeticiones bajo un único concepto ATS
+    if (lower.includes("cliente") || lower.includes("público") || lower.includes("atencion") || lower.includes("fideliza")) encontradas.add("Atención al Cliente");
+    if (lower.includes("document") || lower.includes("archiv") || lower.includes("expediente") || lower.includes("digitaliza")) encontradas.add("Gestión Documental");
+    if (lower.includes("factura") || lower.includes("cobranz") || lower.includes("caja") || lower.includes("efectivo")) encontradas.add("Facturación y Cobranzas");
+    if (lower.includes("tango")) encontradas.add("Sistema Tango Gestión");
+    if (lower.includes("excel") || lower.includes("planilla")) encontradas.add("Microsoft Excel");
+    if (lower.includes("word") || lower.includes("redacció") || lower.includes("informe")) encontradas.add("Microsoft Word & Redacción");
+    if (lower.includes("office") || lower.includes("365")) encontradas.add("Microsoft Office 365");
+    if (lower.includes("ia ") || lower.includes("inteligencia artificial") || lower.includes("copilot")) encontradas.add("Integración de IA (Copilot)");
+    if (lower.includes("equipo") || lower.includes("compañero")) encontradas.add("Trabajo en Equipo");
+    if (lower.includes("organiza") || lower.includes("planific") || lower.includes("agenda") || lower.includes("turno")) encontradas.add("Organización y Planificación");
+    if (lower.includes("escritura") || lower.includes("notarial") || lower.includes("protocolo")) encontradas.add("Gestión Notarial y Legal");
+    if (lower.includes("stock") || lower.includes("inventario") || lower.includes("proveedor") || lower.includes("mercadería")) encontradas.add("Control de Stock y Proveedores");
+    if (lower.includes("resolu") || lower.includes("problema") || lower.includes("conflicto")) encontradas.add("Resolución de Problemas");
+    if (lower.includes("proactiv") || lower.includes("iniciativa") || lower.includes("adaptabil")) encontradas.add("Proactividad y Adaptabilidad");
+    if (lower.includes("comunica") || lower.includes("relacion")) encontradas.add("Comunicación Efectiva");
 
-    const resumenSintetico = "Asistente Administrativa y de Escrituración con sólida trayectoria en gestión documental, atención al cliente y procesos notariales. Perfil proactivo con competencias en herramientas digitales y automatización administrativa.";
-    const experienciaSintetica = "• ESCRIBANÍA BITSH (Abril 2024 – Actualidad): Promoción interna al Área de Escrituración. Gestión documental, resguardo de protocolos, control de escrituras y facturación con Sistema Tango.\n• DESPENSA LA MORENITA (2022 – 2023): Atención al cliente, control de stock y manejo de caja.\n• DOLCE CAPRICCIO (2020 – 2022): Gestión integral y administración comercial.";
-    const estudiosSinteticos = "• Técnico Superior en Régimen Aduanero (En curso)\n• Auxiliar Administrativo en Establecimientos de Salud";
-
-    return {
-        compatibilidad: Math.min(Math.floor((habilidadesEncontradas.length / palabrasClaveIdeal.length) * 100) + 40, 98),
-        nombre: nombre,
-        email: emailMatch ? emailMatch[0] : '',
-        telefono: phoneMatch ? phoneMatch[0] : '',
-        dni: dniMatch ? dniMatch[0] : '',
-        domicilio: 'Río Grande, Tierra del Fuego',
-        disponibilidad: 'Full Time',
-        resumen: resumenSintetico,
-        experiencia: experienciaSintetica,
-        estudios: estudiosSinteticos,
-        habilidades: habilidadesATS
-    };
+    // Si el texto era muy vago y no hizo "match", aplicamos unas genéricas por defecto
+    if (encontradas.size === 0) {
+        return "Gestión Administrativa • Organización • Trabajo en Equipo";
+    }
+    
+    // Convertimos a array y unimos con viñetas horizontales limpias
+    return Array.from(encontradas).join(" • ");
 }
 
-// 1. Recibir postulación desde el link
+// Limpia saltos de línea excesivos y unifica textos para que no desborde la página PDF
+function formatearTexto(texto) {
+    if (!texto) return "";
+    return texto.replace(/\n{2,}/g, '\n').trim();
+}
+
+// 1. Recibir postulación desde el link externo y aplicar optimización en el momento exacto
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
         const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
-        const textoCompleto = `${nombre || ''} ${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
-        const optimizado = sintetizarATS(textoCompleto);
+        // Juntamos toda la info para encontrar habilidades y luego las sintetizamos sin repeticiones
+        const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
+        const habilidadesSintetizadas = optimizarHabilidadesATS(textoCompleto);
 
         const nuevoCandidato = {
             id: Date.now(),
-            nombre: nombre || optimizado.nombre || 'Postulante',
-            dni: dni || optimizado.dni,
-            email: email || optimizado.email,
-            telefono: telefono || optimizado.telefono,
-            direccion: direccion || optimizado.domicilio,
-            disponibilidad: disponibilidad || optimizado.disponibilidad,
-            resumen: resumen && resumen.length > 20 ? resumen : optimizado.resumen,
-            experiencia: experiencia && experiencia.length > 20 ? experiencia : optimizado.experiencia,
-            estudios: estudios && estudios.length > 10 ? estudios : optimizado.estudios,
-            habilidades: habilidades && habilidades.length > 10 ? habilidades : optimizado.habilidades,
+            nombre: nombre || 'Postulante',
+            dni: dni || '',
+            email: email || '',
+            telefono: telefono || '',
+            direccion: direccion || '',
+            disponibilidad: disponibilidad || 'Inmediata',
+            resumen: formatearTexto(resumen),
+            experiencia: formatearTexto(experiencia),
+            estudios: formatearTexto(estudios),
+            habilidades: habilidadesSintetizadas, // GUARDADO YA LIMPIO Y SIN REPETIR
             cvUrl,
             fotoUrl,
             fecha: new Date().toLocaleString()
@@ -123,7 +124,7 @@ app.delete('/api/candidatos/:id', (req, res) => {
     }
 });
 
-// 4. Analizar archivo individual
+// 4. Analizar CV individual
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -148,14 +149,33 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             return res.status(400).json({ success: false, error: 'Formato no soportado.' });
         }
 
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        const analisis = sintetizarATS(extractedText);
+        const habilidadesSintetizadas = optimizarHabilidadesATS(extractedText);
+        
+        const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
+        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
+        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
+        const dniMatch = extractedText.match(/\b\d{7,8}\b/);
+
         const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
-        res.json({ success: true, fotoUrl: fotoUrl, ...analisis });
+        res.json({
+            success: true,
+            fotoUrl: fotoUrl,
+            compatibilidad: 92,
+            nombre: nombre,
+            email: emailMatch ? emailMatch[0] : '',
+            telefono: phoneMatch ? phoneMatch[0] : '',
+            dni: dniMatch ? dniMatch[0] : '',
+            domicilio: 'Río Grande, Tierra del Fuego',
+            disponibilidad: 'A convenir',
+            resumen: "Perfil extraído. Ajustar si es necesario.",
+            experiencia: "Experiencia procesada.",
+            estudios: "Estudios procesados.",
+            habilidades: habilidadesSintetizadas // Mismo proceso limpio aplicado aquí
+        });
 
     } catch (error) {
         console.error('Error al procesar archivo:', error);

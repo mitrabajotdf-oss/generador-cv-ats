@@ -230,7 +230,7 @@
             alert('¡Perfil guardado correctamente!');
         }
 
-        // GENERACIÓN DEL PDF EN PESTAÑA NUEVA
+        // GENERACIÓN DEL PDF EN PESTAÑA NUEVA CORREGIDA
         function generarPDFAts() {
             const nombre = document.getElementById('nombreInput').value || 'Postulante';
             document.getElementById('printNombre').innerText = nombre;
@@ -262,7 +262,7 @@
                 printFotoContainer.innerHTML = '';
             }
 
-            // CREACIÓN DE LA PESTAÑA NUEVA PARA LA IMPRESIÓN
+            // CREACIÓN DE LA PESTAÑA NUEVA PARA LA IMPRESIÓN (SIN ETIQUETAS SCRIPT INYECTADAS)
             const contenidoHtml = document.getElementById('cvPrintTemplate').innerHTML;
             const nuevaPestana = window.open('', '_blank');
             
@@ -281,14 +281,17 @@
                     </head>
                     <body>
                         ${contenidoHtml}
-                        <script>
-                            // Dispara la impresión nativa cuando la pestaña nueva cargue
-                            window.onload = () => { setTimeout(() => { window.print(); }, 200); };
-                        </script>
                     </body>
                     </html>
                 `);
                 nuevaPestana.document.close();
+                
+                // Ejecutamos la impresión usando un evento nativo en la nueva ventana
+                nuevaPestana.onload = function() {
+                    setTimeout(function() {
+                        nuevaPestana.print();
+                    }, 300);
+                };
             } else {
                 alert("Por favor, permite las ventanas emergentes (pop-ups) en tu navegador para generar el PDF.");
             }

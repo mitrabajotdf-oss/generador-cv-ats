@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de almacenamiento temporal para los CVs subidos
+// Configuración de almacenamiento temporal
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'uploads');
@@ -30,45 +30,60 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Ruta para procesar el archivo subido y extraer texto
+// Ruta robusta para procesar el archivo subido
 app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
+    let filePath = '';
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No se ha subido ningún archivo.' });
         }
 
-        const filePath = req.file.path;
+        filePath = req.file.path;
         const fileExtension = path.extname(req.file.originalname).toLowerCase();
         let extractedText = '';
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
             const pdfData = await pdfParse(dataBuffer);
-            extractedText = pdfData.text;
+            extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
-            extractedText = result.value;
+            extractedText = result.value ? result.value.trim() : '';
         } else {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             return res.status(400).json({ error: 'Formato no soportado. Sube un PDF o Word (.docx).' });
         }
 
-        // Limpieza básica del archivo temporal
-        fs.unlinkSync(filePath);
+        // Limpieza segura del archivo temporal
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
 
-        // Simulamos la detección preliminar de datos y cálculo ATS base
+        // Si el texto extraído está vacío (ej. es una imagen escaneada o un PDF gráfico)
+        if (!extractedText || extractedText.length < 10) {
+            return res.json({
+                success: true,
+                warning: true,
+                message: 'El archivo contiene imágenes o no tiene texto seleccionable legible por ATS.',
+                rawText: ''
+            });
+        }
+
         res.json({
             success: true,
             message: 'CV procesado correctamente con filtros ATS',
-            rawText: extractedText,
-            // Aquí en siguientes pasos conectaremos el análisis de palabras clave y puntaje ATS
+            rawText: extractedText
         });
 
     } catch (error) {
-        console.error('Error al procesar el archivo:', error);
-        res.status(500).json({ error: 'Error interno al procesar el documento.' });
+        console.error('Error detallado al procesar documento:', error);
+        if (filePath && fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch (e) {}
+        }
+        res.status(500).json({ error: 'Error al parsear el documento. Asegúrate de que el PDF no esté protegido o dañado.' });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en puerto ${PORT}`);
 });

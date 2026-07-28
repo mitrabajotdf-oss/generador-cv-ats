@@ -15,18 +15,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Rellenar datos personales si existen en los inputs
+                    // Datos personales y de contacto
                     if (document.getElementById('nombreInput')) document.getElementById('nombreInput').value = data.nombre || '';
                     if (document.getElementById('emailInput')) document.getElementById('emailInput').value = data.email || '';
                     if (document.getElementById('telefonoInput')) document.getElementById('telefonoInput').value = data.telefono || '';
                     if (document.getElementById('domicilioInput')) document.getElementById('domicilioInput').value = data.domicilio || '';
                     if (document.getElementById('disponibilidadInput')) document.getElementById('disponibilidadInput').value = data.disponibilidad || 'Inmediata';
                     
-                    // Inyectar el texto completo extraído del PDF de Erika en las secciones grandes
-                    if (document.getElementById('resumenInput')) document.getElementById('resumenInput').value = data.rawText ? data.rawText.substring(0, 500) : '';
-                    if (document.getElementById('experienciaInput')) document.getElementById('experienciaInput').value = data.rawText || '';
-                    if (document.getElementById('estudiosInput')) document.getElementById('estudiosInput').value = data.rawText || '';
-                    if (document.getElementById('habilidadesInput')) document.getElementById('habilidadesInput').value = data.habilidades || 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas';
+                    // Asignación completa del texto sin recortes para que experiencia, estudios y resumen queden íntegros
+                    const textoCompleto = data.rawText || data.text || '';
+                    
+                    if (document.getElementById('resumenInput')) {
+                        document.getElementById('resumenInput').value = textoCompleto.length > 800 ? textoCompleto.substring(0, 800) : textoCompleto;
+                    }
+                    if (document.getElementById('experienciaInput')) {
+                        document.getElementById('experienciaInput').value = textoCompleto;
+                    }
+                    if (document.getElementById('estudiosInput')) {
+                        document.getElementById('estudiosInput').value = textoCompleto;
+                    }
+                    if (document.getElementById('habilidadesInput')) {
+                        document.getElementById('habilidadesInput').value = textoCompleto;
+                    }
 
                     alert('¡CV analizado y extraído correctamente!');
                 } else {

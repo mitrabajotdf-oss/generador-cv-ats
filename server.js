@@ -43,7 +43,7 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
             
-            // Renderizador tolerante a errores de fuentes para extraer todo el texto disponible
+            // Renderizador tolerante para extraer el contenido plano ignorando fallas tipográficas
             const options = {
                 pagerender: async function(pageData) {
                     try {

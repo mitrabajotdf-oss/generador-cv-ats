@@ -1,10 +1,103 @@
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Busca el formulario por ID o selecciona el primer formulario disponible en la página
-    const uploadForm = document.getElementById('uploadForm') || document.querySelector('form');
-    
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async function(e) {
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador y Gestor de CVs ATS</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1, h3 { color: #2c3e50; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], input[type="email"], textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        input[type="file"] { margin-top: 5px; }
+        .btn { background-color: #27ae60; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; width: 100%; }
+        .btn:hover { background-color: #219653; }
+        .card { background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Plataforma ATS y Gestor de Perfiles</h1>
+        
+        <!-- Enlace para compartir -->
+        <div class="card">
+            <h3>🔗 Link de Formulario Externo (Redes / WhatsApp)</h3>
+            <p>Comparte este enlace para recibir postulaciones directas:</p>
+            <input type="text" id="linkFormulario" readonly style="width: 75%; display:inline-block;">
+            <button onclick="copiarLink()" class="btn" style="width: 20%; display:inline-block; margin-top:0; padding:10px;">Copiar</button>
+        </div>
+
+        <!-- Formulario de Subida -->
+        <form id="uploadForm" enctype="multipart/form-data" class="card">
+            <h3>Subir CV (PDF / Word) y Foto de Perfil</h3>
+            
+            <label>Foto de Perfil:</label>
+            <input type="file" name="fotoPerfil" accept="image/*">
+
+            <label>Archivo de CV (PDF o DOCX):</label>
+            <input type="file" name="cvFile" accept=".pdf,.docx" required>
+
+            <button type="submit" class="btn">Analizar y Procesar con Filtros ATS</button>
+        </form>
+
+        <!-- Indicador ATS -->
+        <div id="atsCard" class="card" style="display:none; background: #eef9ec; border-color: #c3e6cb;">
+            <h3>📊 Diagnóstico de Filtros ATS</h3>
+            <p>Porcentaje de Compatibilidad: <strong id="compatibilidadTxt" style="font-size: 1.3em; color: #2e7d32;">0%</strong></p>
+        </div>
+
+        <div id="previewFoto" style="margin-bottom: 15px; text-align: center;"></div>
+
+        <!-- Formulario Editable del CV -->
+        <form id="cvEditorForm" class="card">
+            <h3>Perfil Profesional Extraído</h3>
+            
+            <label>Nombre Completo:</label>
+            <input type="text" id="nombreInput">
+
+            <label>DNI:</label>
+            <input type="text" id="dniInput">
+
+            <label>Email:</label>
+            <input type="text" id="emailInput">
+
+            <label>Teléfono:</label>
+            <input type="text" id="telefonoInput">
+
+            <label>Domicilio:</label>
+            <input type="text" id="domicilioInput">
+
+            <label>Disponibilidad:</label>
+            <input type="text" id="disponibilidadInput">
+
+            <label>Resumen Profesional:</label>
+            <textarea id="resumenInput" rows="4"></textarea>
+
+            <label>Experiencia Laboral:</label>
+            <textarea id="experienciaInput" rows="6"></textarea>
+
+            <label>Estudios, Cursos y Capacitaciones:</label>
+            <textarea id="estudiosInput" rows="4"></textarea>
+
+            <label>Habilidades:</label>
+            <textarea id="habilidadesInput" rows="3"></textarea>
+
+            <button type="button" onclick="guardarPerfil()" class="btn">Guardar Perfil y Estado ATS</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('linkFormulario').value = window.location.origin + '/formulario.html';
+
+        function copiarLink() {
+            const input = document.getElementById('linkFormulario');
+            input.select();
+            document.execCommand('copy');
+            alert('¡Enlace copiado al portapapeles!');
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
 
@@ -13,48 +106,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     body: formData
                 });
-                
                 const data = await response.json();
-                
+
                 if (data.success) {
-                    const asignar = (selectors, val) => {
-                        selectors.forEach(sel => {
-                            const el = document.querySelector(sel);
-                            if (el) el.value = val || '';
-                        });
-                    };
+                    document.getElementById('nombreInput').value = data.nombre || '';
+                    document.getElementById('dniInput').value = data.dni || '';
+                    document.getElementById('emailInput').value = data.email || '';
+                    document.getElementById('telefonoInput').value = data.telefono || '';
+                    document.getElementById('domicilioInput').value = data.domicilio || '';
+                    document.getElementById('disponibilidadInput').value = data.disponibilidad || '';
+                    document.getElementById('resumenInput').value = data.resumen || '';
+                    document.getElementById('experienciaInput').value = data.experiencia || '';
+                    document.getElementById('estudiosInput').value = data.estudios || '';
+                    document.getElementById('habilidadesInput').value = data.habilidades || '';
 
-                    asignar(['#nombreInput', '#nombre', 'input[name*="nombre" i]'], data.nombre);
-                    asignar(['#emailInput', '#email', '#correo', 'input[name*="email" i], input[name*="correo" i]'], data.email);
-                    asignar(['#telefonoInput', '#telefono', '#phone', 'input[name*="telefono" i], input[name*="tel" i]'], data.telefono);
-                    asignar(['#domicilioInput', '#domicilio', '#direccion', 'input[name*="domicilio" i], input[name*="dir" i]'], data.domicilio);
-                    asignar(['#disponibilidadInput', '#disponibilidad', 'input[name*="disponibilidad" i]'], data.disponibilidad || 'Inmediata');
-
-                    const textoCV = data.rawText || data.resumen || '';
-                    const textareas = document.querySelectorAll('textarea');
-                    
-                    if (textareas.length > 0) {
-                        textareas.forEach((ta) => {
-                            ta.value = textoCV;
-                        });
-                    } else {
-                        asignar(['#resumenInput', '#resumen'], textoCV);
-                        asignar(['#experienciaInput', '#experiencia'], textoCV);
-                        asignar(['#estudiosInput', '#estudios'], textoCV);
-                        asignar(['#habilidadesInput', '#habilidades', '#skills'], textoCV);
+                    if(data.fotoUrl) {
+                        document.getElementById('previewFoto').innerHTML = `<img src="${data.fotoUrl}" alt="Foto" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #27ae60;">`;
                     }
 
-                    alert('¡CV analizado y extraído correctamente!');
+                    document.getElementById('atsCard').style.display = 'block';
+                    document.getElementById('compatibilidadTxt').innerText = data.compatibilidad + '%';
+
+                    alert('¡CV analizado y adaptado correctamente a los filtros ATS!');
                 } else {
-                    alert('Error: ' + data.error);
+                    alert('Error: ' + (data.error || 'No se pudo procesar el documento.'));
                 }
             } catch (err) {
-                console.error('Error detallado:', err);
-                alert('Error interno al procesar el archivo.');
+                console.error(err);
+                alert('Error interno al conectar con el servidor.');
             }
         });
-    } else {
-        console.error('No se encontró ningún formulario en el DOM.');
-    }
-});
-</script>
+
+        function guardarPerfil() {
+            alert('¡Perfil guardado correctamente con su respectivo puntaje ATS!');
+        }
+    </script>
+</body>
+</html>

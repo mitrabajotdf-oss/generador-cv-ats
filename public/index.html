@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Gestión de Candidatos & ATS</title>
+    <!-- Librería html2pdf para generar PDF limpio y profesional -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -20,18 +22,16 @@
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
         th { background-color: #2c3e50; color: white; }
 
-        /* Estilos específicos para generar el PDF con formato ATS estricto (Columnas, Máx 2 páginas, Tipografía limpia) */
-        @media print {
-            body { background: #fff; padding: 0; color: #000; font-size: 11pt; font-family: 'Calibri', 'Arial', sans-serif; }
-            .container > *:not(#cvEditorForm):not(#previewFoto) { display: none !important; }
-            .container { max-width: 100% !important; padding: 0 !important; box-shadow: none !important; }
-            #cvEditorForm { border: none !important; padding: 0 !important; background: #fff !important; }
-            textarea, input { border: none !important; background: transparent !important; resize: none; font-family: inherit; font-size: 11pt; padding: 0 !important; margin: 0 !important; width: 100% !important; color: #000 !important; }
-            label { font-size: 11pt; font-weight: bold; color: #111; margin-top: 10px; text-transform: uppercase; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
-            /* Estructura de columnas optimizada para ATS */
-            .ats-columnas { display: flex; flex-wrap: wrap; gap: 20px; }
-            .ats-col { flex: 1; min-width: 45%; }
-            @page { size: A4; margin: 1.5cm; }
+        /* Estilo oculto para la plantilla ATS estricta que se convertirá en PDF */
+        #cvPdfTemplate {
+            display: none;
+            background: #ffffff;
+            color: #000000;
+            padding: 30px;
+            font-family: 'Calibri', 'Arial', sans-serif;
+            font-size: 11pt;
+            width: 210mm;
+            box-sizing: border-box;
         }
     </style>
 </head>
@@ -79,25 +79,19 @@
             <label>Nombre Completo:</label>
             <input type="text" id="nombreInput">
 
-            <div class="ats-columnas">
-                <div class="ats-col">
-                    <label>DNI:</label>
-                    <input type="text" id="dniInput">
-                    <label>Email:</label>
-                    <input type="text" id="emailInput">
-                </div>
-                <div class="ats-col">
-                    <label>Teléfono:</label>
-                    <input type="text" id="telefonoInput">
-                    <label>Domicilio:</label>
-                    <input type="text" id="domicilioInput">
-                </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>DNI:</label><input type="text" id="dniInput"></div>
+                <div style="flex: 1;"><label>Email:</label><input type="text" id="emailInput"></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>Teléfono:</label><input type="text" id="telefonoInput"></div>
+                <div style="flex: 1;"><label>Domicilio:</label><input type="text" id="domicilioInput"></div>
             </div>
 
             <label>Disponibilidad:</label>
             <input type="text" id="disponibilidadInput">
 
-            <label>Resumen Profesional:</label>
+            <label>Resumen Profesional (Perfil Profesional):</label>
             <textarea id="resumenInput" rows="4"></textarea>
 
             <label>Experiencia Laboral:</label>
@@ -110,8 +104,38 @@
             <textarea id="habilidadesInput" rows="3"></textarea>
 
             <button type="button" onclick="guardarPerfil()" class="btn">Guardar Perfil</button>
-            <button type="button" onclick="generarPDF()" class="btn btn-pdf">📥 Descargar CV en PDF (Formato ATS)</button>
+            <button type="button" onclick="generarPDFAts()" class="btn btn-pdf">📥 Descargar CV en PDF (Formato ATS)</button>
         </form>
+    </div>
+
+    <!-- PLANTILLA OCULTA PARA EL PDF FORMATO ATS ESTRICTO -->
+    <div id="cvPdfTemplate">
+        <div style="position: relative; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px;">
+            <div id="pdfFotoContainer" style="position: absolute; right: 0; top: 0;"></div>
+            <h1 id="pdfNombre" style="margin: 0 0 10px 0; font-size: 24pt; color: #111; text-transform: uppercase;"></h1>
+            <div id="pdfDatosHorizontal" style="font-size: 10pt; color: #444; line-height: 1.5; padding-right: 110px;"></div>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <h3 style="color: #2c3e50; font-size: 13pt; border-bottom: 1px solid #ccc; text-transform: uppercase; margin-bottom: 5px;">Perfil Profesional</h3>
+            <p id="pdfResumen" style="margin: 0; line-height: 1.4; white-space: pre-wrap;"></p>
+        </div>
+
+        <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <h3 style="color: #2c3e50; font-size: 13pt; border-bottom: 1px solid #ccc; text-transform: uppercase; margin-bottom: 5px;">Experiencia Laboral</h3>
+                <p id="pdfExperiencia" style="margin: 0; line-height: 1.4; white-space: pre-wrap; font-size: 10pt;"></p>
+            </div>
+            <div style="flex: 1;">
+                <h3 style="color: #2c3e50; font-size: 13pt; border-bottom: 1px solid #ccc; text-transform: uppercase; margin-bottom: 5px;">Estudios y Capacitaciones</h3>
+                <p id="pdfEstudios" style="margin: 0; line-height: 1.4; white-space: pre-wrap; font-size: 10pt;"></p>
+            </div>
+        </div>
+
+        <div>
+            <h3 style="color: #2c3e50; font-size: 13pt; border-bottom: 1px solid #ccc; text-transform: uppercase; margin-bottom: 5px;">Habilidades</h3>
+            <p id="pdfHabilidades" style="margin: 0; line-height: 1.4; white-space: pre-wrap;"></p>
+        </div>
     </div>
 
     <script>
@@ -164,7 +188,9 @@
             document.getElementById('habilidadesInput').value = c.habilidades || '';
 
             if(c.fotoUrl) {
-                document.getElementById('previewFoto').innerHTML = `<img src="${c.fotoUrl}" alt="Foto" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #27ae60;">`;
+                document.getElementById('previewFoto').innerHTML = `<img src="${c.fotoUrl}" alt="Foto" id="fotoPerfilActual" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #27ae60;">`;
+            } else {
+                document.getElementById('previewFoto').innerHTML = '';
             }
 
             window.scrollTo({ top: 500, behavior: 'smooth' });
@@ -195,7 +221,9 @@
                     document.getElementById('habilidadesInput').value = data.habilidades || '';
 
                     if(data.fotoUrl) {
-                        document.getElementById('previewFoto').innerHTML = `<img src="${data.fotoUrl}" alt="Foto" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #27ae60;">`;
+                        document.getElementById('previewFoto').innerHTML = `<img src="${data.fotoUrl}" alt="Foto" id="fotoPerfilActual" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #27ae60;">`;
+                    } else {
+                        document.getElementById('previewFoto').innerHTML = '';
                     }
 
                     document.getElementById('atsCard').style.display = 'block';
@@ -215,8 +243,53 @@
             alert('¡Perfil guardado correctamente!');
         }
 
-        function generarPDF() {
-            window.print();
+        function generarPDFAts() {
+            // Rellenar la plantilla oculta con los datos del editor
+            document.getElementById('pdfNombre').innerText = document.getElementById('nombreInput').value || 'Nombre del Postulante';
+            
+            const dni = document.getElementById('dniInput').value;
+            const email = document.getElementById('emailInput').value;
+            const tel = document.getElementById('telefonoInput').value;
+            const dom = document.getElementById('domicilioInput').value;
+            const disp = document.getElementById('disponibilidadInput').value;
+
+            let datosTexto = '';
+            if(dni) datosTexto += `DNI: ${dni} | `;
+            if(email) datosTexto += `Email: ${email} | `;
+            if(tel) datosTexto += `Tel: ${tel} | `;
+            if(dom) datosTexto += `Domicilio: ${dom} | `;
+            if(disp) datosTexto += `Disponibilidad: ${disp}`;
+            document.getElementById('pdfDatosHorizontal').innerText = datosTexto;
+
+            document.getElementById('pdfResumen').innerText = document.getElementById('resumenInput').value;
+            document.getElementById('pdfExperiencia').innerText = document.getElementById('experienciaInput').value;
+            document.getElementById('pdfEstudios').innerText = document.getElementById('estudiosInput').value;
+            document.getElementById('pdfHabilidades').innerText = document.getElementById('habilidadesInput').value;
+
+            // Gestionar foto arriba a la derecha si existe
+            const fotoActual = document.getElementById('fotoPerfilActual');
+            const pdfFotoContainer = document.getElementById('pdfFotoContainer');
+            if (fotoActual && fotoActual.src) {
+                pdfFotoContainer.innerHTML = `<img src="${fotoActual.src}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 1px solid #666;">`;
+            } else {
+                pdfFotoContainer.innerHTML = '';
+            }
+
+            // Opciones de configuración para generar el PDF limpio y descargable
+            const element = document.getElementById('cvPdfTemplate');
+            element.style.display = 'block'; // Mostrar momentáneamente para renderizar
+
+            const opt = {
+                margin:       10,
+                filename:     `CV_ATS_${(document.getElementById('nombreInput').value || 'Postulante').replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).save().then(() => {
+                element.style.display = 'none'; // Ocultar nuevamente
+            });
         }
 
         cargarCandidatos();

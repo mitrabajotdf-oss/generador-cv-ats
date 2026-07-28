@@ -1,57 +1,61 @@
 <script>
-document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
+document.addEventListener('DOMContentLoaded', () => {
+    const uploadForm = document.getElementById('uploadForm');
+    
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
 
-    try {
-        const response = await fetch('/api/upload-cv', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            console.log('Datos recibidos del servidor:', data);
-
-            // 1. Asignar datos básicos si encuentra campos con estos nombres o IDs comunes
-            const asignar = (selectors, val) => {
-                selectors.forEach(sel => {
-                    const el = document.querySelector(sel);
-                    if (el) el.value = val || '';
+            try {
+                const response = await fetch('/api/upload-cv', {
+                    method: 'POST',
+                    body: formData
                 });
-            };
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('Datos recibidos del servidor:', data);
 
-            asignar(['#nombreInput', '#nombre', 'input[name*="nombre" i]'], data.nombre);
-            asignar(['#emailInput', '#email', '#correo', 'input[name*="email" i], input[name*="correo" i]'], data.email);
-            asignar(['#telefonoInput', '#telefono', '#phone', 'input[name*="telefono" i], input[name*="tel" i]'], data.telefono);
-            asignar(['#domicilioInput', '#domicilio', '#direccion', 'input[name*="domicilio" i], input[name*="dir" i]'], data.domicilio);
-            asignar(['#disponibilidadInput', '#disponibilidad', 'input[name*="disponibilidad" i]'], data.disponibilidad || 'Inmediata');
+                    const asignar = (selectors, val) => {
+                        selectors.forEach(sel => {
+                            const el = document.querySelector(sel);
+                            if (el) el.value = val || '';
+                        });
+                    };
 
-            // 2. Volcar TODO el texto extraído a cualquier textarea disponible en el formulario
-            const textoCV = data.rawText || data.resumen || '';
-            const textareas = document.querySelectorAll('textarea');
-            
-            if (textareas.length > 0) {
-                textareas.forEach((ta, index) => {
-                    // Si hay varios textareas (resumen, experiencia, estudios, habilidades), les asigna el texto completo
-                    ta.value = textoCV;
-                });
-            } else {
-                // Fallback por si usan inputs de tipo texto para las secciones
-                asignar(['#resumenInput', '#resumen'], textoCV);
-                asignar(['#experienciaInput', '#experiencia'], textoCV);
-                asignar(['#estudiosInput', '#estudios'], textoCV);
-                asignar(['#habilidadesInput', '#habilidades', '#skills'], textoCV);
+                    asignar(['#nombreInput', '#nombre', 'input[name*="nombre" i]'], data.nombre);
+                    asignar(['#emailInput', '#email', '#correo', 'input[name*="email" i], input[name*="correo" i]'], data.email);
+                    asignar(['#telefonoInput', '#telefono', '#phone', 'input[name*="telefono" i], input[name*="tel" i]'], data.telefono);
+                    asignar(['#domicilioInput', '#domicilio', '#direccion', 'input[name*="domicilio" i], input[name*="dir" i]'], data.domicilio);
+                    asignar(['#disponibilidadInput', '#disponibilidad', 'input[name*="disponibilidad" i]'], data.disponibilidad || 'Inmediata');
+
+                    const textoCV = data.rawText || data.resumen || '';
+                    const textareas = document.querySelectorAll('textarea');
+                    
+                    if (textareas.length > 0) {
+                        textareas.forEach((ta) => {
+                            ta.value = textoCV;
+                        });
+                    } else {
+                        asignar(['#resumenInput', '#resumen'], textoCV);
+                        asignar(['#experienciaInput', '#experiencia'], textoCV);
+                        asignar(['#estudiosInput', '#estudios'], textoCV);
+                        asignar(['#habilidadesInput', '#habilidades', '#skills'], textoCV);
+                    }
+
+                    alert('¡CV analizado y extraído correctamente!');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                console.error('Error detallado:', err);
+                alert('Error interno al procesar el archivo.');
             }
-
-            alert('¡CV analizado y extraído correctamente!');
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (err) {
-        console.error('Error detallado:', err);
-        alert('Error interno al procesar el archivo.');
+        });
+    } else {
+        console.error('No se encontró el elemento #uploadForm en el DOM.');
     }
 });
 </script>

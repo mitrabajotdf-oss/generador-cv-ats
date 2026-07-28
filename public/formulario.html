@@ -1,1 +1,87 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Envío de Datos - Postulación</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; text-align: center; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], input[type="email"], textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        input[type="file"] { margin-top: 5px; }
+        .btn { background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 25px; width: 100%; }
+        .btn:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Registro de Postulante</h2>
+        <p style="text-align: center; color: #666;">Completa tus datos y adjunta tu CV y foto para enviarlos al reclutador.</p>
+        
+        <form id="publicForm" enctype="multipart/form-data">
+            <label>Foto de Perfil:</label>
+            <input type="file" name="fotoPerfil" accept="image/*">
+
+            <label>Archivo de CV (PDF, Word o cualquier formato):</label>
+            <input type="file" name="cvFile" required>
+
+            <label>Nombre Completo:</label>
+            <input type="text" name="nombre" required>
+
+            <label>DNI:</label>
+            <input type="text" name="dni" required>
+
+            <label>Email de Contacto:</label>
+            <input type="email" name="email" required>
+
+            <label>Dirección / Domicilio:</label>
+            <input type="text" name="direccion" required>
+
+            <label>Disponibilidad:</label>
+            <input type="text" name="disponibilidad" value="Inmediata" required>
+
+            <label>Resumen Profesional:</label>
+            <textarea name="resumen" rows="3" placeholder="Breve descripción de tu perfil..."></textarea>
+
+            <label>Experiencia Laboral:</label>
+            <textarea name="experiencia" rows="4" placeholder="Tus trabajos anteriores..."></textarea>
+
+            <label>Estudios, Cursos y Capacitaciones:</label>
+            <textarea name="estudios" rows="3" placeholder="Títulos, cursos realizados..."></textarea>
+
+            <label>Habilidades:</label>
+            <textarea name="habilidades" rows="2" placeholder="Habilidades técnicas y blandas..."></textarea>
+
+            <button type="submit" class="btn">Enviar Postulación</button>
+        </form>
+        <div id="resultadoEnvio" style="margin-top: 20px; text-align: center; font-weight: bold;"></div>
+    </div>
+
+    <script>
+        document.getElementById('publicForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            try {
+                const res = await fetch('/api/enviar-postulacion', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('resultadoEnvio').innerHTML = `<span style="color: green;">${data.message}</span>`;
+                    document.getElementById('publicForm').reset();
+                } else {
+                    alert('Error al enviar la postulación.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error de conexión con el servidor.');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -18,11 +18,12 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
             document.getElementById('domicilioInput').value = data.domicilio || '';
             document.getElementById('disponibilidadInput').value = data.disponibilidad || 'Inmediata';
             
-            // Asignar el texto completo a las secciones grandes para que no queden incompletas
-            document.getElementById('resumenInput').value = data.rawText ? data.rawText.substring(0, 600) : (data.resumen || '');
+            // Asignar el texto completo sin recortes ni valores por defecto estáticos
+            const textoCompleto = data.rawText || data.resumen || '';
+            document.getElementById('resumenInput').value = textoCompleto;
             document.getElementById('experienciaInput').value = data.rawText || data.experiencia || '';
             document.getElementById('estudiosInput').value = data.rawText || data.estudios || '';
-            document.getElementById('habilidadesInput').value = data.habilidades || 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas';
+            document.getElementById('habilidadesInput').value = data.rawText || data.habilidades || '';
 
             alert('¡CV analizado y extraído correctamente!');
         } else {

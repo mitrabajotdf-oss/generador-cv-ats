@@ -77,9 +77,15 @@ function generarPerfilATS(textoBruto) {
     return perfil;
 }
 
-function formatearTexto(texto) {
+// 🧠 CONVERSOR A LÍNEA FLUIDA (Elimina saltos, viñetas y espacios extra)
+function formatearFluido(texto) {
     if (!texto) return "";
-    return texto.replace(/\n{2,}/g, '\n').trim();
+    return texto
+        .replace(/[\r\n]+/g, '. ') // Cambia saltos de línea por puntos
+        .replace(/[•\-\*]/g, '')   // Elimina viñetas o guiones
+        .replace(/\s{2,}/g, ' ')   // Elimina dobles espacios
+        .replace(/\.\s\./g, '.')   // Limpia puntos redundantes
+        .trim();
 }
 
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
@@ -89,11 +95,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
         const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
-        const habilidadesSintetizadas = optimizarHabilidadesATS(textoCompleto);
         
-        // El perfil se autocompleta usando la IA programada arriba:
-        const perfilGenerado = generarPerfilATS(textoCompleto);
-
         const nuevoCandidato = {
             id: Date.now(),
             nombre: nombre || 'Postulante',
@@ -102,10 +104,10 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            resumen: perfilGenerado, 
-            experiencia: formatearTexto(experiencia),
-            estudios: formatearTexto(estudios),
-            habilidades: habilidadesSintetizadas,
+            resumen: generarPerfilATS(textoCompleto), 
+            experiencia: formatearFluido(experiencia || textoCompleto), // APLICA LÍNEA FLUIDA
+            estudios: formatearFluido(estudios),
+            habilidades: optimizarHabilidadesATS(textoCompleto),
             cvUrl,
             fotoUrl,
             fecha: new Date().toLocaleString()
@@ -150,9 +152,6 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        const habilidadesSintetizadas = optimizarHabilidadesATS(extractedText);
-        const perfilGenerado = generarPerfilATS(extractedText);
-        
         const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
@@ -167,10 +166,10 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             dni: '',
             domicilio: '',
             disponibilidad: 'A convenir',
-            resumen: perfilGenerado,
-            experiencia: formatearTexto(extractedText),
-            estudios: "Completar o editar manualmente.",
-            habilidades: habilidadesSintetizadas
+            resumen: generarPerfilATS(extractedText),
+            experiencia: formatearFluido(extractedText), // APLICA LÍNEA FLUIDA
+            estudios: formatearFluido(extractedText),
+            habilidades: optimizarHabilidadesATS(extractedText)
         });
     } catch (error) {
         if (filePath && fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e){} }

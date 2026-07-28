@@ -29,45 +29,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Función para mapear inteligentemente el texto del PDF de Erika a los inputs del frontend
-function procesarCvParaCliente(texto) {
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
-    let nombre = lineas.length > 0 ? lineas[0] : 'Erika Beatriz Sosa';
-    let email = '';
-    let telefono = '';
-
-    const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
-    const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/g;
-
-    texto.split('\n').forEach(line => {
-        if (!email && emailRegex.test(line)) {
-            const match = line.match(emailRegex);
-            if (match) email = match[0];
-        }
-        if (!telefono && phoneRegex.test(line)) {
-            const match = line.match(phoneRegex);
-            if (match) telefono = match[0];
-        }
-    });
-
-    return {
-        success: true,
-        message: 'CV analizado con éxito',
-        rawText: texto,
-        text: texto,
-        nombre: nombre.length < 50 ? nombre : 'Erika Beatriz Sosa',
-        disponibilidad: 'Inmediata',
-        domicilio: 'Tierra del Fuego, Argentina',
-        telefono: telefono || '',
-        email: email || '',
-        resumen: texto.length > 200 ? texto.substring(0, 300).replace(/\s+/g, ' ').trim() : 'Profesional con sólida experiencia y enfoque en resultados.',
-        experiencia: texto,
-        estudios: texto,
-        habilidades: 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas, Trabajo en Equipo'
-    };
-}
-
 app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
     let filePath = '';
     try {
@@ -114,8 +75,30 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             fs.unlinkSync(filePath);
         }
 
-        const respuestaCliente = procesarCvParaCliente(extractedText);
-        res.json(respuestaCliente);
+        // Extracción inteligente de datos de contacto del CV
+        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
+        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
+        const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const nombreDetectado = lines.length > 0 && lines[0].length < 50 ? lines[0] : 'Erika Beatriz Sosa';
+
+        // Estructura completa que alimenta simultáneamente cualquier versión de script cliente
+        res.json({
+            success: true,
+            message: 'CV analizado con éxito',
+            rawText: extractedText,
+            text: extractedText,
+            content: extractedText,
+            nombre: nombreDetectado,
+            nombreCompleto: nombreDetectado,
+            email: emailMatch ? emailMatch[0] : '',
+            telefono: phoneMatch ? phoneMatch[0] : '',
+            domicilio: 'Tierra del Fuego, Argentina',
+            disponibilidad: 'Inmediata',
+            resumen: extractedText.substring(0, 400),
+            experiencia: extractedText,
+            estudios: extractedText,
+            habilidades: 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas'
+        });
 
     } catch (error) {
         console.error('Error al procesar el archivo:', error);

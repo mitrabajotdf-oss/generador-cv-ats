@@ -15,7 +15,7 @@
         .btn:hover { background-color: #219653; }
         .btn-pdf { background-color: #2980b9; }
         .btn-pdf:hover { background-color: #1f618d; }
-        .btn-danger { background-color: #c0392b; padding: 5px 10px; font-size: 13px; }
+        .btn-danger { background-color: #c0392b; padding: 5px 10px; font-size: 13px; margin-left: 5px; }
         .btn-danger:hover { background-color: #962d22; }
         .card { background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -45,7 +45,7 @@
         </div>
 
         <div class="card" style="background: #eef9ec; border-color: #c3e6cb;">
-            <h3>📥 Candidatos Recibidos mediante el Link (Guardados Definitivamente)</h3>
+            <h3>📥 Candidatos Recibidos mediante el Link</h3>
             <div id="listaCandidatosContainer">
                 <p>Cargando postulaciones...</p>
             </div>
@@ -168,7 +168,8 @@
                     container.innerHTML = `<p>Aún no hay postulaciones guardadas.</p>`;
                 }
             } catch (err) {
-                console.error(err);
+                console.error("Error cargando candidatos:", err);
+                document.getElementById('listaCandidatosContainer').innerHTML = `<p>Error de conexión al cargar los datos.</p>`;
             }
         }
 
@@ -260,14 +261,14 @@
             
             const dni = document.getElementById('dniInput').value;
             const email = document.getElementById('emailInput').value;
-            const tel = document.getElementById('telefonoInput'].value || document.getElementById('telefonoInput').value;
+            const tel = document.getElementById('telefonoInput').value;
             const dom = document.getElementById('domicilioInput').value;
             const disp = document.getElementById('disponibilidadInput').value;
 
             let datosTexto = '';
             if(dni) datosTexto += `DNI: ${dni} &nbsp;|&nbsp; `;
             if(email) datosTexto += `Email: ${email} &nbsp;|&nbsp; `;
-            if(document.getElementById('telefonoInput').value) datosTexto += `Tel: ${document.getElementById('telefonoInput').value} &nbsp;|&nbsp; `;
+            if(tel) datosTexto += `Tel: ${tel} &nbsp;|&nbsp; `;
             if(dom) datosTexto += `Domicilio: ${dom} &nbsp;|&nbsp; `;
             if(disp) datosTexto += `Disponibilidad: ${disp}`;
             document.getElementById('printDatosHorizontal').innerHTML = datosTexto;

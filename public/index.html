@@ -22,7 +22,7 @@
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
         th { background-color: #2c3e50; color: white; }
 
-        /* PLANTILLA DE IMPRESIÓN ATS ESTRICTA (1 SOLA PÁGINA) */
+        /* PLANTILLA DE IMPRESIÓN ATS FLUIDA (1 COLUMNA COMPLETA) */
         #cvPrintTemplate { display: none; }
 
         @media print {
@@ -56,19 +56,14 @@
             <label>Foto de Perfil:</label>
             <input type="file" name="fotoPerfil" accept="image/*">
             <label>Archivo de CV (PDF o DOCX):</label>
-            <input type="file" name="cvFile" accept=".pdf,.docx" required>
+            <input type="file" name="cvFile">
             <button type="submit" class="btn">Analizar y Sintetizar con ATS</button>
         </form>
-
-        <div id="atsCard" class="card" style="display:none; background: #eef9ec;">
-            <h3>📊 Diagnóstico ATS</h3>
-            <p>Porcentaje de Compatibilidad: <strong id="compatibilidadTxt" style="font-size: 1.3em; color: #2e7d32;">0%</strong></p>
-        </div>
 
         <div id="previewFoto" style="margin-bottom: 15px; text-align: center;"></div>
 
         <form id="cvEditorForm" class="card">
-            <h3>Perfil Profesional Sintetizado / Editado (Optimizado 1 Página)</h3>
+            <h3>Perfil Profesional Sintetizado / Editado</h3>
             
             <label>Nombre Completo:</label>
             <input type="text" id="nombreInput">
@@ -85,24 +80,24 @@
             <label>Disponibilidad:</label>
             <input type="text" id="disponibilidadInput">
 
-            <label>Perfil Profesional (Resumen Sintético):</label>
+            <label>Perfil Profesional (Generado Automáticamente):</label>
             <textarea id="resumenInput" rows="3"></textarea>
 
             <label>Experiencia Laboral:</label>
-            <textarea id="experienciaInput" rows="4"></textarea>
+            <textarea id="experienciaInput" rows="5"></textarea>
 
             <label>Estudios, Cursos y Capacitaciones:</label>
-            <textarea id="estudiosInput" rows="3"></textarea>
+            <textarea id="estudiosInput" rows="4"></textarea>
 
             <label>Habilidades (Optimizado ATS):</label>
             <textarea id="habilidadesInput" rows="2"></textarea>
 
             <button type="button" onclick="guardarPerfil()" class="btn">Guardar Perfil</button>
-            <button type="button" onclick="generarPDFAts()" class="btn btn-pdf">📥 Descargar CV en PDF (1 Página ATS)</button>
+            <button type="button" onclick="generarPDFAts()" class="btn btn-pdf">📥 Descargar CV en PDF (Formato Fluido)</button>
         </form>
     </div>
 
-    <!-- PLANTILLA DE IMPRESIÓN ESTRICTA PARA 1 SOLA PÁGINA -->
+    <!-- PLANTILLA DE IMPRESIÓN FLUIDA Y HORIZONTAL (1 COLUMNA COMPLETA) -->
     <div id="cvPrintTemplate">
         <div style="position: relative; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px;">
             <div id="printFotoContainer" style="position: absolute; right: 0; top: 0;"></div>
@@ -110,25 +105,25 @@
             <div id="printDatosHorizontal" style="font-size: 8pt; color: #333; line-height: 1.2; padding-right: 65px;"></div>
         </div>
 
-        <div style="margin-bottom: 6px;">
+        <div style="margin-bottom: 8px;">
             <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Perfil Profesional</h3>
             <div id="printResumen" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
         </div>
 
-        <div style="display: flex; gap: 12px; margin-bottom: 6px;">
-            <div style="flex: 1.2;">
-                <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Experiencia Laboral</h3>
-                <div id="printExperiencia" style="margin: 0; line-height: 1.15; white-space: pre-wrap; font-size: 7.5pt;"></div>
-            </div>
-            <div style="flex: 0.8;">
-                <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Estudios y Cursos</h3>
-                <div id="printEstudios" style="margin: 0; line-height: 1.15; white-space: pre-wrap; font-size: 7.5pt;"></div>
-            </div>
+        <!-- SECCIONES FLUIDAS AL ANCHO COMPLETO (SIN COLUMNAS) -->
+        <div style="margin-bottom: 8px;">
+            <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Experiencia Laboral</h3>
+            <div id="printExperiencia" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
+        </div>
+        
+        <div style="margin-bottom: 8px;">
+            <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Estudios y Cursos</h3>
+            <div id="printEstudios" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
         </div>
 
         <div>
             <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Habilidades</h3>
-            <div id="printHabilidades" style="margin: 0; line-height: 1.15; white-space: pre-wrap; font-size: 7.5pt;"></div>
+            <div id="printHabilidades" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
         </div>
     </div>
 
@@ -169,7 +164,6 @@
                 }
             } catch (err) {
                 console.error("Error cargando candidatos:", err);
-                document.getElementById('listaCandidatosContainer').innerHTML = `<p>Error de conexión al cargar los datos.</p>`;
             }
         }
 
@@ -207,7 +201,6 @@
             }
 
             window.scrollTo({ top: 500, behavior: 'smooth' });
-            alert(`Candidato ${c.nombre} optimizado y cargado en el editor.`);
         }
 
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
@@ -215,19 +208,13 @@
             const formData = new FormData(this);
 
             try {
-                const response = await fetch('/api/upload-cv', {
-                    method: 'POST',
-                    body: formData
-                });
+                const response = await fetch('/api/upload-cv', { method: 'POST', body: formData });
                 const data = await response.json();
 
                 if (data.success) {
                     document.getElementById('nombreInput').value = data.nombre || '';
-                    document.getElementById('dniInput').value = data.dni || '';
                     document.getElementById('emailInput').value = data.email || '';
                     document.getElementById('telefonoInput').value = data.telefono || '';
-                    document.getElementById('domicilioInput').value = data.domicilio || '';
-                    document.getElementById('disponibilidadInput').value = data.disponibilidad || '';
                     document.getElementById('resumenInput').value = data.resumen || '';
                     document.getElementById('experienciaInput').value = data.experiencia || '';
                     document.getElementById('estudiosInput').value = data.estudios || '';
@@ -238,16 +225,11 @@
                     } else {
                         document.getElementById('previewFoto').innerHTML = '';
                     }
-
-                    document.getElementById('atsCard').style.display = 'block';
-                    document.getElementById('compatibilidadTxt').innerText = data.compatibilidad + '%';
-
                     alert('¡CV sintetizado y optimizado con filtros ATS correctamente!');
                 } else {
                     alert('Error: ' + data.error);
                 }
             } catch (err) {
-                console.error(err);
                 alert('Error interno al procesar el archivo.');
             }
         });

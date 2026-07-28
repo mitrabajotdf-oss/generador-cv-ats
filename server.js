@@ -13,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -29,78 +30,81 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
+function analizarATS(texto) {
+    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia"];
+    const textoLower = texto.toLowerCase();
+    
+    let encontradas = 0;
+    palabrasClave.forEach(keyword => {
+        if (textoLower.includes(keyword)) encontradas++;
+    });
+
+    const porcentaje = Math.min(Math.floor((encontradas / palabrasClave.length) * 100) + 35, 98);
+
+    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
+    const emailMatch = texto.match(/[\w.-]+@[\w.-]+\.\w+/);
+    const phoneMatch = texto.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
+    const dniMatch = texto.match(/\b\d{7,8}\b/);
+
+    return {
+        compatibilidad: porcentaje,
+        nombre: nombre,
+        email: emailMatch ? emailMatch[0] : '',
+        telefono: phoneMatch ? phoneMatch[0] : '',
+        dni: dniMatch ? dniMatch[0] : '',
+        domicilio: 'Tierra del Fuego, Argentina',
+        disponibilidad: 'Inmediata',
+        resumen: texto.substring(0, 400),
+        experiencia: texto,
+        estudios: texto,
+        habilidades: palabrasClave.filter(k => textoLower.includes(k)).join(', ')
+    };
+}
+
+app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No se ha subido ningún archivo.' });
+        if (!req.files || !req.files.cvFile) {
+            return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo de CV.' });
         }
 
-        filePath = req.file.path;
-        const fileExtension = path.extname(req.file.originalname).toLowerCase();
+        const cvFile = req.files.cvFile[0];
+        filePath = cvFile.path;
+        const fileExtension = path.extname(cvFile.originalname).toLowerCase();
         let extractedText = '';
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            const options = {
-                pagerender: async function(pageData) {
-                    try {
-                        const textContent = await pageData.getTextContent();
-                        let lastY, text = '';
-                        for (let item of textContent.items) {
-                            if (lastY == item.transform[5] || !lastY) {
-                                text += item.str + ' ';
-                            } else {
-                                text += '\n' + item.str + ' ';
-                            }
-                            lastY = item.transform[5];
-                        }
-                        return text;
-                    } catch (err) {
-                        return '';
-                    }
-                }
-            };
-            const pdfData = await pdfParse(dataBuffer, options);
+            const pdfData = await pdfParse(dataBuffer);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
             extractedText = result.value ? result.value.trim() : '';
         } else {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            return res.status(400).json({ error: 'Formato no soportado.' });
+            return res.status(400).json({ success: false, error: 'Formato no soportado. Sube PDF o Word.' });
         }
 
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }
 
-        const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const nombre = lines.length > 0 && lines[0].length < 50 ? lines[0] : '';
-        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
-        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
+        const analisis = analizarATS(extractedText);
+        const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
         res.json({
             success: true,
-            message: 'CV procesado correctamente',
-            rawText: extractedText,
-            nombre: nombre,
-            email: emailMatch ? emailMatch[0] : '',
-            telefono: phoneMatch ? phoneMatch[0] : '',
-            domicilio: 'Tierra del Fuego, Argentina',
-            disponibilidad: 'Inmediata',
-            resumen: extractedText,
-            experiencia: extractedText,
-            estudios: extractedText,
-            habilidades: extractedText
+            fotoUrl: fotoUrl,
+            ...analisis
         });
 
     } catch (error) {
-        console.error('Error al procesar el archivo:', error);
+        console.error('Error al procesar archivo:', error);
         if (filePath && fs.existsSync(filePath)) {
             try { fs.unlinkSync(filePath); } catch (e) {}
         }
-        res.status(500).json({ error: 'Error interno al procesar el documento.' });
+        res.status(500).json({ success: false, error: 'Error interno al procesar el documento en el servidor.' });
     }
 });
 
@@ -109,5 +113,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Servidor ATS corriendo en puerto ${PORT}`);
 });

@@ -12,38 +12,45 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         const data = await response.json();
         
         if (data.success) {
-            // Función auxiliar para buscar el elemento por múltiples selectores y asignarle valor
-            const asignarValorFlexible = (selectors, valor) => {
-                for (let sel of selectors) {
-                    const el = document.querySelector(sel) || document.getElementById(sel);
-                    if (el) {
-                        el.value = valor || '';
-                        break;
-                    }
-                }
+            console.log('Datos recibidos del servidor:', data);
+
+            // 1. Asignar datos básicos si encuentra campos con estos nombres o IDs comunes
+            const asignar = (selectors, val) => {
+                selectors.forEach(sel => {
+                    const el = document.querySelector(sel);
+                    if (el) el.value = val || '';
+                });
             };
 
-            // Mapeo seguro para datos personales
-            asignarValorFlexible(['#nombreInput', '#nombre', 'input[name="nombre"]'], data.nombre);
-            asignarValorFlexible(['#emailInput', '#email', '#correo', 'input[name="email"]'], data.email);
-            asignarValorFlexible(['#telefonoInput', '#telefono', '#phone', 'input[name="telefono"]'], data.telefono);
-            asignarValorFlexible(['#domicilioInput', '#domicilio', '#direccion', 'input[name="domicilio"]'], data.domicilio);
-            asignarValorFlexible(['#disponibilidadInput', '#disponibilidad', 'input[name="disponibilidad"]'], data.disponibilidad || 'Inmediata');
-            
-            // Texto completo extraído sin recortes para las secciones grandes
-            const textoCompleto = data.rawText || data.resumen || '';
+            asignar(['#nombreInput', '#nombre', 'input[name*="nombre" i]'], data.nombre);
+            asignar(['#emailInput', '#email', '#correo', 'input[name*="email" i], input[name*="correo" i]'], data.email);
+            asignar(['#telefonoInput', '#telefono', '#phone', 'input[name*="telefono" i], input[name*="tel" i]'], data.telefono);
+            asignar(['#domicilioInput', '#domicilio', '#direccion', 'input[name*="domicilio" i], input[name*="dir" i]'], data.domicilio);
+            asignar(['#disponibilidadInput', '#disponibilidad', 'input[name*="disponibilidad" i]'], data.disponibilidad || 'Inmediata');
 
-            asignarValorFlexible(['#resumenInput', '#resumen', 'textarea[name="resumen"]'], textoCompleto);
-            asignarValorFlexible(['#experienciaInput', '#experiencia', 'textarea[name="experiencia"]'], textoCompleto);
-            asignarValorFlexible(['#estudiosInput', '#estudios', '#educacion', 'textarea[name="estudios"]'], textoCompleto);
-            asignarValorFlexible(['#habilidadesInput', '#habilidades', '#skills', 'textarea[name="habilidades"]'], textoCompleto);
+            // 2. Volcar TODO el texto extraído a cualquier textarea disponible en el formulario
+            const textoCV = data.rawText || data.resumen || '';
+            const textareas = document.querySelectorAll('textarea');
+            
+            if (textareas.length > 0) {
+                textareas.forEach((ta, index) => {
+                    // Si hay varios textareas (resumen, experiencia, estudios, habilidades), les asigna el texto completo
+                    ta.value = textoCV;
+                });
+            } else {
+                // Fallback por si usan inputs de tipo texto para las secciones
+                asignar(['#resumenInput', '#resumen'], textoCV);
+                asignar(['#experienciaInput', '#experiencia'], textoCV);
+                asignar(['#estudiosInput', '#estudios'], textoCV);
+                asignar(['#habilidadesInput', '#habilidades', '#skills'], textoCV);
+            }
 
             alert('¡CV analizado y extraído correctamente!');
         } else {
             alert('Error: ' + data.error);
         }
     } catch (err) {
-        console.error(err);
+        console.error('Error detallado:', err);
         alert('Error interno al procesar el archivo.');
     }
 });

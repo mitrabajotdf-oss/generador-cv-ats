@@ -42,7 +42,9 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdfParse(dataBuffer);
+            // Corrección clave para acceder a la función de pdf-parse
+            const parser = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
+            const pdfData = await parser(dataBuffer);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });

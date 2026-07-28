@@ -22,15 +22,8 @@
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
         th { background-color: #2c3e50; color: white; }
 
-        /* PLANTILLA DE IMPRESIÓN ATS FLUIDA (1 COLUMNA COMPLETA) */
+        /* Plantilla oculta de PDF */
         #cvPrintTemplate { display: none; }
-
-        @media print {
-            body { background: #fff; padding: 0; margin: 0; color: #000; font-family: 'Calibri', 'Arial', sans-serif; font-size: 9pt; }
-            .container { display: none !important; }
-            #cvPrintTemplate { display: block !important; width: 100%; padding: 5mm; box-sizing: border-box; }
-            @page { size: A4; margin: 5mm; }
-        }
     </style>
 </head>
 <body>
@@ -83,7 +76,7 @@
             <label>Perfil Profesional (Generado Automáticamente):</label>
             <textarea id="resumenInput" rows="3"></textarea>
 
-            <label>Experiencia Laboral:</label>
+            <label>Experiencia Laboral (Línea Fluida):</label>
             <textarea id="experienciaInput" rows="5"></textarea>
 
             <label>Estudios, Cursos y Capacitaciones:</label>
@@ -93,11 +86,11 @@
             <textarea id="habilidadesInput" rows="2"></textarea>
 
             <button type="button" onclick="guardarPerfil()" class="btn">Guardar Perfil</button>
-            <button type="button" onclick="generarPDFAts()" class="btn btn-pdf">📥 Descargar CV en PDF (Formato Fluido)</button>
+            <button type="button" onclick="generarPDFAts()" class="btn btn-pdf">📥 Descargar CV en PDF (Pestaña Nueva)</button>
         </form>
     </div>
 
-    <!-- PLANTILLA DE IMPRESIÓN FLUIDA Y HORIZONTAL (1 COLUMNA COMPLETA) -->
+    <!-- PLANTILLA BASE PARA ENVIAR A LA NUEVA PESTAÑA -->
     <div id="cvPrintTemplate">
         <div style="position: relative; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px;">
             <div id="printFotoContainer" style="position: absolute; right: 0; top: 0;"></div>
@@ -107,13 +100,12 @@
 
         <div style="margin-bottom: 8px;">
             <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Perfil Profesional</h3>
-            <div id="printResumen" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
+            <div id="printResumen" style="margin: 0; line-height: 1.2; white-space: pre-wrap; text-align: justify; font-size: 8pt;"></div>
         </div>
 
-        <!-- SECCIONES FLUIDAS AL ANCHO COMPLETO (SIN COLUMNAS) -->
         <div style="margin-bottom: 8px;">
             <h3 style="color: #2c3e50; font-size: 9.5pt; border-bottom: 1px solid #999; text-transform: uppercase; margin: 0 0 2px 0; padding-bottom: 1px;">Experiencia Laboral</h3>
-            <div id="printExperiencia" style="margin: 0; line-height: 1.2; white-space: pre-wrap; font-size: 8pt;"></div>
+            <div id="printExperiencia" style="margin: 0; line-height: 1.3; white-space: pre-wrap; text-align: justify; font-size: 8pt;"></div>
         </div>
         
         <div style="margin-bottom: 8px;">
@@ -225,7 +217,7 @@
                     } else {
                         document.getElementById('previewFoto').innerHTML = '';
                     }
-                    alert('¡CV sintetizado y optimizado con filtros ATS correctamente!');
+                    alert('¡CV sintetizado a una línea fluida y optimizado ATS correctamente!');
                 } else {
                     alert('Error: ' + data.error);
                 }
@@ -238,8 +230,10 @@
             alert('¡Perfil guardado correctamente!');
         }
 
+        // GENERACIÓN DEL PDF EN PESTAÑA NUEVA
         function generarPDFAts() {
-            document.getElementById('printNombre').innerText = document.getElementById('nombreInput').value || 'Nombre del Postulante';
+            const nombre = document.getElementById('nombreInput').value || 'Postulante';
+            document.getElementById('printNombre').innerText = nombre;
             
             const dni = document.getElementById('dniInput').value;
             const email = document.getElementById('emailInput').value;
@@ -268,7 +262,36 @@
                 printFotoContainer.innerHTML = '';
             }
 
-            window.print();
+            // CREACIÓN DE LA PESTAÑA NUEVA PARA LA IMPRESIÓN
+            const contenidoHtml = document.getElementById('cvPrintTemplate').innerHTML;
+            const nuevaPestana = window.open('', '_blank');
+            
+            if(nuevaPestana) {
+                nuevaPestana.document.write(`
+                    <!DOCTYPE html>
+                    <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>CV ATS - ${nombre}</title>
+                        <style>
+                            body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 9pt; padding: 5mm; color: #000; margin: 0; }
+                            h1, h3 { color: #2c3e50; }
+                            @page { size: A4; margin: 5mm; }
+                        </style>
+                    </head>
+                    <body>
+                        ${contenidoHtml}
+                        <script>
+                            // Dispara la impresión nativa cuando la pestaña nueva cargue
+                            window.onload = () => { setTimeout(() => { window.print(); }, 200); };
+                        </script>
+                    </body>
+                    </html>
+                `);
+                nuevaPestana.document.close();
+            } else {
+                alert("Por favor, permite las ventanas emergentes (pop-ups) en tu navegador para generar el PDF.");
+            }
         }
 
         cargarCandidatos();

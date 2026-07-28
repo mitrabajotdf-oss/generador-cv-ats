@@ -42,7 +42,29 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdfParse(dataBuffer);
+            
+            // Renderizador tolerante a errores de fuentes para extraer todo el texto disponible
+            const options = {
+                pagerender: async function(pageData) {
+                    try {
+                        const textContent = await pageData.getTextContent();
+                        let lastY, text = '';
+                        for (let item of textContent.items) {
+                            if (lastY == item.transform[5] || !lastY) {
+                                text += item.str + ' ';
+                            } else {
+                                text += '\n' + item.str + ' ';
+                            }
+                            lastY = item.transform[5];
+                        }
+                        return text;
+                    } catch (err) {
+                        return '';
+                    }
+                }
+            };
+
+            const pdfData = await pdfParse(dataBuffer, options);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });

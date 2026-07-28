@@ -284,9 +284,11 @@
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            html2pdf().from(element).set(opt).save().then(() => {
-                element.style.display = 'none';
-            });
+            setTimeout(() => {
+                html2pdf().from(element).set(opt).save().then(() => {
+                    element.style.display = 'none';
+                });
+            }, 300);
         }
 
         cargarCandidatos();

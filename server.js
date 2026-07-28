@@ -76,24 +76,23 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
         }
 
         const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const nombreDetectado = lines.length > 0 && lines[0].length < 50 ? lines[0] : 'Erika Beatriz Sosa';
+        const nombreDetectado = lines.length > 0 && lines[0].length < 50 ? lines[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
         const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
 
         res.json({
             success: true,
-            message: 'CV procesado correctamente',
+            message: 'CV analizado correctamente',
             rawText: extractedText,
-            text: extractedText,
             nombre: nombreDetectado,
             email: emailMatch ? emailMatch[0] : '',
             telefono: phoneMatch ? phoneMatch[0] : '',
+            domicilio: '',
             disponibilidad: 'Inmediata',
-            domicilio: 'Tierra del Fuego, Argentina',
-            resumen: extractedText.substring(0, 500),
+            resumen: extractedText,
             experiencia: extractedText,
             estudios: extractedText,
-            habilidades: 'JavaScript, Node.js, Gestión de Proyectos, Resolución de Problemas'
+            habilidades: extractedText
         });
 
     } catch (error) {

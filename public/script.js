@@ -15,34 +15,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    const asignarValor = (id, valor) => {
-                        const elemento = document.getElementById(id);
-                        if (elemento) {
-                            elemento.value = valor || '';
-                        }
+                    const setValue = (id, valor) => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = valor || '';
                     };
 
-                    // Rellenar datos personales e inputs específicos
-                    asignarValor('nombreInput', data.nombre);
-                    asignarValor('emailInput', data.email);
-                    asignarValor('telefonoInput', data.telefono);
-                    asignarValor('domicilioInput', data.domicilio);
-                    asignarValor('disponibilidadInput', data.disponibilidad || 'Inmediata');
+                    // Datos personales
+                    setValue('nombreInput', data.nombre);
+                    setValue('emailInput', data.email);
+                    setValue('telefonoInput', data.telefono);
+                    setValue('domicilioInput', data.domicilio);
+                    setValue('disponibilidadInput', data.disponibilidad || 'Inmediata');
                     
-                    const textoCompleto = data.rawText || '';
+                    // Texto completo extraído sin recortes ni límites de caracteres
+                    const textoCV = data.rawText || '';
 
-                    // Inyectar contenido en textareas o inputs de secciones
-                    asignarValor('resumenInput', textoCompleto);
-                    asignarValor('experienciaInput', textoCompleto);
-                    asignarValor('estudiosInput', textoCompleto);
-                    asignarValor('habilidadesInput', textoCompleto);
+                    setValue('resumenInput', textoCV);
+                    setValue('experienciaInput', textoCV);
+                    setValue('estudiosInput', textoCV);
+                    setValue('habilidadesInput', textoCV);
 
                     alert('¡CV analizado y extraído correctamente!');
                 } else {
                     alert('Error: ' + (data.error || 'No se pudo procesar el documento.'));
                 }
             } catch (err) {
-                console.error('Error en la petición:', err);
+                console.error('Error:', err);
                 alert('Error interno al conectar con el servidor.');
             }
         });

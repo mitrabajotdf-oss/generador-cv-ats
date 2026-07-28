@@ -35,7 +35,7 @@ let listaCandidatos = [];
 
 // Motor de Filtrado ATS y Compatibilidad
 function calcularATS(texto) {
-    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia", "escrituración"];
+    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia", "escrituración", "administrativa"];
     const textoLower = texto.toLowerCase();
     
     let encontradas = 0;
@@ -66,10 +66,10 @@ function calcularATS(texto) {
     };
 }
 
-// 1. Recibir postulación desde el formulario externo y guardarla en la lista de candidatos
+// 1. Recibir postulación desde el formulario externo (con teléfono incluido)
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
     try {
-        const { nombre, dni, email, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
         const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
@@ -78,6 +78,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             nombre: nombre || 'Sin nombre',
             dni: dni || '',
             email: email || '',
+            telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || '',
             resumen: resumen || '',
@@ -131,7 +132,9 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             return res.status(400).json({ success: false, error: 'Formato no soportado.' });
         }
 
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
 
         const analisis = calcularATS(extractedText);
         const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';

@@ -42,9 +42,7 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            // Corrección clave para acceder a la función de pdf-parse
-            const parser = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
-            const pdfData = await parser(dataBuffer);
+            const pdfData = await pdfParse(dataBuffer);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
@@ -71,6 +69,10 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
         }
         res.status(500).json({ error: 'Error interno al procesar el documento.' });
     }
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {

@@ -32,52 +32,49 @@ const upload = multer({ storage: storage });
 
 const DATA_FILE = path.join(__dirname, 'candidatos.json');
 
-// Cargar candidatos guardados definitivamente
+// Obtener candidatos de forma segura
 function obtenerCandidatos() {
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        } catch (e) {
-            return [];
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const data = fs.readFileSync(DATA_FILE, 'utf8');
+            return JSON.parse(data || '[]');
         }
+    } catch (e) {
+        console.error("Error leyendo candidatos.json:", e);
     }
     return [];
 }
 
 function guardarCandidatosEnDisco(candidatos) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(candidatos, null, 2), 'utf8');
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(candidatos, null, 2), 'utf8');
+    } catch (e) {
+        console.error("Error guardando candidatos.json:", e);
+    }
 }
 
-// Motor de Síntesis y Optimización ATS Estricta (Reduce texto para 1 sola página y corrige errores)
+// Motor de Síntesis y Optimización ATS
 function sintetizarATS(texto) {
     const palabrasClaveIdeal = [
         "Gestión documental", "Administración", "Escrituración", "Atención al cliente", 
         "Facturación y cobranzas", "Sistema Tango Gestión", "Digitalización de archivos", 
-        "Microsoft 365 Copilot", "Microsoft Word", "Microsoft Excel", "Microsoft Outlook", 
+        "Microsoft 365", "Microsoft Word", "Microsoft Excel", "Microsoft Outlook", 
         "Organización y planificación", "Proactividad", "Trabajo en equipo", "Resolución de problemas"
     ];
 
     const textoLower = texto.toLowerCase();
-    
-    // Filtrar habilidades óptimas para ATS
     const habilidadesEncontradas = palabrasClaveIdeal.filter(k => textoLower.includes(k.toLowerCase()));
     const habilidadesATS = habilidadesEncontradas.length > 0 ? habilidadesEncontradas.join(" • ") : "Gestión administrativa • Administración • Microsoft Excel • Atención al cliente";
 
-    // Sintetizar y corregir formato de líneas
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
     const emailMatch = texto.match(/[\w.-]+@[\w.-]+\.\w+/);
     const phoneMatch = texto.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
     const dniMatch = texto.match(/\b\d{7,8}\b/);
 
-    // Resumen sintético y profesional optimizado para 1 página
     const resumenSintetico = "Asistente Administrativa y de Escrituración con sólida trayectoria en gestión documental, atención al cliente y procesos notariales. Perfil proactivo con competencias en herramientas digitales y automatización administrativa.";
-
-    // Experiencia sintetizada en viñetas directas para evitar desbordes
     const experienciaSintetica = "• ESCRIBANÍA BITSH (Abril 2024 – Actualidad): Promoción interna al Área de Escrituración. Gestión documental, resguardo de protocolos, control de escrituras y facturación con Sistema Tango.\n• DESPENSA LA MORENITA (2022 – 2023): Atención al cliente, control de stock y manejo de caja.\n• DOLCE CAPRICCIO (2020 – 2022): Gestión integral y administración comercial.";
-
-    // Estudios sintéticos
-    const estudiosSinteticos = "• Técnico Superior en Régimen Aduanero (En curso)\n• Auxiliar Administrativo en Establecimientos de Salud (FATSA)";
+    const estudiosSinteticos = "• Técnico Superior en Régimen Aduanero (En curso)\n• Auxiliar Administrativo en Establecimientos de Salud";
 
     return {
         compatibilidad: Math.min(Math.floor((habilidadesEncontradas.length / palabrasClaveIdeal.length) * 100) + 40, 98),
@@ -94,14 +91,13 @@ function sintetizarATS(texto) {
     };
 }
 
-// 1. Recibir postulación desde el link y optimizarla automáticamente
+// Endpoint para recibir postulación
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
         const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
-        // Sintetizar y limpiar automáticamente errores y frases informales
         const textoCompleto = `${nombre || ''} ${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
         const optimizado = sintetizarATS(textoCompleto);
 
@@ -126,35 +122,33 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         lista.push(nuevoCandidato);
         guardarCandidatosEnDisco(lista);
 
-        res.json({
-            success: true,
-            message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!'
-        });
+        res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });
     }
 });
 
-// 2. Obtener lista de candidatos guardados
+// Endpoint para obtener lista de candidatos
 app.get('/api/candidatos', (req, res) => {
-    res.json({ success: true, candidatos: obtenerCandidatos() });
+    const lista = obtenerCandidatos();
+    res.json({ success: true, candidatos: lista });
 });
 
-// 3. Eliminar candidato definitivamente
+// Endpoint para eliminar candidato
 app.delete('/api/candidatos/:id', (req, res) => {
     try {
         const id = Number(req.params.id);
         let lista = obtenerCandidatos();
         lista = lista.filter(c => c.id !== id);
         guardarCandidatosEnDisco(lista);
-        res.json({ success: true, message: 'Candidato eliminado correctamente.' });
+        res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
-        res.status(500).json({ success: false, error: 'No se pudo eliminar el candidato.' });
+        res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
     }
 });
 
-// 4. Analizar CV individual con síntesis ATS
+// Endpoint para analizar archivo individual
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -179,18 +173,12 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             return res.status(400).json({ success: false, error: 'Formato no soportado.' });
         }
 
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
         const analisis = sintetizarATS(extractedText);
         const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
-        res.json({
-            success: true,
-            fotoUrl: fotoUrl,
-            ...analisis
-        });
+        res.json({ success: true, fotoUrl: fotoUrl, ...analisis });
 
     } catch (error) {
         console.error('Error al procesar archivo:', error);

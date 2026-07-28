@@ -14,7 +14,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de almacenamiento temporal
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'uploads');
@@ -30,7 +29,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Ruta para procesar el archivo subido y extraer texto de forma robusta
 app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
     let filePath = '';
     try {
@@ -44,9 +42,7 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
 
         if (fileExtension === '.pdf') {
             const dataBuffer = fs.readFileSync(filePath);
-            // Manejo compatible de pdf-parse
-            const parseFunction = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
-            const pdfData = await parseFunction(dataBuffer);
+            const pdfData = await pdfParse(dataBuffer);
             extractedText = pdfData.text ? pdfData.text.trim() : '';
         } else if (fileExtension === '.docx') {
             const result = await mammoth.extractRawText({ path: filePath });
@@ -56,7 +52,6 @@ app.post('/api/upload-cv', upload.single('cvFile'), async (req, res) => {
             return res.status(400).json({ error: 'Formato no soportado. Sube un PDF o Word (.docx).' });
         }
 
-        // Limpieza segura del archivo temporal
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         }

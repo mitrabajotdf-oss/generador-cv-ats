@@ -15,25 +15,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    if (document.getElementById('nombreInput')) document.getElementById('nombreInput').value = data.nombre || '';
-                    if (document.getElementById('emailInput')) document.getElementById('emailInput').value = data.email || '';
-                    if (document.getElementById('telefonoInput')) document.getElementById('telefonoInput').value = data.telefono || '';
-                    if (document.getElementById('domicilioInput')) document.getElementById('domicilioInput').value = data.domicilio || '';
-                    if (document.getElementById('disponibilidadInput')) document.getElementById('disponibilidadInput').value = data.disponibilidad || 'Inmediata';
-                    
-                    const textoCV = data.rawText || '';
+                    const asignarValor = (id, valor) => {
+                        const elemento = document.getElementById(id);
+                        if (elemento) {
+                            elemento.value = valor || '';
+                        }
+                    };
 
-                    if (document.getElementById('resumenInput')) document.getElementById('resumenInput').value = textoCV;
-                    if (document.getElementById('experienciaInput')) document.getElementById('experienciaInput').value = textoCV;
-                    if (document.getElementById('estudiosInput')) document.getElementById('estudiosInput').value = textoCV;
-                    if (document.getElementById('habilidadesInput')) document.getElementById('habilidadesInput').value = textoCV;
+                    // Rellenar datos personales e inputs específicos
+                    asignarValor('nombreInput', data.nombre);
+                    asignarValor('emailInput', data.email);
+                    asignarValor('telefonoInput', data.telefono);
+                    asignarValor('domicilioInput', data.domicilio);
+                    asignarValor('disponibilidadInput', data.disponibilidad || 'Inmediata');
+                    
+                    const textoCompleto = data.rawText || '';
+
+                    // Inyectar contenido en textareas o inputs de secciones
+                    asignarValor('resumenInput', textoCompleto);
+                    asignarValor('experienciaInput', textoCompleto);
+                    asignarValor('estudiosInput', textoCompleto);
+                    asignarValor('habilidadesInput', textoCompleto);
 
                     alert('¡CV analizado y extraído correctamente!');
                 } else {
                     alert('Error: ' + (data.error || 'No se pudo procesar el documento.'));
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Error en la petición:', err);
                 alert('Error interno al conectar con el servidor.');
             }
         });

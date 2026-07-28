@@ -30,8 +30,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-function analizarATS(texto) {
-    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia"];
+// Motor de Filtrado ATS y Compatibilidad (Solo para tu panel de control)
+function calcularATS(texto) {
+    const palabrasClave = ["javascript", "node.js", "python", "react", "sql", "gestión de proyectos", "agile", "scrum", "inglés", "trabajo en equipo", "experiencia", "escrituración", "administrativa"];
     const textoLower = texto.toLowerCase();
     
     let encontradas = 0;
@@ -39,7 +40,7 @@ function analizarATS(texto) {
         if (textoLower.includes(keyword)) encontradas++;
     });
 
-    const porcentaje = Math.min(Math.floor((encontradas / palabrasClave.length) * 100) + 35, 98);
+    const porcentaje = Math.min(Math.floor((encontradas / palabrasClave.length) * 100) + 30, 98);
 
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
@@ -55,18 +56,37 @@ function analizarATS(texto) {
         dni: dniMatch ? dniMatch[0] : '',
         domicilio: 'Tierra del Fuego, Argentina',
         disponibilidad: 'Inmediata',
-        resumen: texto.substring(0, 400),
+        resumen: texto,
         experiencia: texto,
         estudios: texto,
         habilidades: palabrasClave.filter(k => textoLower.includes(k)).join(', ')
     };
 }
 
+// 1. Endpoint para que el cliente cargue su CV y foto desde el link externo
+app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
+    try {
+        const { nombre, dni, email, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
+        const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
+
+        // Aquí guardas o procesas la postulación recibida por redes/WhatsApp
+        res.json({
+            success: true,
+            message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });
+    }
+});
+
+// 2. Endpoint para que TÚ analices cualquier CV o documento recibido usando filtros ATS en tu panel principal
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
         if (!req.files || !req.files.cvFile) {
-            return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo de CV.' });
+            return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo.' });
         }
 
         const cvFile = req.files.cvFile[0];
@@ -83,14 +103,12 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             extractedText = result.value ? result.value.trim() : '';
         } else {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            return res.status(400).json({ success: false, error: 'Formato no soportado. Sube PDF o Word.' });
+            return res.status(400).json({ success: false, error: 'Formato no soportado.' });
         }
 
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        const analisis = analizarATS(extractedText);
+        const analisis = calcularATS(extractedText);
         const fotoUrl = req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
 
         res.json({
@@ -104,7 +122,7 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
         if (filePath && fs.existsSync(filePath)) {
             try { fs.unlinkSync(filePath); } catch (e) {}
         }
-        res.status(500).json({ success: false, error: 'Error interno al procesar el documento en el servidor.' });
+        res.status(500).json({ success: false, error: 'Error interno al procesar el documento.' });
     }
 });
 

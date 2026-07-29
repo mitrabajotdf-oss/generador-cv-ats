@@ -5,85 +5,140 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Formulario de Envío de Datos - Postulación</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h2 { color: #2c3e50; text-align: center; }
-        label { display: block; margin-top: 15px; font-weight: bold; }
-        input[type="text"], input[type="email"], textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        input[type="file"] { margin-top: 5px; }
-        .btn { background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 25px; width: 100%; }
-        .btn:hover { background-color: #2980b9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 700px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; }
+        input[type="text"], input[type="email"], textarea, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        textarea { height: 80px; resize: vertical; }
+        button { background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: background 0.2s; margin-top: 10px; }
+        button:hover { background: #2980b9; }
+        .success-box { display: none; margin-top: 25px; padding: 20px; background: #e8f8f5; border: 1px solid #a3e4d7; border-radius: 8px; text-align: center; }
+        .success-box h3 { color: #117a65; margin-top: 0; }
+        .cv-promo { background: #fef9e7; border: 1px solid #f9e79f; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }
+        .cv-promo h4 { color: #b7950b; margin-top: 0; }
+        .btn-pago { background: #27ae60; color: white; text-decoration: none; display: inline-block; padding: 12px 25px; border-radius: 6px; font-weight: bold; margin-top: 10px; }
+        .btn-pago:hover { background: #219653; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Registro de Postulante</h2>
-        <p style="text-align: center; color: #666;">Completa tus datos y adjunta tu CV y foto para enviarlos al reclutador.</p>
-        
-        <form id="publicForm" enctype="multipart/form-data">
+
+<div class="container">
+    <h2>Registro de Postulante</h2>
+    <p>Completa tus datos y adjunta tu CV y foto para enviarlos al reclutador.</p>
+
+    <form id="postulacionForm" onsubmit="enviarPostulacion(event)">
+        <div class="form-group">
             <label>Foto de Perfil:</label>
-            <input type="file" name="fotoPerfil" accept="image/*">
-
-            <label>Archivo de CV (PDF, Word o cualquier formato):</label>
-            <input type="file" name="cvFile">
-
+            <input type="file" id="fotoPerfil" accept="image/*">
+        </div>
+        <div class="form-group">
+            <label>Archivo de CV (PDF, Word):</label>
+            <input type="file" id="cvFile" accept=".pdf,.doc,.docx" required>
+        </div>
+        <div class="form-group">
             <label>Nombre Completo:</label>
-            <input type="text" name="nombre">
-
+            <input type="text" id="nombre" required>
+        </div>
+        <div class="form-group">
             <label>DNI:</label>
-            <input type="text" name="dni">
-
+            <input type="text" id="dni" required>
+        </div>
+        <div class="form-group">
             <label>Email de Contacto:</label>
-            <input type="email" name="email">
-
+            <input type="email" id="email" required>
+        </div>
+        <div class="form-group">
             <label>Teléfono:</label>
-            <input type="text" name="telefono">
-
+            <input type="text" id="telefono" required>
+        </div>
+        <div class="form-group">
             <label>Dirección / Domicilio:</label>
-            <input type="text" name="direccion">
-
+            <input type="text" id="direccion">
+        </div>
+        <div class="form-group">
             <label>Disponibilidad:</label>
-            <input type="text" name="disponibilidad" value="Inmediata">
-
+            <input type="text" id="disponibilidad" value="Inmediata">
+        </div>
+        <div class="form-group">
             <label>Resumen Profesional:</label>
-            <textarea name="resumen" rows="3" placeholder="Breve descripción de tu perfil..."></textarea>
-
+            <textarea id="resumen" placeholder="Breve descripción de tu perfil..."></textarea>
+        </div>
+        <div class="form-group">
             <label>Experiencia Laboral:</label>
-            <textarea name="experiencia" rows="4" placeholder="Tus trabajos anteriores..."></textarea>
-
+            <textarea id="experiencia" placeholder="Tus trabajos anteriores..."></textarea>
+        </div>
+        <div class="form-group">
             <label>Estudios, Cursos y Capacitaciones:</label>
-            <textarea name="estudios" rows="3" placeholder="Títulos, cursos realizados..."></textarea>
-
+            <textarea id="estudios" placeholder="Títulos, cursos realizados..."></textarea>
+        </div>
+        <div class="form-group">
             <label>Habilidades:</label>
-            <textarea name="habilidades" rows="2" placeholder="Habilidades técnicas y blandas..."></textarea>
+            <textarea id="habilidades" placeholder="Habilidades técnicas y blandas..."></textarea>
+        </div>
 
-            <button type="submit" class="btn">Enviar Postulación</button>
-        </form>
-        <div id="resultadoEnvio" style="margin-top: 20px; text-align: center; font-weight: bold;"></div>
+        <button type="submit" id="btnEnviar">Enviar Postulación</button>
+    </form>
+
+    <!-- CAJA DE ÉXITO Y MONETIZACIÓN DEL CV ATS ($ 5.000) -->
+    <div id="mensajeExito" class="success-box">
+        <h3>¡Tus datos fueron enviados correctamente al reclutador!</h3>
+        <p>Tu postulación ya está registrada en el sistema de la empresa.</p>
+
+        <div class="cv-promo">
+            <h4>📄 ¿Quieres descargar tu CV Optimizado en Formato ATS?</h4>
+            <p>Obtén tu documento profesional pulido para destacar en cualquier proceso de selección corporativo por solo <strong>$ 5.000,00</strong>.</p>
+            <!-- Aquí puedes colocar tu enlace de Mercado Pago o pasarela de pago -->
+            <a href="https://link.mercadopago.com.ar/TUS_DATOS_DE_PAGO" target="_blank" class="btn-pago">Abonar $ 5.000 y Descargar CV ATS</a>
+        </div>
     </div>
+</div>
 
-    <script>
-        document.getElementById('publicForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
+<script>
+    async function enviarPostulacion(event) {
+        event.preventDefault();
+        const btn = document.getElementById('btnEnviar');
+        btn.innerText = 'Enviando postulación...';
+        btn.disabled = true;
 
-            try {
-                const res = await fetch('/api/enviar-postulacion', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                if(data.success) {
-                    document.getElementById('resultadoEnvio').innerHTML = `<span style="color: green;">${data.message}</span>`;
-                    document.getElementById('publicForm').reset();
-                } else {
-                    alert('Error al enviar la postulación.');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Error de conexión con el servidor.');
+        const formData = new FormData();
+        formData.append('nombre', document.getElementById('nombre').value);
+        formData.append('dni', document.getElementById('dni').value);
+        formData.append('email', document.getElementById('email').value);
+        formData.append('telefono', document.getElementById('telefono').value);
+        formData.append('direccion', document.getElementById('direccion').value);
+        formData.append('disponibilidad', document.getElementById('disponibilidad').value);
+        formData.append('resumen', document.getElementById('resumen').value);
+        formData.append('experiencia', document.getElementById('experiencia').value);
+        formData.append('estudios', document.getElementById('estudios').value);
+        formData.append('habilidades', document.getElementById('habilidades').value);
+
+        if (document.getElementById('cvFile').files[0]) {
+            formData.append('cvFile', document.getElementById('cvFile').files[0]);
+        }
+        if (document.getElementById('fotoPerfil').files[0]) {
+            formData.append('fotoPerfil', document.getElementById('fotoPerfil').files[0]);
+        }
+
+        try {
+            const res = await fetch('/api/enviar-postulacion', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('postulacionForm').style.display = 'none';
+                document.getElementById('mensajeExito').style.display = 'block';
+            } else {
+                alert('Hubo un error al enviar la postulación.');
+                btn.innerText = 'Enviar Postulación';
+                btn.disabled = false;
             }
-        });
-    </script>
+        } catch (e) {
+            alert('Error de conexión con el servidor.');
+            btn.innerText = 'Enviar Postulación';
+            btn.disabled = false;
+        }
+    }
+</script>
+
 </body>
 </html>

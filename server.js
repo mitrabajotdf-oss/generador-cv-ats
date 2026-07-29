@@ -5,6 +5,7 @@ const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const cors = require('cors');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,9 +27,38 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-let listaCandidatos = [];
+// -------------------------------------------------------------------
+// 🚀 CONEXIÓN A LA BASE DE DATOS MONGODB EN LA NUBE
+// -------------------------------------------------------------------
+const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
 
-// 🧠 MOTOR DE SÍNTESIS ATS PARA HABILIDADES
+mongoose.connect(mongoURI)
+    .then(() => console.log('✅ Base de datos MongoDB conectada con éxito.'))
+    .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
+
+// 📋 ESTRUCTURA DEL CANDIDATO (Schema de MongoDB)
+const candidatoSchema = new mongoose.Schema({
+    id: Number,
+    nombre: String,
+    dni: String,
+    email: String,
+    telefono: String,
+    direccion: String,
+    disponibilidad: String,
+    resumen: String,
+    experiencia: String,
+    estudios: String,
+    habilidades: String,
+    cvUrl: String,
+    fotoUrl: String,
+    fecha: String
+});
+
+const Candidato = mongoose.model('Candidato', candidatoSchema);
+
+// -------------------------------------------------------------------
+// 🧠 MOTORES DE SÍNTESIS ATS
+// -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo";
     let encontradas = new Set();
@@ -51,7 +81,6 @@ function optimizarHabilidadesATS(textoBruto) {
     return Array.from(encontradas).join(" • ");
 }
 
-// 🧠 MOTOR DE REDACCIÓN AUTOMÁTICA DE PERFIL PROFESIONAL
 function generarPerfilATS(textoBruto) {
     if (!textoBruto) return "Profesional proactivo con alta capacidad de aprendizaje y enfoque en resultados.";
     let lower = textoBruto.toLowerCase();
@@ -77,18 +106,22 @@ function generarPerfilATS(textoBruto) {
     return perfil;
 }
 
-// 🧠 CONVERSOR A LÍNEA FLUIDA (Elimina saltos, viñetas y espacios extra)
 function formatearFluido(texto) {
     if (!texto) return "";
     return texto
-        .replace(/[\r\n]+/g, '. ') // Cambia saltos de línea por puntos
-        .replace(/[•\-\*]/g, '')   // Elimina viñetas o guiones
-        .replace(/\s{2,}/g, ' ')   // Elimina dobles espacios
-        .replace(/\.\s\./g, '.')   // Limpia puntos redundantes
+        .replace(/[\r\n]+/g, '. ')
+        .replace(/[•\-\*]/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\.\s\./g, '.')
         .trim();
 }
 
-app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), (req, res) => {
+// -------------------------------------------------------------------
+// 🌐 ENDPOINTS ACTUALIZADOS PARA MONGODB
+// -------------------------------------------------------------------
+
+// 1. GUARDAR EN LA NUBE AL ENVIAR POSTULACIÓN
+app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
@@ -96,7 +129,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
         
-        const nuevoCandidato = {
+        // Creamos un nuevo registro usando Mongoose y lo guardamos
+        const nuevoCandidato = new Candidato({
             id: Date.now(),
             nombre: nombre || 'Postulante',
             dni: dni || '',
@@ -105,15 +139,16 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
             resumen: generarPerfilATS(textoCompleto), 
-            experiencia: formatearFluido(experiencia || textoCompleto), // APLICA LÍNEA FLUIDA
+            experiencia: formatearFluido(experiencia || textoCompleto),
             estudios: formatearFluido(estudios),
             habilidades: optimizarHabilidadesATS(textoCompleto),
             cvUrl,
             fotoUrl,
             fecha: new Date().toLocaleString()
-        };
+        });
 
-        listaCandidatos.push(nuevoCandidato);
+        await nuevoCandidato.save(); // ¡GUARDADO EN MONGODB!
+
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {
         console.error(error);
@@ -121,16 +156,31 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-app.get('/api/candidatos', (req, res) => { res.json({ success: true, candidatos: listaCandidatos }); });
-
-app.delete('/api/candidatos/:id', (req, res) => {
+// 2. OBTENER LISTA DESDE MONGODB
+app.get('/api/candidatos', async (req, res) => {
     try {
-        const id = Number(req.params.id);
-        listaCandidatos = listaCandidatos.filter(c => c.id !== id);
-        res.json({ success: true, message: 'Candidato eliminado.' });
-    } catch (error) { res.status(500).json({ success: false, error: 'No se pudo eliminar.' }); }
+        // Busca todos los candidatos y los ordena del más nuevo al más viejo
+        const listaCandidatos = await Candidato.find().sort({ id: -1 }); 
+        res.json({ success: true, candidatos: listaCandidatos });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Error al cargar las postulaciones.' });
+    }
 });
 
+// 3. ELIMINAR DESDE MONGODB
+app.delete('/api/candidatos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        await Candidato.deleteOne({ id: id }); // Elimina el documento de la base de datos
+        res.json({ success: true, message: 'Candidato eliminado.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
+    }
+});
+
+// 4. ANALIZAR CV INDIVIDUAL
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -167,7 +217,7 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             domicilio: '',
             disponibilidad: 'A convenir',
             resumen: generarPerfilATS(extractedText),
-            experiencia: formatearFluido(extractedText), // APLICA LÍNEA FLUIDA
+            experiencia: formatearFluido(extractedText),
             estudios: formatearFluido(extractedText),
             habilidades: optimizarHabilidadesATS(extractedText)
         });
@@ -178,4 +228,5 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
 });
 
 app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
+
 app.listen(PORT, () => { console.log(`Servidor ATS corriendo en puerto ${PORT}`); });

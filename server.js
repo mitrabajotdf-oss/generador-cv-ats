@@ -7,6 +7,7 @@ const mammoth = require('mammoth');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
+const basicAuth = require('express-basic-auth'); // 🔒 Módulo de Seguridad para la Fase 2
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,27 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// -------------------------------------------------------------------
+// 🔒 PROTECCIÓN DEL PANEL DE GESTIÓN (Fase 2)
+// -------------------------------------------------------------------
+// Protege el archivo principal y las rutas de administración de candidatos
+const authMiddleware = basicAuth({
+    users: { 'MitrabajoTDF': 'EmpleoRG' },
+    challenge: true,
+    realm: 'Portal de Reclutamiento Protegido - Mi Trabajo TDF'
+});
+
+// El panel de gestión principal (index.html) ahora requiere login
+app.get('/', authMiddleware, ( एक्सप्रेस, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// El formulario público sigue libre sin contraseña
+app.get('/formulario.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -120,15 +142,14 @@ function formatearFluido(texto) {
     return texto.replace(/[\r\n]+/g, '. ').replace(/[•\-\*]/g, '').replace(/\s{2,}/g, ' ').replace(/\.\s\./g, '.').trim();
 }
 
-// Función auxiliar para subir a Cloudinary y borrar el archivo local
 async function subirACloudinary(filePath, isPdf = false) {
     if (!filePath || !fs.existsSync(filePath)) return '';
     try {
         const options = { folder: 'candidatos' };
-        if (isPdf) options.resource_type = 'auto'; // Necesario para que Cloudinary acepte PDFs y Docs
+        if (isPdf) options.resource_type = 'auto';
         
         const result = await cloudinary.uploader.upload(filePath, options);
-        fs.unlinkSync(filePath); // Borrar de Render para no ocupar espacio
+        fs.unlinkSync(filePath);
         return result.secure_url;
     } catch (error) {
         console.error("Error al subir a Cloudinary:", error);
@@ -140,7 +161,7 @@ async function subirACloudinary(filePath, isPdf = false) {
 // 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR POSTULACIÓN (Con Cloudinary y MongoDB)
+// 1. GUARDAR POSTULACIÓN (Público)
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -148,7 +169,6 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         let cvUrlCloud = '';
         let fotoUrlCloud = '';
 
-        // Subir archivos a Cloudinary si existen
         if (req.files && req.files.cvFile) {
             cvUrlCloud = await subirACloudinary(req.files.cvFile[0].path, true);
         }
@@ -170,8 +190,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             experiencia: formatearFluido(experiencia || textoCompleto),
             estudios: formatearFluido(estudios),
             habilidades: optimizarHabilidadesATS(textoCompleto),
-            cvUrl: cvUrlCloud,     // URL Permanente en Cloudinary
-            fotoUrl: fotoUrlCloud, // URL Permanente en Cloudinary
+            cvUrl: cvUrlCloud,
+            fotoUrl: fotoUrlCloud,
             fecha: new Date().toLocaleString()
         });
 
@@ -183,8 +203,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-// 2. OBTENER LISTA DESDE MONGODB
-app.get('/api/candidatos', async (req, res) => {
+// 2. OBTENER LISTA DESDE MONGODB (Protegido por Auth para el panel)
+app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const listaCandidatos = await Candidato.find().sort({ id: -1 }); 
         res.json({ success: true, candidatos: listaCandidatos });
@@ -194,8 +214,8 @@ app.get('/api/candidatos', async (req, res) => {
     }
 });
 
-// 3. ELIMINAR DESDE MONGODB
-app.delete('/api/candidatos/:id', async (req, res) => {
+// 3. ELIMINAR DESDE MONGODB (Protegido por Auth)
+app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         await Candidato.deleteOne({ id: id }); 
@@ -206,8 +226,8 @@ app.delete('/api/candidatos/:id', async (req, res) => {
     }
 });
 
-// 4. ANALIZAR CV INDIVIDUAL (ATS PREVIEW)
-app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
+// 4. ANALIZAR CV INDIVIDUAL (Protegido por Auth ya que está en el panel)
+app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
         if (!req.files || !req.files.cvFile) return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo.' });
@@ -226,13 +246,11 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             extractedText = result.value ? result.value.trim() : '';
         }
 
-        // Subir la foto de preview a Cloudinary para que se vea en el formulario (opcional pero recomendado)
         let fotoPreviewUrl = '';
         if (req.files && req.files.fotoPerfil) {
             fotoPreviewUrl = await subirACloudinary(req.files.fotoPerfil[0].path, false);
         }
 
-        // Borrar el CV temporal tras analizarlo
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
         const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -242,7 +260,7 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
         
         res.json({
             success: true,
-            fotoUrl: fotoPreviewUrl, // Ahora usa la URL de Cloudinary
+            fotoUrl: fotoPreviewUrl,
             nombre: nombre,
             email: emailMatch ? emailMatch[0] : '',
             telefono: phoneMatch ? phoneMatch[0] : '',
@@ -262,4 +280,4 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
 
 app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
-app.listen(PORT, () => { console.log(`Servidor ATS corriendo en puerto ${PORT}`); });
+app.listen(PORT, () => { console.log(`Servidor ATS Fase 2 corriendo en puerto ${PORT}`); });

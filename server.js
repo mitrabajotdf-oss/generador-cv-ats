@@ -27,7 +27,7 @@ const authMiddleware = basicAuth({
 });
 
 // El panel de gestión principal (index.html) ahora requiere login
-app.get('/', authMiddleware, ( एक्सप्रेस, res) => {
+app.get('/', authMiddleware, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

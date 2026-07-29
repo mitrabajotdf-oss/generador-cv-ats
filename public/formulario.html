@@ -12,8 +12,16 @@
         label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; }
         input[type="text"], input[type="email"], textarea, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         textarea { height: 80px; resize: vertical; }
+        
+        /* Términos y Condiciones Estilos */
+        .terminos-box { background: #f9f9f9; border: 1px solid #e1e1e1; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; max-height: 100px; overflow-y: auto; color: #666; }
+        .checkbox-group { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; font-size: 14px; }
+        .checkbox-group input { margin-top: 3px; }
+
         button { background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: background 0.2s; margin-top: 10px; }
         button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+
         .success-box { display: none; margin-top: 25px; padding: 20px; background: #e8f8f5; border: 1px solid #a3e4d7; border-radius: 8px; text-align: center; }
         .success-box h3 { color: #117a65; margin-top: 0; }
         .cv-promo { background: #fef9e7; border: 1px solid #f9e79f; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }
@@ -26,7 +34,7 @@
 
 <div class="container">
     <h2>Registro de Postulante</h2>
-    <p>Completa tus datos y adjunta tu CV y foto para enviarlos al reclutador.</p>
+    <p>Completa tus datos y adjunta tu CV y foto para enviarlos a los reclutadores locales.</p>
 
     <form id="postulacionForm" onsubmit="enviarPostulacion(event)">
         <div class="form-group">
@@ -78,10 +86,23 @@
             <textarea id="habilidades" placeholder="Habilidades técnicas y blandas..."></textarea>
         </div>
 
+        <!-- TÉRMINOS Y CONDICIONES (LEY 25.326) -->
+        <label>Términos, Condiciones y Política de Privacidad:</label>
+        <div class="terminos-box">
+            <strong>1. Consentimiento de Datos:</strong> Autorizo de manera voluntaria a Mi Trabajo TDF a recolectar, almacenar y compartir mis datos personales y currículum vitae con empresas y empleadores locales exclusivamente para fines de selección laboral.<br>
+            <strong>2. Responsabilidad:</strong> La plataforma actúa como intermediaria tecnológica. Mi Trabajo TDF no garantiza la contratación efectiva por parte de terceros.<br>
+            <strong>3. Privacidad:</strong> Sus datos están protegidos conforme a la legislación vigente y no serán comercializados a terceros ajenos a procesos de empleo en la región.
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="aceptaTerminos" required onchange="validarTerminos()">
+            <label for="aceptaTerminos" style="font-weight: normal; display: inline;">He leído y acepto los Términos y Condiciones y la Política de Privacidad de datos.</label>
+        </div>
+
         <button type="submit" id="btnEnviar">Enviar Postulación</button>
     </form>
 
-    <!-- CAJA DE ÉXITO Y MONETIZACIÓN DEL CV ATS ($ 5.000) CON LINK REAL -->
+    <!-- CAJA DE ÉXITO Y MONETIZACIÓN DEL CV ATS ($ 5.000) -->
     <div id="mensajeExito" class="success-box">
         <h3>¡Tus datos fueron enviados correctamente al reclutador!</h3>
         <p>Tu postulación ya está registrada en el sistema de la empresa.</p>
@@ -89,7 +110,6 @@
         <div class="cv-promo">
             <h4>📄 ¿Quieres descargar tu CV Optimizado en Formato ATS?</h4>
             <p>Obtén tu documento profesional pulido para destacar en cualquier proceso de selección corporativo por solo <strong>$ 5.000,00</strong>.</p>
-            <!-- Enlace oficial de Mercado Pago de la empresa -->
             <a href="https://mpago.la/2fr9Jeh" target="_blank" class="btn-pago">💳 Pagar $ 5.000 y Descargar CV ATS</a>
         </div>
     </div>
@@ -98,6 +118,13 @@
 <script>
     async function enviarPostulacion(event) {
         event.preventDefault();
+        
+        const acepta = document.getElementById('aceptaTerminos').checked;
+        if (!acepta) {
+            alert('Debes aceptar los Términos y Condiciones para continuar.');
+            return;
+        }
+
         const btn = document.getElementById('btnEnviar');
         btn.innerText = 'Enviando postulación...';
         btn.disabled = true;

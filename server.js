@@ -6,6 +6,7 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// -------------------------------------------------------------------
+// ☁️ CONFIGURACIÓN DE CLOUDINARY (Disco Duro en la Nube)
+// -------------------------------------------------------------------
+cloudinary.config({
+    cloud_name: 'a8siaiyr',
+    api_key: '455571468339364',
+    api_secret: 'ZSrtu_B7-v6wt-lasYGQapSVCis'
+});
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -36,7 +46,6 @@ mongoose.connect(mongoURI)
     .then(() => console.log('✅ Base de datos MongoDB conectada con éxito.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
 
-// 📋 ESTRUCTURA DEL CANDIDATO (Schema de MongoDB)
 const candidatoSchema = new mongoose.Schema({
     id: Number,
     nombre: String,
@@ -108,28 +117,47 @@ function generarPerfilATS(textoBruto) {
 
 function formatearFluido(texto) {
     if (!texto) return "";
-    return texto
-        .replace(/[\r\n]+/g, '. ')
-        .replace(/[•\-\*]/g, '')
-        .replace(/\s{2,}/g, ' ')
-        .replace(/\.\s\./g, '.')
-        .trim();
+    return texto.replace(/[\r\n]+/g, '. ').replace(/[•\-\*]/g, '').replace(/\s{2,}/g, ' ').replace(/\.\s\./g, '.').trim();
+}
+
+// Función auxiliar para subir a Cloudinary y borrar el archivo local
+async function subirACloudinary(filePath, isPdf = false) {
+    if (!filePath || !fs.existsSync(filePath)) return '';
+    try {
+        const options = { folder: 'candidatos' };
+        if (isPdf) options.resource_type = 'auto'; // Necesario para que Cloudinary acepte PDFs y Docs
+        
+        const result = await cloudinary.uploader.upload(filePath, options);
+        fs.unlinkSync(filePath); // Borrar de Render para no ocupar espacio
+        return result.secure_url;
+    } catch (error) {
+        console.error("Error al subir a Cloudinary:", error);
+        return '';
+    }
 }
 
 // -------------------------------------------------------------------
-// 🌐 ENDPOINTS ACTUALIZADOS PARA MONGODB
+// 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR EN LA NUBE AL ENVIAR POSTULACIÓN
+// 1. GUARDAR POSTULACIÓN (Con Cloudinary y MongoDB)
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
-        const cvUrl = req.files && req.files.cvFile ? `/uploads/${req.files.cvFile[0].filename}` : '';
-        const fotoUrl = req.files && req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '';
+        
+        let cvUrlCloud = '';
+        let fotoUrlCloud = '';
+
+        // Subir archivos a Cloudinary si existen
+        if (req.files && req.files.cvFile) {
+            cvUrlCloud = await subirACloudinary(req.files.cvFile[0].path, true);
+        }
+        if (req.files && req.files.fotoPerfil) {
+            fotoUrlCloud = await subirACloudinary(req.files.fotoPerfil[0].path, false);
+        }
 
         const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
         
-        // Creamos un nuevo registro usando Mongoose y lo guardamos
         const nuevoCandidato = new Candidato({
             id: Date.now(),
             nombre: nombre || 'Postulante',
@@ -142,13 +170,12 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             experiencia: formatearFluido(experiencia || textoCompleto),
             estudios: formatearFluido(estudios),
             habilidades: optimizarHabilidadesATS(textoCompleto),
-            cvUrl,
-            fotoUrl,
+            cvUrl: cvUrlCloud,     // URL Permanente en Cloudinary
+            fotoUrl: fotoUrlCloud, // URL Permanente en Cloudinary
             fecha: new Date().toLocaleString()
         });
 
-        await nuevoCandidato.save(); // ¡GUARDADO EN MONGODB!
-
+        await nuevoCandidato.save(); 
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {
         console.error(error);
@@ -159,7 +186,6 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 // 2. OBTENER LISTA DESDE MONGODB
 app.get('/api/candidatos', async (req, res) => {
     try {
-        // Busca todos los candidatos y los ordena del más nuevo al más viejo
         const listaCandidatos = await Candidato.find().sort({ id: -1 }); 
         res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
@@ -172,7 +198,7 @@ app.get('/api/candidatos', async (req, res) => {
 app.delete('/api/candidatos/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
-        await Candidato.deleteOne({ id: id }); // Elimina el documento de la base de datos
+        await Candidato.deleteOne({ id: id }); 
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
         console.error(error);
@@ -180,7 +206,7 @@ app.delete('/api/candidatos/:id', async (req, res) => {
     }
 });
 
-// 4. ANALIZAR CV INDIVIDUAL
+// 4. ANALIZAR CV INDIVIDUAL (ATS PREVIEW)
 app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -200,6 +226,13 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
             extractedText = result.value ? result.value.trim() : '';
         }
 
+        // Subir la foto de preview a Cloudinary para que se vea en el formulario (opcional pero recomendado)
+        let fotoPreviewUrl = '';
+        if (req.files && req.files.fotoPerfil) {
+            fotoPreviewUrl = await subirACloudinary(req.files.fotoPerfil[0].path, false);
+        }
+
+        // Borrar el CV temporal tras analizarlo
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
         const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -209,7 +242,7 @@ app.post('/api/upload-cv', upload.fields([{ name: 'cvFile', maxCount: 1 }, { nam
         
         res.json({
             success: true,
-            fotoUrl: req.files.fotoPerfil ? `/uploads/${req.files.fotoPerfil[0].filename}` : '',
+            fotoUrl: fotoPreviewUrl, // Ahora usa la URL de Cloudinary
             nombre: nombre,
             email: emailMatch ? emailMatch[0] : '',
             telefono: phoneMatch ? phoneMatch[0] : '',

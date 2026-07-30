@@ -202,7 +202,11 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });
     }
 });
+const { enviarAlertaAdmin, enviarConfirmacionCandidato } = require('./mailer');
 
+// (Dentro de tu app.post donde procesas el formulario)
+await enviarAlertaAdmin({ nombre, email, telefono });
+await enviarConfirmacionCandidato(email, nombre);
 // 2. OBTENER LISTA DESDE MONGODB (Protegido por Auth para el panel)
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {

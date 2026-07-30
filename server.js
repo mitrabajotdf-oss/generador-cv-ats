@@ -164,7 +164,7 @@ async function subirACloudinary(filePath, isPdf = false) {
 // 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR POSTULACIÓN (Público) con correos automáticos dentro de la función async
+// 1. GUARDAR POSTULACIÓN (Público) con protección de correos try/catch para evitar bloqueos
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -199,9 +199,13 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // 🚀 DISPARAR LOS CORREOS AUTOMÁTICOS AQUÍ ADENTRO
-        await enviarAlertaAdmin({ nombre, email, telefono });
-        await enviarConfirmacionCandidato(email, nombre);
+        // 🚀 DISPARAR CORREOS PROTEGIDOS (si fallan, no bloquean al usuario)
+        try {
+            await enviarAlertaAdmin({ nombre, email, telefono });
+            await enviarConfirmacionCandidato(email, nombre);
+        } catch (mailError) {
+            console.error("Aviso: No se pudo enviar el correo automático, pero la postulación se guardó:", mailError);
+        }
 
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {

@@ -7,7 +7,10 @@ const mammoth = require('mammoth');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
-const basicAuth = require('express-basic-auth'); // 🔒 Módulo de Seguridad para la Fase 2
+const basicAuth = require('express-basic-auth');
+
+// 📧 Importar funciones de correo
+const { enviarAlertaAdmin, enviarConfirmacionCandidato } = require('./mailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,19 +22,16 @@ app.use(express.urlencoded({ extended: true }));
 // -------------------------------------------------------------------
 // 🔒 PROTECCIÓN DEL PANEL DE GESTIÓN (Fase 2)
 // -------------------------------------------------------------------
-// Protege el archivo principal y las rutas de administración de candidatos
 const authMiddleware = basicAuth({
     users: { 'MitrabajoTDF': 'EmpleoRG' },
     challenge: true,
     realm: 'Portal de Reclutamiento Protegido - Mi Trabajo TDF'
 });
 
-// El panel de gestión principal (index.html) ahora requiere login
 app.get('/', authMiddleware, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// El formulario público sigue libre sin contraseña
 app.get('/formulario.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
 });
@@ -40,7 +40,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // -------------------------------------------------------------------
-// ☁️ CONFIGURACIÓN DE CLOUDINARY (Disco Duro en la Nube)
+// ☁️ CONFIGURACIÓN DE CLOUDINARY
 // -------------------------------------------------------------------
 cloudinary.config({
     cloud_name: 'a8siaiyr',
@@ -51,10 +51,14 @@ cloudinary.config({
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir, { recursive: true }); }
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
         cb(null, uploadDir);
     },
-    filename: (req, file, cb) => { cb(null, Date.now() + '-' + file.originalname); }
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
 });
 
 const upload = multer({ storage: storage });
@@ -94,7 +98,7 @@ function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo";
     let encontradas = new Set();
     let lower = textoBruto.toLowerCase();
-
+    
     if (lower.includes("cliente") || lower.includes("público") || lower.includes("atencion")) encontradas.add("Atención al Cliente");
     if (lower.includes("document") || lower.includes("archiv") || lower.includes("digitaliza")) encontradas.add("Gestión Documental");
     if (lower.includes("factura") || lower.includes("cobranz") || lower.includes("caja")) encontradas.add("Facturación y Cobranzas");
@@ -147,7 +151,6 @@ async function subirACloudinary(filePath, isPdf = false) {
     try {
         const options = { folder: 'candidatos' };
         if (isPdf) options.resource_type = 'auto';
-        
         const result = await cloudinary.uploader.upload(filePath, options);
         fs.unlinkSync(filePath);
         return result.secure_url;
@@ -161,11 +164,10 @@ async function subirACloudinary(filePath, isPdf = false) {
 // 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR POSTULACIÓN (Público)
+// 1. GUARDAR POSTULACIÓN (Público) con correos automáticos dentro de la función async
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
-        
         let cvUrlCloud = '';
         let fotoUrlCloud = '';
 
@@ -177,7 +179,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         }
 
         const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
-        
+
         const nuevoCandidato = new Candidato({
             id: Date.now(),
             nombre: nombre || 'Postulante',
@@ -186,7 +188,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            resumen: generarPerfilATS(textoCompleto), 
+            resumen: generarPerfilATS(textoCompleto),
             experiencia: formatearFluido(experiencia || textoCompleto),
             estudios: formatearFluido(estudios),
             habilidades: optimizarHabilidadesATS(textoCompleto),
@@ -195,22 +197,23 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             fecha: new Date().toLocaleString()
         });
 
-        await nuevoCandidato.save(); 
+        await nuevoCandidato.save();
+
+        // 🚀 DISPARAR LOS CORREOS AUTOMÁTICOS AQUÍ ADENTRO
+        await enviarAlertaAdmin({ nombre, email, telefono });
+        await enviarConfirmacionCandidato(email, nombre);
+
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });
     }
 });
-const { enviarAlertaAdmin, enviarConfirmacionCandidato } = require('./mailer');
 
-// (Dentro de tu app.post donde procesas el formulario)
-await enviarAlertaAdmin({ nombre, email, telefono });
-await enviarConfirmacionCandidato(email, nombre);
 // 2. OBTENER LISTA DESDE MONGODB (Protegido por Auth para el panel)
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        const listaCandidatos = await Candidato.find().sort({ id: -1 }); 
+        const listaCandidatos = await Candidato.find().sort({ id: -1 });
         res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
         console.error(error);
@@ -222,7 +225,7 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
 app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
-        await Candidato.deleteOne({ id: id }); 
+        await Candidato.deleteOne({ id: id });
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
         console.error(error);
@@ -230,7 +233,7 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 4. ANALIZAR CV INDIVIDUAL (Protegido por Auth ya que está en el panel)
+// 4. ANALIZAR CV INDIVIDUAL (Protegido por Auth)
 app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -261,7 +264,7 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
         const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
         const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
-        
+
         res.json({
             success: true,
             fotoUrl: fotoPreviewUrl,
@@ -277,11 +280,17 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
             habilidades: optimizarHabilidadesATS(extractedText)
         });
     } catch (error) {
-        if (filePath && fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e){} }
+        if (filePath && fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch(e){}
+        }
         res.status(500).json({ success: false, error: 'Error interno al procesar el documento.' });
     }
 });
 
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'public', 'index.html')); });
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-app.listen(PORT, () => { console.log(`Servidor ATS Fase 2 corriendo en puerto ${PORT}`); });
+app.listen(PORT, () => {
+    console.log(`Servidor ATS Fase 2 corriendo en puerto ${PORT}`);
+});

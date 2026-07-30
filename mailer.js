@@ -3,36 +3,37 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'mitrabajotdf@gmail.com',         // <-- Tu correo de Gmail acá
-        pass: 'yfuw tmez qsxd xwvc'   // <-- Contraseña de aplicación de Gmail (NO tu contraseña normal)
+        user: 'mitrabajotdf@gmail.com',
+        pass: 'yfuw tmez qsxd xwvc'
     }
 });
 
 async function enviarAlertaAdmin(datos) {
     try {
-        if (!process.env.RESEND_API_KEY) return;
         await transporter.sendMail({
-            from: 'onboarding@resend.dev',
-            to: 'tu-correo@ejemplo.com',
+            from: 'mitrabajotdf@gmail.com',
+            to: 'mitrabajotdf@gmail.com',
             subject: 'Nueva postulación recibida',
-            text: `Nuevo candidato: ${datos.nombre}`
+            text: `Nuevo candidato registrado: ${datos.nombre} - Teléfono: ${datos.telefono} - Email: ${datos.email}`
         });
+        console.log("Alerta enviada al administrador con éxito.");
     } catch (e) {
-        console.log("Aviso mail admin omitido:", e.message);
+        console.log("Error enviando alerta admin:", e.message);
     }
 }
 
 async function enviarConfirmacionCandidato(email, nombre) {
     try {
-        if (!process.env.RESEND_API_KEY || !email) return;
+        if (!email) return;
         await transporter.sendMail({
-            from: 'onboarding@resend.dev',
+            from: 'mitrabajotdf@gmail.com',
             to: email,
             subject: 'Postulación recibida - Mi Trabajo TDF',
-            text: `Hola ${nombre}, recibimos tus datos correctamente.`
+            text: `Hola ${nombre},\n\nRecibimos tus datos correctamente en el sistema de Mi Trabajo TDF. Nos pondremos en contacto si tu perfil coincide con alguna búsqueda activa.\n\n¡Muchas gracias por postularte!`
         });
+        console.log("Correo de confirmación enviado al candidato con éxito.");
     } catch (e) {
-        console.log("Aviso mail candidato omitido:", e.message);
+        console.log("Error enviando confirmación candidato:", e.message);
     }
 }
 

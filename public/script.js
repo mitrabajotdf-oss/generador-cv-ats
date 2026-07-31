@@ -46,20 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Función global para corregir dinámicamente cualquier enlace de PDF de Cloudinary
-    const corregirEnlacesPDF = () => {
+    // Permitir descarga limpia y directa de los enlaces de Cloudinary sin forzar parámetros rotos
+    const limpiarEnlacesPDF = () => {
         const pdfLinks = document.querySelectorAll('a[href*="cloudinary.com"]');
         pdfLinks.forEach(link => {
-            if (!link.href.includes('fl_attachment')) {
-                link.href = link.href.replace('/upload/', '/upload/fl_attachment/');
-                link.setAttribute('download', '');
-                link.setAttribute('target', '_self'); // Evita que abra pestaña nueva vacía
-            }
+            // Aseguramos que use target="_blank" y download para que el navegador baje el PDF sin errores de respuesta
+            link.setAttribute('target', '_blank');
+            link.setAttribute('download', '');
         });
     };
 
-    // Ejecutar al cargar y observar cambios por si la tabla se actualiza dinámicamente
-    corregirEnlacesPDF();
-    const observer = new MutationObserver(corregirEnlacesPDF);
+    limpiarEnlacesPDF();
+    const observer = new MutationObserver(limpiarEnlacesPDF);
     observer.observe(document.body, { childList: true, subtree: true });
 });

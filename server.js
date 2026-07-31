@@ -57,13 +57,14 @@ mongoose.connect(mongoURI)
 
 const candidatoSchema = new mongoose.Schema({
     id: Number,
-    puestoRequerido: String, // 📌 Nuevo campo agregado
+    puestoRequerido: String,
     nombre: String,
     dni: String,
     email: String,
     telefono: String,
     direccion: String,
     disponibilidad: String,
+    medioEntrega: String, // 📌 Nuevo campo agregado
     resumen: String,
     experiencia: String,
     estudios: String,
@@ -78,7 +79,7 @@ const Candidato = mongoose.model('Candidato', candidatoSchema);
 // 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
-        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, medioEntrega, resumen, experiencia, estudios, habilidades } = req.body;
         
         let cvUrlLocal = '';
         let fotoUrlLocal = '';
@@ -101,6 +102,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
+            medioEntrega: medioEntrega || 'Email', // 📌 Guardar la preferencia
             resumen: resumen || '',
             experiencia: experiencia || '',
             estudios: estudios || '',

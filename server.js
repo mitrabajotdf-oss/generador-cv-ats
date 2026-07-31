@@ -6,17 +6,6 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 
-// Importar módulo de correos seguro
-let enviarAlertaAdmin = () => {};
-let enviarConfirmacionCandidato = () => {};
-try {
-    const mailer = require('./mailer');
-    if (mailer.enviarAlertaAdmin) enviarAlertaAdmin = mailer.enviarAlertaAdmin;
-    if (mailer.enviarConfirmacionCandidato) enviarConfirmacionCandidato = mailer.enviarConfirmacionCandidato;
-} catch (e) {
-    console.log("Aviso: Módulo de correo omitido.", e.message);
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -42,7 +31,7 @@ app.get('/formulario.html', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 📂 Gestión de Archivos Locales
+// 📂 Gestión de Archivos Locales (Multer seguro)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'uploads');
@@ -52,11 +41,15 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // Límite de 10MB por archivo
+});
 
 // 🚀 Conexión a MongoDB
 const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
@@ -84,10 +77,11 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// 🌐 Endpoint de Recepción de Postulación (Manual y Seguro)
+// 🌐 Endpoint Blindado de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        
         let cvUrlLocal = '';
         let fotoUrlLocal = '';
 
@@ -118,32 +112,20 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         });
 
         await nuevoCandidato.save();
-        
-        // Respondemos con éxito al cliente inmediatamente
-        res.json({ success: true, message: '¡Postulación guardada con éxito!' });
-
-        // Correos en segundo plano (sin bloquear)
-        setImmediate(async () => {
-            try {
-                await enviarAlertaAdmin(nuevoCandidato);
-                await enviarConfirmacionCandidato(email, nombre);
-            } catch (err) {
-                console.log("Aviso de correo secundario:", err.message);
-            }
-        });
+        return res.json({ success: true, message: '¡Postulación guardada con éxito!' });
 
     } catch (error) {
-        console.error("Error al guardar postulación:", error);
-        res.status(500).json({ success: false, error: error.message });
+        console.error("Error crítico al procesar postulación:", error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const listaCandidatos = await Candidato.find().sort({ id: -1 });
-        res.json({ success: true, candidatos: listaCandidatos });
+        return res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
-        res.status(500).json({ success: false, error: 'Error al cargar candidatos.' });
+        return res.status(500).json({ success: false, error: 'Error al cargar candidatos.' });
     }
 });
 
@@ -160,9 +142,9 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
         }
 
         await Candidato.deleteOne({ id: id });
-        res.json({ success: true, message: 'Candidato eliminado.' });
+        return res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
-        res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
+        return res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
     }
 });
 

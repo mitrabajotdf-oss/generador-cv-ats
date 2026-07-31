@@ -131,7 +131,7 @@
         const c = candidatosGlobal.find(item => item.id === id);
         if (!c) return;
         
-        alert(`=== PERFIL ATS DE ${c.nombre.toUpperCase()} ===\n\nRESUMEN:\n${c.resumen}\n\nEXPERIENCIA:\n${c.experiencia}\n\nESTUDIOS:\n${c.estudios}\n\nHABILIDADES:\n${c.habilidades}`);
+        alert(`=== PERFIL ATS DE ${c.nombre.toUpperCase()} ===\n\nRESUMEN PROFESIONAL:\n${c.resumen || 'No especificado'}\n\nEXPERIENCIA LABORAL:\n${c.experiencia || 'No especificada'}\n\nESTUDIOS Y CURSOS:\n${c.estudios || 'No especificados'}\n\nHABILIDADES:\n${c.habilidades || 'No especificadas'}`);
     }
 
     function copiarLink() {

@@ -164,7 +164,7 @@ async function subirACloudinary(filePath, isPdf = false) {
 // 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR POSTULACIÓN (Público) con protección de correos try/catch para evitar bloqueos
+// 1. GUARDAR POSTULACIÓN (Público) con respuesta instantánea y correos en segundo plano
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -199,15 +199,19 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // 🚀 DISPARAR CORREOS PROTEGIDOS (si fallan, no bloquean al usuario)
-        try {
-            await enviarAlertaAdmin({ nombre, email, telefono });
-            await enviarConfirmacionCandidato(email, nombre);
-        } catch (mailError) {
-            console.error("Aviso: No se pudo enviar el correo automático, pero la postulación se guardó:", mailError);
-        }
-
+        // ⚡ RESPONDER AL NAVEGADOR DE INMEDIATO (Elimina cualquier demora en pantalla)
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
+
+        // 🚀 ENVIAR CORREOS EN SEGUNDO PLANO (Sin bloquear al usuario)
+        setImmediate(async () => {
+            try {
+                await enviarAlertaAdmin({ nombre, dni, email, telefono });
+                await enviarConfirmacionCandidato(email, nombre);
+            } catch (mailError) {
+                console.log("Aviso de correo en segundo plano:", mailError.message);
+            }
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });

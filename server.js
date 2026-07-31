@@ -92,7 +92,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS Y LIMPIEZA INTELIGENTE (ATS)
+// 🧠 MOTORES DE FILTRADO Y SÍNTESIS ATS (Para la vista de panel)
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -100,7 +100,7 @@ function optimizarHabilidadesATS(textoBruto) {
     let lower = textoBruto.toLowerCase();
     
     if (lower.includes("cliente") || lower.includes("público") || lower.includes("atencion")) encontradas.add("Atención al Cliente");
-    if (lower.includes("document") || lower.includes("archiv") || lower.includes("digitaliza")) encontradas.add("Gestión Documental");
+    if (lower.includes("document") || lower.includes("archiv") || lower.includes("digitaliza") || lower.includes("escriban") || lower.includes("notarial")) encontradas.add("Gestión Documental y Notarial");
     if (lower.includes("factura") || lower.includes("cobranz") || lower.includes("caja")) encontradas.add("Facturación y Cobranzas");
     if (lower.includes("tango")) encontradas.add("Sistema Tango Gestión");
     if (lower.includes("excel") || lower.includes("planilla")) encontradas.add("Microsoft Excel");
@@ -111,75 +111,20 @@ function optimizarHabilidadesATS(textoBruto) {
     if (lower.includes("resolu") || lower.includes("problema")) encontradas.add("Resolución de Problemas");
     if (lower.includes("proactiv") || lower.includes("iniciativa")) encontradas.add("Proactividad y Adaptabilidad");
     if (lower.includes("liderazgo") || lower.includes("supervisor")) encontradas.add("Liderazgo de Equipos");
-    if (lower.includes("copilot") || lower.includes("ia")) encontradas.add("Microsoft Office 365 e Integración de IA");
+    if (lower.includes("copilot") || lower.includes("ia") || lower.includes("inteligencia artificial")) encontradas.add("Microsoft Office 365 e Integración de IA");
 
     if (encontradas.size === 0) return "Organización • Trabajo en Equipo • Adaptabilidad";
     return Array.from(encontradas).join(" • ");
 }
 
-function generarPerfilATS(textoBruto) {
-    if (!textoBruto) return "Profesional proactivo con alta capacidad de aprendizaje y enfoque en resultados y cumplimiento de objetivos.";
-    let lower = textoBruto.toLowerCase();
-    let perfil = "Profesional ";
-
-    if (lower.includes("administr") || lower.includes("gestión") || lower.includes("secretari")) {
-        perfil += "con sólida trayectoria en áreas administrativas, de gestión y documentación, ";
-    } else if (lower.includes("ventas") || lower.includes("comercial") || lower.includes("atención")) {
-        perfil += "con destacada experiencia en atención al cliente y gestión comercial, ";
-    } else if (lower.includes("producción") || lower.includes("operario") || lower.includes("logística") || lower.includes("depósito")) {
-        perfil += "con experiencia comprobable en entornos operativos, producción y logística, ";
-    } else {
-        perfil += "con trayectoria versátil y dinámica, ";
-    }
-
-    perfil += "demostrando excelentes habilidades para el trabajo en equipo, resolución de situaciones complejas y orientación a resultados.";
-    return perfil;
-}
-
-function limpiarTextoColumnas(texto) {
+function formatearFluidoATS(texto) {
     if (!texto) return "";
-    // Normaliza saltos de línea múltiples y elimina caracteres basura de maquetación en columnas
     return texto
         .replace(/\r/g, '')
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 0)
-        .join(' ')
-        .replace(/\s{2,}/g, ' ');
-}
-
-function extraerBloqueSeccion(textoLimpio, palabrasClaves) {
-    let textoUpper = textoLimpio.toUpperCase();
-    let mejorIndice = -1;
-    let keywordUsada = '';
-
-    for (let kw of palabrasClaves) {
-        let idx = textoUpper.indexOf(kw);
-        if (idx !== -1 && (mejorIndice === -1 || idx < mejorIndice)) {
-            mejorIndice = idx;
-            keywordUsada = kw;
-        }
-    }
-
-    if (mejorIndice === -1) return '';
-
-    let sub = textoLimpio.substring(mejorIndice + keywordUsada.length).trim();
-    
-    // Intentamos cortar antes de la siguiente sección típica para que no se mezcle todo
-    const cortes = ["EXPERIENCIA", "ESTUDIOS", "EDUCACIÓN", "CURSOS", "HABILIDADES", "FORMACIÓN", "PERFIL"];
-    let menorCorte = sub.length;
-
-    let subUpper = sub.toUpperCase();
-    for (let corte of cortes) {
-        if (corte !== keywordUsada) {
-            let idxCorte = subUpper.indexOf(corte);
-            if (idxCorte !== -1 && idxCorte < menorCorte) {
-                menorCorte = idxCorte;
-            }
-        }
-    }
-
-    return sub.substring(0, menorCorte).trim();
+        .replace(/[\n\t]+/g, ' ')
+        .replace(/[•\-\*]/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
 }
 
 async function subirFotoACloudinary(filePath) {
@@ -211,8 +156,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             fotoUrlCloud = await subirFotoACloudinary(req.files.fotoPerfil[0].path);
         }
 
-        const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
-
+        // Aplicamos formato fluido ATS estricto de una sola columna optimizado para el panel y exportación
         const nuevoCandidato = new Candidato({
             id: Date.now(),
             nombre: nombre || 'Postulante',
@@ -221,10 +165,10 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            resumen: resumen ? limpiarTextoColumnas(resumen) : generarPerfilATS(textoCompleto),
-            experiencia: experiencia ? limpiarTextoColumnas(experiencia) : limpiarTextoColumnas(textoCompleto),
-            estudios: estudios ? limpiarTextoColumnas(estudios) : 'Formación continua orientada a objetivos.',
-            habilidades: habilidades ? habilidades : optimizarHabilidadesATS(textoCompleto),
+            resumen: formatearFluidoATS(resumen),
+            experiencia: formatearFluidoATS(experiencia),
+            estudios: formatearFluidoATS(estudios),
+            habilidades: habilidades ? optimizarHabilidadesATS(habilidades) : optimizarHabilidadesATS(experiencia),
             cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlCloud,
             fecha: new Date().toLocaleString()
@@ -277,6 +221,7 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// Endpoint para leer el CV tal cual sin filtros pesados en el formulario
 app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -303,21 +248,14 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        // Limpieza profunda del texto de columnas múltiples
-        const textoLimpio = limpiarTextoColumnas(extractedText);
+        // Limpieza básica para que se vea legible en el formulario sin recortar contenido
+        const textoLimpioForm = extractedText.replace(/\r/g, '').replace(/\t/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
         const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
         const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
         const dniMatch = extractedText.match(/\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,8}\b/);
-
-        // Extracción limpia de secciones basadas en el texto normalizado
-        let experienciaExt = extraerBloqueSeccion(textoLimpio, ["EXPERIENCIA LABORAL", "EXPERIENCIA"]);
-        let estudiosExt = extraerBloqueSeccion(textoLimpio, ["ESTUDIOS Y CURSOS", "ESTUDIOS", "EDUCACIÓN", "CURSOS", "FORMACIÓN"]);
-
-        if (!experienciaExt) experienciaExt = textoLimpio;
-        if (!estudiosExt) estudiosExt = "Formación académica y continua orientada al puesto.";
 
         res.json({
             success: true,
@@ -328,11 +266,10 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
             dni: dniMatch ? dniMatch[0] : '',
             domicilio: '',
             disponibilidad: 'Inmediata',
-            resumen: generarPerfilATS(textoLimpio),
-            experiencia: limpiarTextoColumnas(experienciaExt),
-            estudios: limpiarTextoColumnas(estudiosExt),
-            habilidades: optimizarHabilidadesATS(textoLimpio),
-            rawText: extractedText
+            resumen: textoLimpioForm,
+            experiencia: textoLimpioForm,
+            estudios: '',
+            habilidades: optimizarHabilidadesATS(extractedText)
         });
     } catch (error) {
         if (filePath && fs.existsSync(filePath)) {

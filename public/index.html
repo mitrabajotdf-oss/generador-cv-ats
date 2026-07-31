@@ -94,7 +94,7 @@
         
         <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button class="btn-success" onclick="guardarCambios()">Guardar Perfil</button>
-            <a id="btnDescargarPdf" class="btn" href="#" target="_blank" style="display:none;">📥 Descargar CV en PDF (Pestaña Nueva)</a>
+            <a id="btnDescargarPdf" class="btn" href="#" download style="display:none;">📥 Descargar CV en PDF</a>
         </div>
     </div>
 </div>
@@ -190,7 +190,12 @@
 
         const btnPdf = document.getElementById('btnDescargarPdf');
         if (c.cvUrl) {
-            btnPdf.href = c.cvUrl;
+            let urlDescarga = c.cvUrl;
+            if (urlDescarga.includes('/upload/') && !urlDescarga.includes('fl_attachment')) {
+                urlDescarga = urlDescarga.replace('/upload/', '/upload/fl_attachment/');
+            }
+            btnPdf.href = urlDescarga;
+            btnPdf.setAttribute('download', '');
             btnPdf.style.display = 'inline-block';
         } else {
             btnPdf.style.display = 'none';

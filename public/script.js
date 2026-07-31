@@ -20,14 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (el) el.value = valor || '';
                     };
 
-                    // Datos personales
                     setValue('nombreInput', data.nombre);
                     setValue('emailInput', data.email);
                     setValue('telefonoInput', data.telefono);
                     setValue('domicilioInput', data.domicilio);
                     setValue('disponibilidadInput', data.disponibilidad || 'Inmediata');
                     
-                    // Texto completo extraído sin recortes ni límites de caracteres
                     const textoCV = data.rawText || '';
 
                     setValue('resumenInput', textoCV);
@@ -46,17 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Permitir descarga limpia y directa de los enlaces de Cloudinary sin forzar parámetros rotos
-    const limpiarEnlacesPDF = () => {
+    // Limpieza profunda: eliminamos cualquier intento anterior de alterar o romper los enlaces de Cloudinary
+    const limpiarEnlacesCloudinary = () => {
         const pdfLinks = document.querySelectorAll('a[href*="cloudinary.com"]');
         pdfLinks.forEach(link => {
-            // Aseguramos que use target="_blank" y download para que el navegador baje el PDF sin errores de respuesta
+            // Si la URL contiene el parámetro problemático fl_attachment, se lo quitamos limpiamente
+            if (link.href.includes('fl_attachment')) {
+                link.href = link.href.replace('/upload/fl_attachment/', '/upload/');
+            }
             link.setAttribute('target', '_blank');
-            link.setAttribute('download', '');
+            link.removeAttribute('download'); // Dejamos que el navegador maneje la visualización o descarga del PDF nativamente
         });
     };
 
-    limpiarEnlacesPDF();
-    const observer = new MutationObserver(limpiarEnlacesPDF);
+    limpiarEnlacesCloudinary();
+    const observer = new MutationObserver(limpiarEnlacesCloudinary);
     observer.observe(document.body, { childList: true, subtree: true });
 });

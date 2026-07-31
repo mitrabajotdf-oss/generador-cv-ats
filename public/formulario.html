@@ -16,7 +16,7 @@
         <!-- 📌 PUESTO AL QUE SE POSTULA (Opcional) -->
         <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
             <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
-           <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
+            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
         </div>
 
         <!-- 1. ARCHIVOS -->
@@ -38,7 +38,16 @@
         <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
-        <!-- 3. CAMPOS MANUALES ATS -->
+        <!-- 3. MEDIO PREFERIDO DE ENTREGA DEL CV OPTIMIZADO -->
+        <div class="form-group" style="background: #f4f6f7; padding: 15px; border-radius: 8px; border-left: 5px solid #16a085;">
+            <label style="color: #2c3e50; font-size: 15px; font-weight: bold;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado una vez abonado?</label>
+            <select id="medioEntrega" name="medioEntrega" style="margin-top: 8px; width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;" required>
+                <option value="Email">Por Email</option>
+                <option value="WhatsApp">Por WhatsApp</option>
+            </select>
+        </div>
+
+        <!-- 4. CAMPOS MANUALES ATS -->
         <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
@@ -48,14 +57,21 @@
         <button type="submit" id="btnEnviar" class="btn-submit">Enviar Postulación Final</button>
     </form>
 
-    <div id="resultadoSeccion">
+    <div id="resultadoSeccion" style="display: none; background: #fff; padding: 20px; border-radius: 8px; text-align: center;">
         <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
         <p>Tus datos han sido registrados correctamente en la bolsa de empleo de Tierra del Fuego.</p>
-        <p><strong>¿Deseas descargar tu CV optimizado profesionalmente bajo formato ATS en líneas fluidas?</strong></p>
-        <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo de habilitación de descarga: $5,000 ARS</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p><strong>¿Deseas descargar y recibir tu CV optimizado profesionalmente bajo formato ATS en líneas fluidas?</strong></p>
+        <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo de habilitación: $5,000 ARS</p>
         
-        <!-- Link de pago configurado con tu cuenta -->
-        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago">Abonar $5,000 y Descargar CV ATS</a>
+        <!-- Link de pago oficial -->
+        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:10px;">Abonar $5,000 con Mercado Pago</a>
+        
+        <!-- Mensaje automático aclaratorio -->
+        <div style="background: #eaf2f8; padding: 15px; border-radius: 6px; margin-top: 25px; text-align: left; font-size: 14px; color: #2c3e50;">
+            <p style="margin: 0; font-weight: bold; color: #2980b9;">ℹ️ Importante sobre la entrega:</p>
+            <p style="margin: 5px 0 0 0;">Una vez confirmado el pago de los $5,000 en nuestro sistema, validaremos tus datos y te enviaremos tu CV ATS totalmente optimizado a través del medio que seleccionaste (<strong>Email o WhatsApp</strong>) a la brevedad.</p>
+        </div>
     </div>
 </div>
 

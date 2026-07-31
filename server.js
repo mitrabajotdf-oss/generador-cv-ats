@@ -92,7 +92,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE FILTRADO Y SÍNTESIS ATS (Para la vista de panel)
+// 🧠 MOTORES DE SÍNTESIS ATS (Líneas fluidas y formato de una sola columna)
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -100,7 +100,7 @@ function optimizarHabilidadesATS(textoBruto) {
     let lower = textoBruto.toLowerCase();
     
     if (lower.includes("cliente") || lower.includes("público") || lower.includes("atencion")) encontradas.add("Atención al Cliente");
-    if (lower.includes("document") || lower.includes("archiv") || lower.includes("digitaliza") || lower.includes("escriban") || lower.includes("notarial")) encontradas.add("Gestión Documental y Notarial");
+    if (lower.includes("document") || lower.includes("archiv") || lower.includes("digitaliza") || lower.includes("escribanía") || lower.includes("notarial")) encontradas.add("Gestión Documental y Notarial");
     if (lower.includes("factura") || lower.includes("cobranz") || lower.includes("caja")) encontradas.add("Facturación y Cobranzas");
     if (lower.includes("tango")) encontradas.add("Sistema Tango Gestión");
     if (lower.includes("excel") || lower.includes("planilla")) encontradas.add("Microsoft Excel");
@@ -156,7 +156,6 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             fotoUrlCloud = await subirFotoACloudinary(req.files.fotoPerfil[0].path);
         }
 
-        // Aplicamos formato fluido ATS estricto de una sola columna optimizado para el panel y exportación
         const nuevoCandidato = new Candidato({
             id: Date.now(),
             nombre: nombre || 'Postulante',
@@ -218,64 +217,6 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
         res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
-    }
-});
-
-// Endpoint para leer el CV tal cual sin filtros pesados en el formulario
-app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
-    let filePath = '';
-    try {
-        if (!req.files || !req.files.cvFile) return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo.' });
-        
-        const cvFile = req.files.cvFile[0];
-        filePath = cvFile.path;
-        const fileExtension = path.extname(cvFile.originalname).toLowerCase();
-        let extractedText = '';
-
-        if (fileExtension === '.pdf') {
-            const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdfParse(dataBuffer);
-            extractedText = pdfData.text ? pdfData.text.trim() : '';
-        } else if (fileExtension === '.docx') {
-            const result = await mammoth.extractRawText({ path: filePath });
-            extractedText = result.value ? result.value.trim() : '';
-        }
-
-        let fotoPreviewUrl = '';
-        if (req.files && req.files.fotoPerfil) {
-            fotoPreviewUrl = await subirFotoACloudinary(req.files.fotoPerfil[0].path);
-        }
-
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-        // Limpieza básica para que se vea legible en el formulario sin recortar contenido
-        const textoLimpioForm = extractedText.replace(/\r/g, '').replace(/\t/g, ' ').replace(/\s{2,}/g, ' ').trim();
-
-        const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
-        const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
-        const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
-        const dniMatch = extractedText.match(/\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,8}\b/);
-
-        res.json({
-            success: true,
-            fotoUrl: fotoPreviewUrl,
-            nombre: nombre,
-            email: emailMatch ? emailMatch[0] : '',
-            telefono: phoneMatch ? phoneMatch[0] : '',
-            dni: dniMatch ? dniMatch[0] : '',
-            domicilio: '',
-            disponibilidad: 'Inmediata',
-            resumen: textoLimpioForm,
-            experiencia: textoLimpioForm,
-            estudios: '',
-            habilidades: optimizarHabilidadesATS(extractedText)
-        });
-    } catch (error) {
-        if (filePath && fs.existsSync(filePath)) {
-            try { fs.unlinkSync(filePath); } catch(e){}
-        }
-        res.status(500).json({ success: false, error: 'Error interno al procesar el documento.' });
     }
 });
 

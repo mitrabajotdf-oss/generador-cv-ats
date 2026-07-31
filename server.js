@@ -7,17 +7,6 @@ const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const basicAuth = require('express-basic-auth');
 
-// 📧 Importar funciones de correo (protegidas)
-let enviarAlertaAdmin = () => {};
-let enviarConfirmacionCandidato = () => {};
-try {
-    const mailer = require('./mailer');
-    if (mailer.enviarAlertaAdmin) enviarAlertaAdmin = mailer.enviarAlertaAdmin;
-    if (mailer.enviarConfirmacionCandidato) enviarConfirmacionCandidato = mailer.enviarConfirmacionCandidato;
-} catch (e) {
-    console.log("Aviso: Módulo de correo no disponible o con errores.", e.message);
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -98,7 +87,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS ATS
+// 🧠 MOTORES DE SÍNTESIS Y LIMPIEZA ATS
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -180,18 +169,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // Respondemos de inmediato al cliente con éxito para evitar errores de conexión
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente!' });
-
-        // Intentamos enviar correos en segundo plano sin bloquear la respuesta
-        setImmediate(async () => {
-            try {
-                await enviarAlertaAdmin({ nombre, dni, email, telefono });
-                await enviarConfirmacionCandidato(email, nombre);
-            } catch (mailError) {
-                console.log("Aviso de correo (no crítico):", mailError.message);
-            }
-        });
 
     } catch (error) {
         console.error("Error crítico en /api/enviar-postulacion:", error);

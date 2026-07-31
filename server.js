@@ -149,8 +149,13 @@ function formatearFluido(texto) {
 async function subirACloudinary(filePath, isPdf = false) {
     if (!filePath || !fs.existsSync(filePath)) return '';
     try {
-        const options = { folder: 'candidatos' };
+        const options = { 
+            folder: 'candidatos',
+            access_mode: 'public', // 🔓 Fuerza acceso público para evitar errores 401
+            type: 'upload'
+        };
         if (isPdf) options.resource_type = 'auto';
+        
         const result = await cloudinary.uploader.upload(filePath, options);
         fs.unlinkSync(filePath);
         return result.secure_url;
@@ -199,10 +204,10 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // ⚡ RESPONDER AL NAVEGADOR DE INMEDIATO (Elimina cualquier demora en pantalla)
+        // ⚡ RESPONDER AL NAVEGADOR DE INMEDIATO
         res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
 
-        // 🚀 ENVIAR CORREOS EN SEGUNDO PLANO (Sin bloquear al usuario)
+        // 🚀 ENVIAR CORREOS EN SEGUNDO PLANO
         setImmediate(async () => {
             try {
                 await enviarAlertaAdmin({ nombre, dni, email, telefono });

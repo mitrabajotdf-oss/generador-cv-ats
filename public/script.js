@@ -42,16 +42,17 @@ if (listaCandidatosDiv) {
             
             if (data.success && data.candidatos.length > 0) {
                 let html = '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 10px;">';
-                html += '<tr style="background:#f2f2f2;"><th>Nombre</th><th>Email</th><th>DNI</th><th>Fecha</th><th>Acciones</th></tr>';
+                html += '<tr style="background:#f2f2f2;"><th>Puesto Requerido</th><th>Nombre</th><th>Email</th><th>DNI</th><th>Fecha</th><th>Acciones</th></tr>';
                 
                 data.candidatos.forEach(c => {
                     html += `<tr>
+                        <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
                         <td style="padding:10px;">${c.nombre}</td>
                         <td style="padding:10px;">${c.email}</td>
                         <td style="padding:10px;">${c.dni}</td>
                         <td style="padding:10px;">${c.fecha}</td>
                         <td style="padding:10px; text-align:center;">
-                            ${c.cvUrl ? `<a href="${c.cvUrl}" target="_blank" style="margin-right:10px;">📂 Ver CV</a>` : ''}
+                            ${c.cvUrl && c.cvUrl.startsWith('/uploads/') ? `<a href="${c.cvUrl}" target="_blank" style="margin-right:10px;">📂 Ver CV</a>` : ''}
                             <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Eliminar</button>
                         </td>
                     </tr>`;

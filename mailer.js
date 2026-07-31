@@ -1,32 +1,46 @@
 const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
 
-async function enviarAlertaAdmin(datos) {
+// Usamos la API key directamente o mediante variables de entorno
+const resend = new Resend(process.env.RESEND_API_KEY || 're_123456789');
+
+async function enviarAlertaAdmin(candidato) {
     try {
         await resend.emails.send({
-            from: 'onboarding@resend.dev',
-            to: 'mitrabajotdf@gmail.com',
-            subject: '📋 Nuevo Postulante Registrado en la Base',
-            text: `Se ha cargado un nuevo postulante al sistema:\n\n- Nombre: ${datos.nombre}\n- DNI: ${datos.dni || 'No especificado'}\n- Teléfono: ${datos.telefono}\n- Email: ${datos.email}\n\nIngresá al panel de control para ver su perfil completo y filtros ATS.`
+            from: 'Portal ATS <onboarding@resend.dev>',
+            to: ['mitrabajotdf@gmail.com'], // O tu correo de administración
+            subject: `Nueva Postulación Recibida: ${candidato.nombre}`,
+            html: `
+                <h2>¡Nuevo Candidato Registrado!</h2>
+                <p><strong>Nombre:</strong> ${candidato.nombre}</p>
+                <p><strong>DNI:</strong> ${candidato.dni}</p>
+                <p><strong>Email:</strong> ${candidato.email}</p>
+                <p><strong>Teléfono:</strong> ${candidato.telefono}</p>
+                <p>Ingresa al <a href="https://generador-cv-ats-1.onrender.com/">Panel de Gestión</a> para ver los detalles completos y descargar su CV.</p>
+            `
         });
-        console.log("Alerta enviada al administrador con éxito.");
-    } catch (e) {
-        console.log("Error enviando alerta admin:", e.message);
+    } catch (error) {
+        console.error("Error al enviar alerta al admin:", error);
     }
 }
 
-async function enviarConfirmacionCandidato(email, nombre) {
+async function enviarConfirmacionCandidato(emailCandidato, nombreCandidato) {
+    if (!emailCandidato) return;
     try {
-        if (!email) return;
         await resend.emails.send({
-            from: 'onboarding@resend.dev',
-            to: email,
-            subject: 'Postulación Recibida - Mi Trabajo TDF',
-            text: `Hola ${nombre},\n\n¡Recibimos tus datos correctamente en nuestra base de datos!\n\nTe avisamos que cuando haya una búsqueda activa que coincida con tus habilidades y perfil ATS, nos pondremos en contacto.\n\nMuchas gracias por confiar en Mi Trabajo TDF.`
+            from: 'Mi Trabajo TDF <onboarding@resend.dev>',
+            to: [emailCandidato],
+            subject: '¡Postulación Recibida con Éxito - Mi Trabajo TDF!',
+            html: `
+                <h2>¡Hola ${nombreCandidato}!</h2>
+                <p>Hemos recibido correctamente tu postulación y tu CV optimizado en nuestro sistema.</p>
+                <p>Tus datos ya se encuentran disponibles en nuestra base para los procesos de selección activos.</p>
+                <br>
+                <p>Atentamente,</p>
+                <p><strong>Equipo de Reclutamiento - Mi Trabajo TDF</strong></p>
+            `
         });
-        console.log("Correo de confirmación enviado al candidato con éxito.");
-    } catch (e) {
-        console.log("Error enviando confirmación candidato:", e.message);
+    } catch (error) {
+        console.error("Error al enviar confirmación al candidato:", error);
     }
 }
 

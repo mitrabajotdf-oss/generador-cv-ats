@@ -4,145 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Gestión de Candidatos & ATS</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1, h2 { color: #2c3e50; }
-        h1 { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e1e8ed; font-size: 14px; }
-        th { background-color: #f8f9fa; color: #2c3e50; font-weight: 600; }
-        .btn-accion { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 12px; margin-right: 5px; display: inline-block; }
-        .btn-ver { background: #3498db; color: white; }
-        .btn-descargar { background: #27ae60; color: white; }
-        .btn-eliminar { background: #e74c3c; color: white; border: none; cursor: pointer; }
-        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        .link-form { background: #e8f8f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #a3e4d7; display: flex; justify-content: space-between; align-items: center; }
-        .link-form input { flex: 1; padding: 8px; margin-right: 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: #fff; }
-        .btn-copiar { background: #16a085; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<div class="container">
+<div class="container" style="max-width: 1000px;">
     <h1>Panel de Gestión y Filtros ATS</h1>
-
-    <div class="link-form">
-        <span style="font-weight: 600; margin-right: 10px;">Link de Formulario para Redes / WhatsApp:</span>
-        <input type="text" id="urlFormulario" readonly>
-        <button class="btn-copiar" onclick="copiarLink()">Copiar</button>
+    <p><strong>Link de Formulario para Redes / WhatsApp:</strong> <a href="/formulario.html" target="_blank">https://generador-cv-ats-1.onrender.com/formulario.html</a></p>
+    
+    <div class="form-group" style="margin-top: 20px;">
+        <input type="text" id="buscador" placeholder="🔍 Buscar por nombre, DNI, email o habilidades..." style="padding: 10px; width: 100%;">
     </div>
 
     <h2>📥 Candidatos Recibidos</h2>
-    <input type="text" id="buscador" class="search-box" placeholder="🔍 Buscar por nombre, DNI, email o habilidades..." onkeyup="filtrarCandidatos()">
-
-    <div style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>DNI</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="tablaCandidatos">
-                <!-- Se llena dinámicamente -->
-            </tbody>
-        </table>
+    <div id="listaCandidatos">
+        <p>Cargando postulantes...</p>
     </div>
 </div>
 
-<script>
-    let candidatosGlobal = [];
-
-    document.getElementById('urlFormulario').value = window.location.origin + '/formulario.html';
-
-    async function cargarCandidatos() {
-        try {
-            const res = await fetch('/api/candidatos');
-            const data = await res.json();
-            if (data.success) {
-                candidatosGlobal = data.candidatos;
-                mostrarCandidatos(candidatosGlobal);
-            }
-        } catch (e) {
-            console.error("Error al cargar candidatos", e);
-        }
-    }
-
-    function mostrarCandidatos(lista) {
-        const tbody = document.getElementById('tablaCandidatos');
-        tbody.innerHTML = '';
-
-        if (lista.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #7f8c8d;">No hay postulantes registrados todavía.</td></tr>';
-            return;
-        }
-
-        lista.forEach(c => {
-            const tr = document.createElement('tr');
-            
-            let btnDescargarHTML = c.cvUrl ? `<a href="${c.cvUrl}" target="_blank" class="btn-accion btn-descargar">Descargar CV</a>` : `<span style="color: #95a5a6; font-size:12px;">Sin CV</span>`;
-
-            tr.innerHTML = `
-                <td><strong>${c.nombre || 'Sin Nombre'}</strong></td>
-                <td>${c.email || '-'}</td>
-                <td>${c.dni || '-'}</td>
-                <td>${c.fecha || '-'}</td>
-                <td>
-                    <button onclick="verDetalle(${c.id})" class="btn-accion btn-ver">Ver / ATS</button>
-                    ${btnDescargarHTML}
-                    <button onclick="eliminarCandidato(${c.id})" class="btn-accion btn-eliminar">Eliminar</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function filtrarCandidatos() {
-        const texto = document.getElementById('buscador').value.toLowerCase();
-        const filtrados = candidatosGlobal.filter(c => 
-            (c.nombre && c.nombre.toLowerCase().includes(texto)) ||
-            (c.email && c.email.toLowerCase().includes(texto)) ||
-            (c.dni && c.dni.toLowerCase().includes(texto)) ||
-            (c.habilidades && c.habilidades.toLowerCase().includes(texto))
-        );
-        mostrarCandidatos(filtrados);
-    }
-
-    async function eliminarCandidato(id) {
-        if (!confirm('¿Estás seguro de eliminar este candidato?')) return;
-        try {
-            const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) {
-                cargarCandidatos();
-            } else {
-                alert('No se pudo eliminar.');
-            }
-        } catch (e) {
-            alert('Error de conexión.');
-        }
-    }
-
-    function verDetalle(id) {
-        const c = candidatosGlobal.find(item => item.id === id);
-        if (!c) return;
-        
-        alert(`=== PERFIL ATS DE ${c.nombre.toUpperCase()} ===\n\nRESUMEN PROFESIONAL:\n${c.resumen || 'No especificado'}\n\nEXPERIENCIA LABORAL:\n${c.experiencia || 'No especificada'}\n\nESTUDIOS Y CURSOS:\n${c.estudios || 'No especificados'}\n\nHABILIDADES:\n${c.habilidades || 'No especificadas'}`);
-    }
-
-    function copiarLink() {
-        const input = document.getElementById('urlFormulario');
-        input.select();
-        document.execCommand('copy');
-        alert('¡Link copiado al portapapeles!');
-    }
-
-    cargarCandidatos();
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>

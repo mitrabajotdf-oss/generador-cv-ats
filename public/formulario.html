@@ -9,9 +9,16 @@
 <body>
 
 <div class="container">
-    <h1>Envía tu Postulación & CV ATS</h1>
+    <h1>Bolsa de Empleo TDF - Envía tu Postulación & CV ATS</h1>
     
     <form id="formPostulacion">
+        
+        <!-- 📌 PUESTO AL QUE SE POSTULA -->
+        <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
+            <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
+            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." required style="margin-top: 8px;">
+        </div>
+
         <!-- 1. ARCHIVOS -->
         <div class="upload-section">
             <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
@@ -31,25 +38,58 @@
         <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
-        <!-- 3. CAMPOS EDITABLES MANUALMENTE -->
+        <!-- 3. CAMPOS MANUALES ATS -->
         <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
         <div class="form-group"><label>Estudios y Cursos:</label><textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea></div>
         <div class="form-group"><label>Habilidades:</label><input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required></div>
         
-        <button type="submit" class="btn-submit">Enviar Postulación Final</button>
+        <button type="submit" id="btnEnviar" class="btn-submit">Enviar Postulación Final</button>
     </form>
 
     <div id="resultadoSeccion">
         <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
-        <p>Tus datos han sido registrados correctamente en nuestra base de datos.</p>
+        <p>Tus datos han sido registrados correctamente en la bolsa de empleo de Tierra del Fuego.</p>
         <p><strong>¿Deseas descargar tu CV optimizado profesionalmente bajo formato ATS en líneas fluidas?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo de habilitación de descarga: $5,000 ARS</p>
         <a href="https://mpago.la/19o6kwh" target="_blank" class="btn-pago">Abonar $5,000 y Descargar CV ATS</a>
     </div>
 </div>
 
-<script src="script.js"></script>
+<script>
+    document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('btnEnviar');
+        btn.disabled = true;
+        btn.textContent = 'Enviando postulación...';
+
+        const formData = new FormData(this);
+
+        try {
+            const res = await fetch('/api/enviar-postulacion', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('formPostulacion').style.display = 'none';
+                document.getElementById('resultadoSeccion').style.display = 'block';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                alert('No se pudo guardar: ' + (data.error || 'Error desconocido'));
+                btn.disabled = false;
+                btn.textContent = 'Enviar Postulación Final';
+            }
+        } catch (err) {
+            console.error('Error de red:', err);
+            alert('Error de conexión con el servidor.');
+            btn.disabled = false;
+            btn.textContent = 'Enviar Postulación Final';
+        }
+    });
+</script>
 </body>
 </html>

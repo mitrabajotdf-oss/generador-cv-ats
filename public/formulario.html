@@ -18,7 +18,6 @@
         #resultadoSeccion { display: none; margin-top: 30px; background: #e8f8f5; border: 1px solid #a3e4d7; padding: 25px; border-radius: 8px; text-align: center; }
         .btn-pago { background: #009ee3; color: white; text-decoration: none; padding: 12px 25px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px; }
         .btn-pago:hover { background: #0082be; }
-        .spinner { display: none; text-align: center; margin-top: 15px; font-weight: bold; color: #3498db; }
     </style>
 </head>
 <body>
@@ -30,13 +29,12 @@
         
         <!-- 1. SECCIÓN SUPERIOR: ARCHIVOS -->
         <div class="upload-section">
-            <label style="color: #16a085; font-size: 16px;">📂 Sube tu CV actual (PDF o DOCX) para autorellenar y optimizar:</label>
+            <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
             <input type="file" id="cvFile" name="cvFile" accept=".pdf,.docx" style="margin-top: 10px;" required>
             <div style="margin-top: 15px;">
                 <label>Foto de Perfil (Opcional):</label>
                 <input type="file" id="fotoPerfil" name="fotoPerfil" accept="image/*">
             </div>
-            <div id="spinner" class="spinner">Leyendo y optimizando tu CV a una sola columna fluida... Un momento por favor.</div>
         </div>
 
         <!-- 2. SECCIÓN: DATOS PERSONALES -->
@@ -67,24 +65,24 @@
             <input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required>
         </div>
 
-        <!-- 3. SECCIÓN: CAMPOS EDITABLES ATS (Resumen, Experiencia, Estudios, Habilidades) -->
+        <!-- 3. SECCIÓN: CAMPOS EDITABLES MANUALMENTE (Resumen, Experiencia, Estudios, Habilidades) -->
         <h2 style="font-size: 18px; color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 30px;">Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
 
         <div class="form-group">
             <label>Resumen Profesional:</label>
-            <textarea id="resumenInput" name="resumen" placeholder="Redacta o edita el perfil profesional..."></textarea>
+            <textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea>
         </div>
         <div class="form-group">
             <label>Experiencia Laboral:</label>
-            <textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..."></textarea>
+            <textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea>
         </div>
         <div class="form-group">
             <label>Estudios y Cursos:</label>
-            <textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..."></textarea>
+            <textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea>
         </div>
         <div class="form-group">
             <label>Habilidades:</label>
-            <input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo">
+            <input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required>
         </div>
         
         <button type="submit" class="btn-submit">Enviar Postulación Final</button>
@@ -102,54 +100,7 @@
 </div>
 
 <script>
-    // Al seleccionar el archivo de CV, se procesa automáticamente para rellenar y optimizar los campos
-    document.getElementById('cvFile').addEventListener('change', async function() {
-        if (!this.files[0]) return;
-        
-        const spinner = document.getElementById('spinner');
-        spinner.style.display = 'block';
-
-        const formData = new FormData();
-        formData.append('cvFile', this.files[0]);
-
-        try {
-            const response = await fetch('/api/upload-cv', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            
-            spinner.style.display = 'none';
-
-            if (data.success) {
-                const setValue = (id, valor) => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = valor || '';
-                };
-
-                setValue('nombreInput', data.nombre);
-                setValue('emailInput', data.email);
-                setValue('telefonoInput', data.telefono);
-                setValue('direccionInput', data.domicilio);
-                setValue('disponibilidadInput', data.disponibilidad || 'Inmediata');
-                
-                setValue('resumenInput', data.resumen);
-                setValue('experienciaInput', data.experiencia);
-                setValue('estudiosInput', data.estudios);
-                setValue('habilidadesInput', data.habilidades);
-
-                alert('¡CV leído y optimizado con formato ATS de una sola columna correctamente!');
-            } else {
-                alert('Error al procesar el archivo: ' + (data.error || 'Desconocido'));
-            }
-        } catch (e) {
-            spinner.style.display = 'none';
-            console.error(e);
-            alert('Error de conexión al analizar el documento.');
-        }
-    });
-
-    // Envío final de la postulación con todos los campos editados
+    // Envío final de la postulación con los datos ingresados manualmente
     document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
         e.preventDefault();
 

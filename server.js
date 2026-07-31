@@ -151,10 +151,9 @@ async function subirACloudinary(filePath, isPdf = false) {
     try {
         const options = { 
             folder: 'candidatos',
-            access_mode: 'public', // 🔓 Fuerza acceso público para evitar errores 401
-            type: 'upload'
+            access_mode: 'public',
+            resource_type: isPdf ? 'raw' : 'image' // 🛠️ 'raw' trata al PDF como documento bruto descargable sin alterar su formato
         };
-        if (isPdf) options.resource_type = 'auto';
         
         const result = await cloudinary.uploader.upload(filePath, options);
         fs.unlinkSync(filePath);

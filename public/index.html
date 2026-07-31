@@ -190,9 +190,12 @@
 
         const btnPdf = document.getElementById('btnDescargarPdf');
         if (c.cvUrl) {
-            // Asignar directamente la URL segura original de Cloudinary
-            btnPdf.href = c.cvUrl;
-            btnPdf.removeAttribute('download'); // Permite previsualizar o descargar limpiamente
+            // Limpiamos cualquier parámetro anterior y armamos una URL directa y compatible
+            let urlLimpia = c.cvUrl.replace('/upload/fl_attachment/', '/upload/');
+            
+            btnPdf.href = urlLimpia;
+            btnPdf.setAttribute('target', '_blank');
+            btnPdf.removeAttribute('download'); // Abre de forma limpia para que puedan guardarlo sin errores 401 ni blancos
             btnPdf.style.display = 'inline-block';
         } else {
             btnPdf.style.display = 'none';

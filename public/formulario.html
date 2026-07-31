@@ -3,48 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Formulario de Envío de Datos - Postulación</title>
+    <title>Postulación y Optimización ATS - Mi Trabajo TDF</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 700px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h2 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; margin-top: 0; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; }
-        input[type="text"], input[type="email"], textarea, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        textarea { height: 80px; resize: vertical; }
-        
-        /* Términos y Condiciones Estilos */
-        .terminos-box { background: #f9f9f9; border: 1px solid #e1e1e1; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; max-height: 100px; overflow-y: auto; color: #666; }
-        .checkbox-group { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; font-size: 14px; }
-        .checkbox-group input { margin-top: 3px; }
-
-        button { background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: background 0.2s; margin-top: 10px; }
-        button:hover { background: #2980b9; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
-
-        .success-box { display: none; margin-top: 25px; padding: 20px; background: #e8f8f5; border: 1px solid #a3e4d7; border-radius: 8px; text-align: center; }
-        .success-box h3 { color: #117a65; margin-top: 0; }
-        .cv-promo { background: #fef9e7; border: 1px solid #f9e79f; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }
-        .cv-promo h4 { color: #b7950b; margin-top: 0; }
-        .btn-pago { background: #009ee3; color: white; text-decoration: none; display: inline-block; padding: 12px 25px; border-radius: 6px; font-weight: bold; margin-top: 10px; }
-        .btn-pago:hover { background: #0081be; }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #555; }
+        input[type="text"], input[type="email"], textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        textarea { height: 100px; resize: vertical; }
+        .btn-submit { background: #3498db; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: background 0.2s; }
+        .btn-submit:hover { background: #2980b9; }
+        #resultadoSeccion { display: none; margin-top: 30px; background: #e8f8f5; border: 1px solid #a3e4d7; padding: 25px; border-radius: 8px; text-align: center; }
+        .btn-pago { background: #009ee3; color: white; text-decoration: none; padding: 12px 25px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px; }
+        .btn-pago:hover { background: #0082be; }
+        .spinner { display: none; text-align: center; margin-top: 15px; font-weight: bold; color: #3498db; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Registro de Postulante</h2>
-    <p>Completa tus datos y adjunta tu CV y foto para enviarlos a los reclutadores locales.</p>
-
-    <form id="postulacionForm" onsubmit="enviarPostulacion(event)">
-        <div class="form-group">
-            <label>Foto de Perfil:</label>
-            <input type="file" id="fotoPerfil" accept="image/*">
-        </div>
-        <div class="form-group">
-            <label>Archivo de CV (PDF, Word):</label>
-            <input type="file" id="cvFile" accept=".pdf,.doc,.docx" required>
-        </div>
+    <h1>Envía tu Postulación & CV ATS</h1>
+    
+    <form id="formPostulacion" onsubmit="enviarFormulario(event)">
         <div class="form-group">
             <label>Nombre Completo:</label>
             <input type="text" id="nombre" required>
@@ -54,80 +35,52 @@
             <input type="text" id="dni" required>
         </div>
         <div class="form-group">
-            <label>Email de Contacto:</label>
+            <label>Email:</label>
             <input type="email" id="email" required>
         </div>
         <div class="form-group">
-            <label>Teléfono:</label>
+            <label>Teléfono de Contacto:</label>
             <input type="text" id="telefono" required>
         </div>
         <div class="form-group">
-            <label>Dirección / Domicilio:</label>
-            <input type="text" id="direccion">
+            <label>Domicilio / Dirección:</label>
+            <input type="text" id="direccion" required>
         </div>
         <div class="form-group">
-            <label>Disponibilidad:</label>
-            <input type="text" id="disponibilidad" value="Inmediata">
+            <label>Disponibilidad Horaria:</label>
+            <input type="text" id="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required>
         </div>
         <div class="form-group">
-            <label>Resumen Profesional:</label>
-            <textarea id="resumen" placeholder="Breve descripción de tu perfil..."></textarea>
+            <label>Adjuntar tu CV actual (PDF o DOCX):</label>
+            <input type="file" id="cvFile" accept=".pdf,.docx" required>
         </div>
         <div class="form-group">
-            <label>Experiencia Laboral:</label>
-            <textarea id="experiencia" placeholder="Tus trabajos anteriores..."></textarea>
+            <label>Foto de Perfil (Opcional):</label>
+            <input type="file" id="fotoPerfil" accept="image/*">
         </div>
-        <div class="form-group">
-            <label>Estudios, Cursos y Capacitaciones:</label>
-            <textarea id="estudios" placeholder="Títulos, cursos realizados..."></textarea>
-        </div>
-        <div class="form-group">
-            <label>Habilidades:</label>
-            <textarea id="habilidades" placeholder="Habilidades técnicas y blandas..."></textarea>
-        </div>
-
-        <!-- TÉRMINOS Y CONDICIONES (LEY 25.326) -->
-        <label>Términos, Condiciones y Política de Privacidad:</label>
-        <div class="terminos-box">
-            <strong>1. Consentimiento de Datos:</strong> Autorizo de manera voluntaria a Mi Trabajo TDF a recolectar, almacenar y compartir mis datos personales y currículum vitae con empresas y empleadores locales exclusivamente para fines de selección laboral.<br>
-            <strong>2. Responsabilidad:</strong> La plataforma actúa como intermediaria tecnológica. Mi Trabajo TDF no garantiza la contratación efectiva por parte de terceros.<br>
-            <strong>3. Privacidad:</strong> Sus datos están protegidos conforme a la legislación vigente y no serán comercializados a terceros ajenos a procesos de empleo en la región.
-        </div>
-
-        <div class="checkbox-group">
-            <input type="checkbox" id="aceptaTerminos" required>
-            <label for="aceptaTerminos" style="font-weight: normal; display: inline;">He leído y acepto los Términos y Condiciones y la Política de Privacidad de datos.</label>
-        </div>
-
-        <button type="submit" id="btnEnviar">Enviar Postulación</button>
+        
+        <button type="submit" class="btn-submit">Enviar y Optimizar CV con ATS</button>
+        <div id="spinner" class="spinner">Procesando tu perfil profesional en una sola columna y optimizando datos... Un momento por favor.</div>
     </form>
 
-    <!-- CAJA DE ÉXITO Y MONETIZACIÓN DEL CV ATS ($ 5.000) -->
-    <div id="mensajeExito" class="success-box">
-        <h3>¡Tus datos fueron enviados correctamente al reclutador!</h3>
-        <p>Tu postulación ya está registrada en el sistema de la empresa.</p>
-
-        <div class="cv-promo">
-            <h4>📄 ¿Quieres descargar tu CV Optimizado en Formato ATS?</h4>
-            <p>Obtén tu documento profesional pulido para destacar en cualquier proceso de selección corporativo por solo <strong>$ 5.000,00</strong>.</p>
-            <a href="https://mpago.la/2fr9Jeh" target="_blank" class="btn-pago">💳 Pagar $ 5.000 y Descargar CV ATS</a>
-        </div>
+    <!-- Sección que aparece tras el éxito para el pago de $5000 y descarga -->
+    <div id="resultadoSeccion">
+        <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
+        <p>Tus datos han sido registrados correctamente en nuestra base de datos para las búsquedas laborales.</p>
+        <p><strong>¿Deseas descargar tu CV optimizado profesionalmente bajo formato ATS en líneas fluidas?</strong></p>
+        <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo de habilitación de descarga: $5,000 ARS</p>
+        
+        <!-- Reemplaza el enlace href con tu link de pago real de Mercado Pago -->
+        <a href="https://link.mercadopago.com.ar/TU_LINK_DE_PAGO" target="_blank" class="btn-pago">Abonar $5,000 y Descargar CV ATS</a>
     </div>
 </div>
 
 <script>
-    async function enviarPostulacion(event) {
+    async function enviarFormulario(event) {
         event.preventDefault();
         
-        const acepta = document.getElementById('aceptaTerminos').checked;
-        if (!acepta) {
-            alert('Debes aceptar los Términos y Condiciones para continuar.');
-            return;
-        }
-
-        const btn = document.getElementById('btnEnviar');
-        btn.innerText = 'Enviando postulación...';
-        btn.disabled = true;
+        const spinner = document.getElementById('spinner');
+        spinner.style.display = 'block';
 
         const formData = new FormData();
         formData.append('nombre', document.getElementById('nombre').value);
@@ -136,33 +89,32 @@
         formData.append('telefono', document.getElementById('telefono').value);
         formData.append('direccion', document.getElementById('direccion').value);
         formData.append('disponibilidad', document.getElementById('disponibilidad').value);
-        formData.append('resumen', document.getElementById('resumen').value);
-        formData.append('experiencia', document.getElementById('experiencia').value);
-        formData.append('estudios', document.getElementById('estudios').value);
-        formData.append('habilidades', document.getElementById('habilidades').value);
+        
+        const cvFile = document.getElementById('cvFile').files[0];
+        if (cvFile) formData.append('cvFile', cvFile);
 
-        if (document.getElementById('cvFile').files[0]) {
-            formData.append('cvFile', document.getElementById('cvFile').files[0]);
-        }
-        if (document.getElementById('fotoPerfil').files[0]) {
-            formData.append('fotoPerfil', document.getElementById('fotoPerfil').files[0]);
-        }
+        const fotoPerfil = document.getElementById('fotoPerfil').files[0];
+        if (fotoPerfil) formData.append('fotoPerfil', fotoPerfil);
 
         try {
-            const res = await fetch('/api/enviar-postulacion', { method: 'POST', body: formData });
+            const res = await fetch('/api/enviar-postulacion', {
+                method: 'POST',
+                body: formData
+            });
             const data = await res.json();
+            
+            spinner.style.display = 'none';
+
             if (data.success) {
-                document.getElementById('postulacionForm').style.display = 'none';
-                document.getElementById('mensajeExito').style.display = 'block';
+                document.getElementById('formPostulacion').style.display = 'none';
+                document.getElementById('resultadoSeccion').style.display = 'block';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
-                alert('Hubo un error al enviar la postulación.');
-                btn.innerText = 'Enviar Postulación';
-                btn.disabled = false;
+                alert('Hubo un error al enviar el formulario. Intenta nuevamente.');
             }
         } catch (e) {
+            spinner.style.display = 'none';
             alert('Error de conexión con el servidor.');
-            btn.innerText = 'Enviar Postulación';
-            btn.disabled = false;
         }
     }
 </script>

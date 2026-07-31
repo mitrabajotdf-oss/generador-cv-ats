@@ -5,6 +5,7 @@ const path = require('path');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,7 +65,7 @@ const candidatoSchema = new mongoose.Schema({
     telefono: String,
     direccion: String,
     disponibilidad: String,
-    medioEntrega: String, // 📌 Nuevo campo agregado
+    medioEntrega: String,
     resumen: String,
     experiencia: String,
     estudios: String,
@@ -75,6 +76,15 @@ const candidatoSchema = new mongoose.Schema({
 });
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
+
+// 📧 Configuración del Transportador de Correos (Nodemailer)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'mitrabajotdf@gmail.com',
+        pass: 'yuwg fbla hnms llki'
+    }
+});
 
 // 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
@@ -102,7 +112,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            medioEntrega: medioEntrega || 'Email', // 📌 Guardar la preferencia
+            medioEntrega: medioEntrega || 'Email',
             resumen: resumen || '',
             experiencia: experiencia || '',
             estudios: estudios || '',
@@ -113,6 +123,33 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         });
 
         await nuevoCandidato.save();
+
+        // ✉️ Enviar correo electrónico de notificación al administrador
+        const mailOptions = {
+            from: 'mitrabajotdf@gmail.com',
+            to: 'mitrabajotdf@gmail.com',
+            subject: `🚀 ¡Nueva Postulación Recibida: ${nombre}!`,
+            html: `
+                <h2>¡Nuevo postulante registrado en Mi Trabajo TDF!</h2>
+                <p><strong>Puesto Requerido:</strong> ${puestoRequerido || 'General'}</p>
+                <p><strong>Nombre:</strong> ${nombre}</p>
+                <p><strong>DNI:</strong> ${dni}</p>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Teléfono:</strong> ${telefono}</p>
+                <p><strong>Medio de Entrega elegido:</strong> ${medioEntrega}</p>
+                <hr>
+                <p>Entra a tu <a href="https://generador-cv-ats-1.onrender.com/">Panel de Gestión</a> para ver su perfil completo y generar su CV ATS una vez confirmado el pago de $5,000.</p>
+            `
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('❌ Error al enviar el correo de notificación:', error);
+            } else {
+                console.log('✅ Correo de notificación enviado:', info.response);
+            }
+        });
+
         return res.json({ success: true, message: '¡Postulación guardada con éxito!' });
 
     } catch (error) {

@@ -92,7 +92,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS INTELIGENTE (ATS)
+// 🧠 MOTORES DE SÍNTESIS Y LIMPIEZA INTELIGENTE (ATS)
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -120,9 +120,8 @@ function optimizarHabilidadesATS(textoBruto) {
 function generarPerfilATS(textoBruto) {
     if (!textoBruto) return "Profesional proactivo con alta capacidad de aprendizaje y enfoque en resultados y cumplimiento de objetivos.";
     let lower = textoBruto.toLowerCase();
-    
-    // Si el texto ya tiene un resumen explícito al inicio, intentamos extraerlo o redactamos uno robusto
     let perfil = "Profesional ";
+
     if (lower.includes("administr") || lower.includes("gestión") || lower.includes("secretari")) {
         perfil += "con sólida trayectoria en áreas administrativas, de gestión y documentación, ";
     } else if (lower.includes("ventas") || lower.includes("comercial") || lower.includes("atención")) {
@@ -132,28 +131,55 @@ function generarPerfilATS(textoBruto) {
     } else {
         perfil += "con trayectoria versátil y dinámica, ";
     }
+
     perfil += "demostrando excelentes habilidades para el trabajo en equipo, resolución de situaciones complejas y orientación a resultados.";
     return perfil;
 }
 
-function extraerSeccion(texto, palabraClaveInicio, palabraClaveFin) {
+function limpiarTextoColumnas(texto) {
     if (!texto) return "";
-    let indexInicio = texto.toUpperCase().indexOf(palabraClaveInicio.toUpperCase());
-    if (indexInicio === -1) return "";
-    
-    let subTexto = texto.substring(indexInicio + palabraClaveInicio.length);
-    if (palabraClaveFin) {
-        let indexFin = subTexto.toUpperCase().indexOf(palabraClaveFin.toUpperCase());
-        if (indexFin !== -1) {
-            subTexto = subTexto.substring(0, indexFin);
-        }
-    }
-    return subTexto.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    // Normaliza saltos de línea múltiples y elimina caracteres basura de maquetación en columnas
+    return texto
+        .replace(/\r/g, '')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .join(' ')
+        .replace(/\s{2,}/g, ' ');
 }
 
-function formatearFluidoCompleto(texto) {
-    if (!texto) return "";
-    return texto.replace(/[\r\n]+/g, ' ').replace(/[•\-\*]/g, '').replace(/\s{2,}/g, ' ').trim();
+function extraerBloqueSeccion(textoLimpio, palabrasClaves) {
+    let textoUpper = textoLimpio.toUpperCase();
+    let mejorIndice = -1;
+    let keywordUsada = '';
+
+    for (let kw of palabrasClaves) {
+        let idx = textoUpper.indexOf(kw);
+        if (idx !== -1 && (mejorIndice === -1 || idx < mejorIndice)) {
+            mejorIndice = idx;
+            keywordUsada = kw;
+        }
+    }
+
+    if (mejorIndice === -1) return '';
+
+    let sub = textoLimpio.substring(mejorIndice + keywordUsada.length).trim();
+    
+    // Intentamos cortar antes de la siguiente sección típica para que no se mezcle todo
+    const cortes = ["EXPERIENCIA", "ESTUDIOS", "EDUCACIÓN", "CURSOS", "HABILIDADES", "FORMACIÓN", "PERFIL"];
+    let menorCorte = sub.length;
+
+    let subUpper = sub.toUpperCase();
+    for (let corte of cortes) {
+        if (corte !== keywordUsada) {
+            let idxCorte = subUpper.indexOf(corte);
+            if (idxCorte !== -1 && idxCorte < menorCorte) {
+                menorCorte = idxCorte;
+            }
+        }
+    }
+
+    return sub.substring(0, menorCorte).trim();
 }
 
 async function subirFotoACloudinary(filePath) {
@@ -195,9 +221,9 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            resumen: resumen ? formatearFluidoCompleto(resumen) : generarPerfilATS(textoCompleto),
-            experiencia: experiencia ? formatearFluidoCompleto(experiencia) : formatearFluidoCompleto(textoCompleto),
-            estudios: estudios ? formatearFluidoCompleto(estudios) : 'Formación continua orientada a objetivos.',
+            resumen: resumen ? limpiarTextoColumnas(resumen) : generarPerfilATS(textoCompleto),
+            experiencia: experiencia ? limpiarTextoColumnas(experiencia) : limpiarTextoColumnas(textoCompleto),
+            estudios: estudios ? limpiarTextoColumnas(estudios) : 'Formación continua orientada a objetivos.',
             habilidades: habilidades ? habilidades : optimizarHabilidadesATS(textoCompleto),
             cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlCloud,
@@ -277,19 +303,21 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        // Extracción inteligente y seccionada de datos
+        // Limpieza profunda del texto de columnas múltiples
+        const textoLimpio = limpiarTextoColumnas(extractedText);
+
         const lineas = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         const nombre = lineas.length > 0 && lineas[0].length < 50 ? lineas[0] : '';
         const emailMatch = extractedText.match(/[\w.-]+@[\w.-]+\.\w+/);
         const phoneMatch = extractedText.match(/(\+?\d{1,3}[-.\s]?)?(\d{2,4}[-.\s]?){2,4}\d{4}/);
         const dniMatch = extractedText.match(/\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,8}\b/);
 
-        // Separar secciones limpias basadas en palabras clave habituales de los CVs
-        let experienciaExtraida = extraerSeccion(extractedText, "EXPERIENCIA", "ESTUDIOS") || extraerSeccion(extractedText, "EXPERIENCIA", "EDUCACIÓN") || extraerSeccion(extractedText, "EXPERIENCIA", "HABILIDADES");
-        let estudiosExtraidos = extraerSeccion(extractedText, "ESTUDIOS", "HABILIDADES") || extraerSeccion(extractedText, "EDUCACIÓN", "HABILIDADES") || extraerSeccion(extractedText, "ESTUDIOS", "CURSOS");
+        // Extracción limpia de secciones basadas en el texto normalizado
+        let experienciaExt = extraerBloqueSeccion(textoLimpio, ["EXPERIENCIA LABORAL", "EXPERIENCIA"]);
+        let estudiosExt = extraerBloqueSeccion(textoLimpio, ["ESTUDIOS Y CURSOS", "ESTUDIOS", "EDUCACIÓN", "CURSOS", "FORMACIÓN"]);
 
-        if (!experienciaExtraida) experienciaExtraida = formatearFluidoCompleto(extractedText);
-        if (!estudiosExtraidos) estudiosExtraidos = "Formación académica y continua orientada al puesto.";
+        if (!experienciaExt) experienciaExt = textoLimpio;
+        if (!estudiosExt) estudiosExt = "Formación académica y continua orientada al puesto.";
 
         res.json({
             success: true,
@@ -300,10 +328,10 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
             dni: dniMatch ? dniMatch[0] : '',
             domicilio: '',
             disponibilidad: 'Inmediata',
-            resumen: generarPerfilATS(extractedText),
-            experiencia: formatearFluidoCompleto(experienciaExtraida),
-            estudios: formatearFluidoCompleto(estudiosExtraidos),
-            habilidades: optimizarHabilidadesATS(extractedText),
+            resumen: generarPerfilATS(textoLimpio),
+            experiencia: limpiarTextoColumnas(experienciaExt),
+            estudios: limpiarTextoColumnas(estudiosExt),
+            habilidades: optimizarHabilidadesATS(textoLimpio),
             rawText: extractedText
         });
     } catch (error) {

@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // -------------------------------------------------------------------
-// 🔒 PROTECCIÓN DEL PANEL DE GESTIÓN (Fase 2)
+// 🔒 PROTECCIÓN DEL PANEL DE GESTIÓN
 // -------------------------------------------------------------------
 const authMiddleware = basicAuth({
     users: { 'MitrabajoTDF': 'EmpleoRG' },
@@ -64,7 +64,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // -------------------------------------------------------------------
-// 🚀 CONEXIÓN A LA BASE DE DATOS MONGODB EN LA NUBE
+// 🚀 CONEXIÓN A MONGODB
 // -------------------------------------------------------------------
 const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
 
@@ -92,10 +92,10 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS ATS
+// 🧠 MOTORES DE SÍNTESIS ATS (Líneas fluidas y formato de una sola columna)
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
-    if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo";
+    if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
     let encontradas = new Set();
     let lower = textoBruto.toLowerCase();
     
@@ -117,27 +117,21 @@ function optimizarHabilidadesATS(textoBruto) {
 }
 
 function generarPerfilATS(textoBruto) {
-    if (!textoBruto) return "Profesional proactivo con alta capacidad de aprendizaje y enfoque en resultados.";
+    if (!textoBruto) return "Profesional proactivo con alta capacidad de aprendizaje y enfoque en resultados y cumplimiento de objetivos.";
     let lower = textoBruto.toLowerCase();
     let perfil = "Profesional ";
 
     if (lower.includes("administr") || lower.includes("gestión") || lower.includes("secretari")) {
-        perfil += "con sólida experiencia en áreas administrativas y de gestión, ";
+        perfil += "con sólida trayectoria en áreas administrativas y de gestión, ";
     } else if (lower.includes("ventas") || lower.includes("comercial") || lower.includes("atención")) {
-        perfil += "con destacada trayectoria en atención al cliente y gestión comercial, ";
+        perfil += "con destacada experiencia en atención al cliente y gestión comercial, ";
     } else if (lower.includes("producción") || lower.includes("operario") || lower.includes("logística") || lower.includes("depósito")) {
-        perfil += "con experiencia comprobable en áreas operativas, producción y logística, ";
+        perfil += "con experiencia comprobable en entornos operativos, producción y logística, ";
     } else {
-        perfil += "con trayectoria versátil, ";
+        perfil += "con trayectoria versátil y dinámica, ";
     }
 
-    perfil += "demostrando habilidades para el trabajo en equipo, resolución de problemas y cumplimiento de objetivos.";
-
-    if (lower.includes("liderazgo") || lower.includes("coordinación") || lower.includes("supervisor") || lower.includes("encargado")) {
-        perfil += " Perfil de liderazgo con capacidad para coordinar operaciones, optimizar procesos y asegurar la calidad del servicio.";
-    } else {
-        perfil += " Destaca por su alta proactividad y rápida adaptación a nuevos entornos y herramientas de trabajo.";
-    }
+    perfil += "demostrando excelentes habilidades para el trabajo en equipo, resolución de situaciones complejas y orientación a resultados.";
     return perfil;
 }
 
@@ -146,13 +140,14 @@ function formatearFluido(texto) {
     return texto.replace(/[\r\n]+/g, '. ').replace(/[•\-\*]/g, '').replace(/\s{2,}/g, ' ').replace(/\.\s\./g, '.').trim();
 }
 
+// ☁️ Subida robusta a Cloudinary con tratamiento de archivos 'raw' para PDFs
 async function subirACloudinary(filePath, isPdf = false) {
     if (!filePath || !fs.existsSync(filePath)) return '';
     try {
         const options = { 
             folder: 'candidatos',
             access_mode: 'public',
-            resource_type: isPdf ? 'raw' : 'image' // 🛠️ 'raw' trata al PDF como documento bruto descargable sin alterar su formato
+            resource_type: isPdf ? 'raw' : 'image' 
         };
         
         const result = await cloudinary.uploader.upload(filePath, options);
@@ -168,7 +163,6 @@ async function subirACloudinary(filePath, isPdf = false) {
 // 🌐 ENDPOINTS DE LA APLICACIÓN
 // -------------------------------------------------------------------
 
-// 1. GUARDAR POSTULACIÓN (Público) con respuesta instantánea y correos en segundo plano
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -203,16 +197,14 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // ⚡ RESPONDER AL NAVEGADOR DE INMEDIATO
-        res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente al reclutador!' });
+        res.json({ success: true, message: '¡Tus datos y archivos fueron enviados correctamente!' });
 
-        // 🚀 ENVIAR CORREOS EN SEGUNDO PLANO
         setImmediate(async () => {
             try {
                 await enviarAlertaAdmin({ nombre, dni, email, telefono });
                 await enviarConfirmacionCandidato(email, nombre);
             } catch (mailError) {
-                console.log("Aviso de correo en segundo plano:", mailError.message);
+                console.log("Aviso de correo:", mailError.message);
             }
         });
 
@@ -222,30 +214,25 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-// 2. OBTENER LISTA DESDE MONGODB (Protegido por Auth para el panel)
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const listaCandidatos = await Candidato.find().sort({ id: -1 });
         res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ success: false, error: 'Error al cargar las postulaciones.' });
     }
 });
 
-// 3. ELIMINAR DESDE MONGODB (Protegido por Auth)
 app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         await Candidato.deleteOne({ id: id });
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
     }
 });
 
-// 4. ANALIZAR CV INDIVIDUAL (Protegido por Auth)
 app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     let filePath = '';
     try {
@@ -304,5 +291,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor ATS Fase 2 corriendo en puerto ${PORT}`);
+    console.log(`Servidor ATS corriendo en puerto ${PORT}`);
 });

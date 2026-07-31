@@ -7,46 +7,34 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1, h2 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
-        .link-box { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #3498db; }
-        .link-box a { color: #2980b9; font-weight: bold; text-decoration: none; word-break: break-all; }
-        button, .btn { background: #3498db; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; text-decoration: none; display: inline-block; }
-        button:hover, .btn:hover { background: #2980b9; }
-        .btn-danger { background: #e74c3c; }
-        .btn-danger:hover { background: #c0392b; }
-        .btn-success { background: #2ecc71; }
-        .btn-success:hover { background: #27ae60; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; color: #2c3e50; }
-        .form-section { background: #fafbfc; padding: 20px; border-radius: 8px; border: 1px solid #e1e4e8; margin-top: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: 600; margin-bottom: 5px; color: #555; }
-        input[type="text"], input[type="email"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        textarea { height: 90px; resize: vertical; }
-        .search-bar { margin-bottom: 20px; display: flex; gap: 10px; }
-        .search-bar input { flex: 1; padding: 12px; font-size: 15px; border: 1px solid #bdc3c7; border-radius: 6px; }
+        h1, h2 { color: #2c3e50; }
+        h1 { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e1e8ed; font-size: 14px; }
+        th { background-color: #f8f9fa; color: #2c3e50; font-weight: 600; }
+        .btn-accion { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 12px; margin-right: 5px; display: inline-block; }
+        .btn-ver { background: #3498db; color: white; }
+        .btn-descargar { background: #27ae60; color: white; }
+        .btn-eliminar { background: #e74c3c; color: white; border: none; cursor: pointer; }
+        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .link-form { background: #e8f8f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #a3e4d7; display: flex; justify-content: space-between; align-items: center; }
+        .link-form input { flex: 1; padding: 8px; margin-right: 10px; border: 1px solid #bdc3c7; border-radius: 4px; background: #fff; }
+        .btn-copiar { background: #16a085; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Panel de Gestión y Filtros ATS</h1>
-    
-    <div class="link-box">
-        <div>
-            <strong>Link de Formulario para Redes / WhatsApp:</strong><br>
-            <a href="/formulario.html" target="_blank" id="publicLink">Cargando enlace...</a>
-        </div>
-        <button onclick="copiarLink()">Copiar</button>
+
+    <div class="link-form">
+        <span style="font-weight: 600; margin-right: 10px;">Link de Formulario para Redes / WhatsApp:</span>
+        <input type="text" id="urlFormulario" readonly>
+        <button class="btn-copiar" onclick="copiarLink()">Copiar</button>
     </div>
 
-    <h2>📥 Candidatos Recibidos (<span id="contadorCandidatos">0</span>)</h2>
-    
-    <!-- BARRA DE BÚSQUEDA INTELIGENTE (Fase 3) -->
-    <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="🔍 Buscar por nombre, DNI, email o habilidades..." onkeyup="filtrarCandidatos()">
-    </div>
+    <h2>📥 Candidatos Recibidos</h2>
+    <input type="text" id="buscador" class="search-box" placeholder="🔍 Buscar por nombre, DNI, email o habilidades..." onkeyup="filtrarCandidatos()">
 
     <div style="overflow-x: auto;">
         <table>
@@ -60,189 +48,98 @@
                 </tr>
             </thead>
             <tbody id="tablaCandidatos">
-                <tr><td colspan="5" style="text-align:center;">Cargando postulaciones desde la nube...</td></tr>
+                <!-- Se llena dinámicamente -->
             </tbody>
         </table>
-    </div>
-
-    <div class="form-section">
-        <h2>Analizar CV Individual con Síntesis ATS</h2>
-        <div class="form-group">
-            <label>Foto de Perfil:</label>
-            <input type="file" id="fotoInput">
-        </div>
-        <div class="form-group">
-            <label>Archivo de CV (PDF o DOCX):</label>
-            <input type="file" id="cvInput">
-        </div>
-        <button class="btn-success" onclick="analizarCV()">Analizar y Sintetizar con ATS</button>
-    </div>
-
-    <div class="form-section" style="margin-top: 25px;">
-        <h2>Perfil Profesional Sintetizado / Editado</h2>
-        <input type="hidden" id="editIndex">
-        <div class="form-group"><label>Nombre Completo:</label><input type="text" id="nombre"></div>
-        <div class="form-group"><label>DNI:</label><input type="text" id="dni"></div>
-        <div class="form-group"><label>Email:</label><input type="text" id="email"></div>
-        <div class="form-group"><label>Teléfono:</label><input type="text" id="telefono"></div>
-        <div class="form-group"><label>Domicilio:</label><input type="text" id="direccion"></div>
-        <div class="form-group"><label>Disponibilidad:</label><input type="text" id="disponibilidad"></div>
-        <div class="form-group"><label>Perfil Profesional (Generado Automáticamente):</label><textarea id="resumen"></textarea></div>
-        <div class="form-group"><label>Experiencia Laboral (Línea Fluida):</label><textarea id="experiencia"></textarea></div>
-        <div class="form-group"><label>Estudios, Cursos y Capacitaciones:</label><textarea id="estudios"></textarea></div>
-        <div class="form-group"><label>Habilidades (Optimizado ATS):</label><textarea id="habilidades"></textarea></div>
-        
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button class="btn-success" onclick="guardarCambios()">Guardar Perfil</button>
-            <a id="btnDescargarPdf" class="btn" href="#" download style="display:none;">📥 Descargar CV en PDF</a>
-        </div>
     </div>
 </div>
 
 <script>
-    let listaGlobalCandidatos = [];
-    const formularioUrl = window.location.origin + '/formulario.html';
-    document.getElementById('publicLink').innerText = formularioUrl;
-    document.getElementById('publicLink').href = formularioUrl;
+    let candidatosGlobal = [];
 
-    function copiarLink() {
-        navigator.clipboard.writeText(formularioUrl);
-        alert('¡Enlace copiado al portapapeles!');
-    }
+    document.getElementById('urlFormulario').value = window.location.origin + '/formulario.html';
 
     async function cargarCandidatos() {
         try {
             const res = await fetch('/api/candidatos');
             const data = await res.json();
             if (data.success) {
-                listaGlobalCandidatos = data.candidatos;
-                renderizarTabla(listaGlobalCandidatos);
+                candidatosGlobal = data.candidatos;
+                mostrarCandidatos(candidatosGlobal);
             }
         } catch (e) {
-            console.error('Error al cargar datos:', e);
+            console.error("Error al cargar candidatos", e);
         }
     }
 
-    function renderizarTabla(candidatos) {
+    function mostrarCandidatos(lista) {
         const tbody = document.getElementById('tablaCandidatos');
-        document.getElementById('contadorCandidatos').innerText = candidatos.length;
         tbody.innerHTML = '';
 
-        if (candidatos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No se encontraron postulantes.</td></tr>';
+        if (lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #7f8c8d;">No hay postulantes registrados todavía.</td></tr>';
             return;
         }
 
-        candidatos.forEach(c => {
+        lista.forEach(c => {
             const tr = document.createElement('tr');
+            
+            // Verificamos si tiene cvUrl para mostrar el botón de descarga directa
+            let btnDescargarHTML = c.cvUrl ? `<a href="${c.cvUrl}" target="_blank" download class="btn-accion btn-descargar">Descargar CV</a>` : `<span style="color: #95a5a6; font-size:12px;">Sin CV</span>`;
+
             tr.innerHTML = `
                 <td><strong>${c.nombre || 'Sin Nombre'}</strong></td>
                 <td>${c.email || '-'}</td>
                 <td>${c.dni || '-'}</td>
                 <td>${c.fecha || '-'}</td>
                 <td>
-                    <button class="btn" onclick="verCandidato(${c.id})">Ver / ATS</button>
-                    <button class="btn btn-danger" onclick="eliminarCandidato(${c.id})">Eliminar</button>
+                    <button onclick="verDetalle(${c.id})" class="btn-accion btn-ver">Ver / ATS</button>
+                    ${btnDescargarHTML}
+                    <button onclick="eliminarCandidato(${c.id})" class="btn-accion btn-eliminar">Eliminar</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // Filtro dinámico en tiempo real (Fase 3)
     function filtrarCandidatos() {
-        const query = document.getElementById('searchInput').value.toLowerCase();
-        const filtrados = listaGlobalCandidatos.filter(c => {
-            const nombre = (c.nombre || '').toLowerCase();
-            const dni = (c.dni || '').toLowerCase();
-            const email = (c.email || '').toLowerCase();
-            const habilidades = (c.habilidades || '').toLowerCase();
-            return nombre.includes(query) || dni.includes(query) || email.includes(query) || habilidades.includes(query);
-        });
-        renderizarTabla(filtrados);
+        const texto = document.getElementById('buscador').value.toLowerCase();
+        const filtrados = candidatosGlobal.filter(c => 
+            (c.nombre && c.nombre.toLowerCase().includes(texto)) ||
+            (c.email && c.email.toLowerCase().includes(texto)) ||
+            (c.dni && c.dni.toLowerCase().includes(texto)) ||
+            (c.habilidades && c.habilidades.toLowerCase().includes(texto))
+        );
+        mostrarCandidatos(filtrados);
     }
 
     async function eliminarCandidato(id) {
-        if (!confirm('¿Seguro que deseas eliminar este postulante?')) return;
+        if (!confirm('¿Estás seguro de eliminar este candidato?')) return;
         try {
-            const res = await fetch('/api/candidatos/' + id, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) { cargarCandidatos(); }
-        } catch (e) {
-            alert('Error al eliminar.');
-        }
-    }
-
-    function verCandidato(id) {
-        const c = listaGlobalCandidatos.find(item => item.id === id);
-        if (!c) return;
-        document.getElementById('editIndex').value = c.id;
-        document.getElementById('nombre').value = c.nombre || '';
-        document.getElementById('dni').value = c.dni || '';
-        document.getElementById('email').value = c.email || '';
-        document.getElementById('telefono').value = c.telefono || '';
-        document.getElementById('direccion').value = c.direccion || '';
-        document.getElementById('disponibilidad').value = c.disponibilidad || '';
-        document.getElementById('resumen').value = c.resumen || '';
-        document.getElementById('experiencia').value = c.experiencia || '';
-        document.getElementById('estudios').value = c.estudios || '';
-        document.getElementById('habilidades').value = c.habilidades || '';
-
-        const btnPdf = document.getElementById('btnDescargarPdf');
-        if (c.cvUrl) {
-            // Limpiamos cualquier parámetro anterior y armamos una URL directa y compatible
-            let urlLimpia = c.cvUrl.replace('/upload/fl_attachment/', '/upload/');
-            
-            btnPdf.href = urlLimpia;
-            btnPdf.setAttribute('target', '_blank');
-            btnPdf.removeAttribute('download'); // Abre de forma limpia para que puedan guardarlo sin errores 401 ni blancos
-            btnPdf.style.display = 'inline-block';
-        } else {
-            btnPdf.style.display = 'none';
-        }
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }
-
-    async function analizarCV() {
-        const fotoFile = document.getElementById('fotoInput').files[0];
-        const cvFile = document.getElementById('cvInput').files[0];
-
-        if (!cvFile) {
-            alert('Por favor, selecciona un archivo de CV (PDF o DOCX).');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('cvFile', cvFile);
-        if (fotoFile) formData.append('fotoPerfil', fotoFile);
-
-        alert('Procesando y sintetizando con motor ATS... Un momento.');
-
-        try {
-            const res = await fetch('/api/upload-cv', { method: 'POST', body: formData });
+            const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
-                document.getElementById('nombre').value = data.nombre || '';
-                document.getElementById('email').value = data.email || '';
-                document.getElementById('telefono').value = data.telefono || '';
-                document.getElementById('dni').value = data.dni || '';
-                document.getElementById('direccion').value = data.domicilio || '';
-                document.getElementById('disponibilidad').value = data.disponibilidad || '';
-                document.getElementById('resumen').value = data.resumen || '';
-                document.getElementById('experiencia').value = data.experiencia || '';
-                document.getElementById('estudios').value = data.estudios || '';
-                document.getElementById('habilidades').value = data.habilidades || '';
-                alert('¡CV analizado y perfil ATS generado con éxito!');
+                cargarCandidatos();
             } else {
-                alert('Error al analizar el CV.');
+                alert('No se pudo eliminar.');
             }
         } catch (e) {
-            alert('Error de conexión al analizar el archivo.');
+            alert('Error de conexión.');
         }
     }
 
-    function guardarCambios() {
-        alert('Perfil actualizado localmente en vista previa. Los datos oficiales ya se encuentran resguardados en MongoDB Atlas.');
+    function verDetalle(id) {
+        const c = candidatosGlobal.find(item => item.id === id);
+        if (!c) return;
+        
+        alert(`=== PERFIL ATS DE ${c.nombre.toUpperCase()} ===\n\nRESUMEN:\n${c.resumen}\n\nEXPERIENCIA:\n${c.experiencia}\n\nESTUDIOS:\n${c.estudios}\n\nHABILIDADES:\n${c.habilidades}`);
+    }
+
+    function copiarLink() {
+        const input = document.getElementById('urlFormulario');
+        input.select();
+        document.execCommand('copy');
+        alert('¡Link copiado al portapapeles!');
     }
 
     cargarCandidatos();

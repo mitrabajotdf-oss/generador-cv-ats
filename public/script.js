@@ -45,4 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Corrección para forzar la descarga directa de PDFs de Cloudinary y evitar errores de visualización
+    const pdfLinks = document.querySelectorAll('a[href*="cloudinary.com"][href$=".pdf"]');
+    pdfLinks.forEach(link => {
+        if (!link.href.includes('fl_attachment')) {
+            link.href = link.href.replace('/upload/', '/upload/fl_attachment/');
+            link.setAttribute('download', '');
+        }
+    });
 });

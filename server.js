@@ -38,7 +38,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // -------------------------------------------------------------------
-// ☁️ CONFIGURACIÓN DE CLOUDINARY (Solo para fotos de perfil opcionales)
+// ☁️ CONFIGURACIÓN DE CLOUDINARY
 // -------------------------------------------------------------------
 cloudinary.config({
     cloud_name: 'a8siaiyr',
@@ -90,7 +90,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS ATS (Líneas fluidas y formato de una sola columna)
+// 🧠 MOTORES DE SÍNTESIS ATS
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -184,8 +184,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, error: 'Error al recibir la postulación.' });
+        console.error("Error interno en /api/enviar-postulacion:", error);
+        res.status(500).json({ success: false, error: 'Error al recibir la postulación: ' + error.message });
     }
 });
 

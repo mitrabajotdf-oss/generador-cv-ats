@@ -40,7 +40,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // -------------------------------------------------------------------
-// ☁️ CONFIGURACIÓN DE CLOUDINARY
+// ☁️ CONFIGURACIÓN DE CLOUDINARY (Solo para fotos de perfil opcionales)
 // -------------------------------------------------------------------
 cloudinary.config({
     cloud_name: 'a8siaiyr',
@@ -140,21 +140,15 @@ function formatearFluido(texto) {
     return texto.replace(/[\r\n]+/g, '. ').replace(/[•\-\*]/g, '').replace(/\s{2,}/g, ' ').replace(/\.\s\./g, '.').trim();
 }
 
-// ☁️ Subida robusta a Cloudinary con tratamiento de archivos 'raw' para PDFs
-async function subirACloudinary(filePath, isPdf = false) {
+// Subida a Cloudinary únicamente para imágenes (foto de perfil)
+async function subirFotoACloudinary(filePath) {
     if (!filePath || !fs.existsSync(filePath)) return '';
     try {
-        const options = { 
-            folder: 'candidatos',
-            access_mode: 'public',
-            resource_type: isPdf ? 'raw' : 'image' 
-        };
-        
-        const result = await cloudinary.uploader.upload(filePath, options);
+        const result = await cloudinary.uploader.upload(filePath, { folder: 'candidatos_fotos' });
         fs.unlinkSync(filePath);
         return result.secure_url;
     } catch (error) {
-        console.error("Error al subir a Cloudinary:", error);
+        console.error("Error al subir foto a Cloudinary:", error);
         return '';
     }
 }
@@ -166,14 +160,15 @@ async function subirACloudinary(filePath, isPdf = false) {
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
-        let cvUrlCloud = '';
+        let cvUrlLocal = '';
         let fotoUrlCloud = '';
 
         if (req.files && req.files.cvFile) {
-            cvUrlCloud = await subirACloudinary(req.files.cvFile[0].path, true);
+            // Guardamos la ruta local directa del CV para descarga perfecta
+            cvUrlLocal = `/uploads/${path.basename(req.files.cvFile[0].path)}`;
         }
         if (req.files && req.files.fotoPerfil) {
-            fotoUrlCloud = await subirACloudinary(req.files.fotoPerfil[0].path, false);
+            fotoUrlCloud = await subirFotoACloudinary(req.files.fotoPerfil[0].path);
         }
 
         const textoCompleto = `${resumen || ''} ${experiencia || ''} ${estudios || ''} ${habilidades || ''}`;
@@ -190,7 +185,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             experiencia: formatearFluido(experiencia || textoCompleto),
             estudios: formatearFluido(estudios),
             habilidades: optimizarHabilidadesATS(textoCompleto),
-            cvUrl: cvUrlCloud,
+            cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlCloud,
             fecha: new Date().toLocaleString()
         });
@@ -226,6 +221,15 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
 app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        
+        if (candidato && candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
+            const filePath = path.join(__dirname, candidato.cvUrl);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
         await Candidato.deleteOne({ id: id });
         res.json({ success: true, message: 'Candidato eliminado.' });
     } catch (error) {
@@ -254,7 +258,7 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
 
         let fotoPreviewUrl = '';
         if (req.files && req.files.fotoPerfil) {
-            fotoPreviewUrl = await subirACloudinary(req.files.fotoPerfil[0].path, false);
+            fotoPreviewUrl = await subirFotoACloudinary(req.files.fotoPerfil[0].path);
         }
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

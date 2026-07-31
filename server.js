@@ -31,7 +31,7 @@ app.get('/formulario.html', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 📂 Gestión de Archivos Locales (Multer seguro)
+// 📂 Gestión de Archivos Locales
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, 'uploads');
@@ -46,10 +46,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // Límite de 10MB por archivo
-});
+const upload = multer({ storage: storage });
 
 // 🚀 Conexión a MongoDB
 const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
@@ -60,6 +57,7 @@ mongoose.connect(mongoURI)
 
 const candidatoSchema = new mongoose.Schema({
     id: Number,
+    puestoRequerido: String, // 📌 Nuevo campo agregado
     nombre: String,
     dni: String,
     email: String,
@@ -77,10 +75,10 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// 🌐 Endpoint Blindado de Recepción de Postulación
+// 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
-        const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
         let cvUrlLocal = '';
         let fotoUrlLocal = '';
@@ -96,6 +94,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         const nuevoCandidato = new Candidato({
             id: Date.now(),
+            puestoRequerido: puestoRequerido || 'General / Sin especificar',
             nombre: nombre || 'Postulante',
             dni: dni || '',
             email: email || '',

@@ -1,17 +1,10 @@
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'mitrabajotdf@gmail.com',
-        pass: 'yfuw tmez qsxd xwvc'
-    }
-});
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function enviarAlertaAdmin(datos) {
     try {
-        await transporter.sendMail({
-            from: 'mitrabajotdf@gmail.com',
+        await resend.emails.send({
+            from: 'onboarding@resend.dev',
             to: 'mitrabajotdf@gmail.com',
             subject: '📋 Nuevo Postulante Registrado en la Base',
             text: `Se ha cargado un nuevo postulante al sistema:\n\n- Nombre: ${datos.nombre}\n- DNI: ${datos.dni || 'No especificado'}\n- Teléfono: ${datos.telefono}\n- Email: ${datos.email}\n\nIngresá al panel de control para ver su perfil completo y filtros ATS.`
@@ -25,8 +18,8 @@ async function enviarAlertaAdmin(datos) {
 async function enviarConfirmacionCandidato(email, nombre) {
     try {
         if (!email) return;
-        await transporter.sendMail({
-            from: 'mitrabajotdf@gmail.com',
+        await resend.emails.send({
+            from: 'onboarding@resend.dev',
             to: email,
             subject: 'Postulación Recibida - Mi Trabajo TDF',
             text: `Hola ${nombre},\n\n¡Recibimos tus datos correctamente en nuestra base de datos!\n\nTe avisamos que cuando haya una búsqueda activa que coincida con tus habilidades y perfil ATS, nos pondremos en contacto.\n\nMuchas gracias por confiar en Mi Trabajo TDF.`

@@ -4,21 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Postulación y Optimización ATS - Mi Trabajo TDF</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: 600; margin-bottom: 8px; color: #555; }
-        input[type="text"], input[type="email"], textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        textarea { height: 120px; resize: vertical; }
-        .upload-section { background: #e8f8f5; border: 2px dashed #16a085; padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center; }
-        .btn-submit { background: #3498db; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: background 0.2s; }
-        .btn-submit:hover { background: #2980b9; }
-        #resultadoSeccion { display: none; margin-top: 30px; background: #e8f8f5; border: 1px solid #a3e4d7; padding: 25px; border-radius: 8px; text-align: center; }
-        .btn-pago { background: #009ee3; color: white; text-decoration: none; padding: 12px 25px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px; }
-        .btn-pago:hover { background: #0082be; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -26,8 +12,7 @@
     <h1>Envía tu Postulación & CV ATS</h1>
     
     <form id="formPostulacion">
-        
-        <!-- 1. SECCIÓN SUPERIOR: ARCHIVOS -->
+        <!-- 1. ARCHIVOS -->
         <div class="upload-section">
             <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
             <input type="file" id="cvFile" name="cvFile" accept=".pdf,.docx" style="margin-top: 10px;" required>
@@ -37,99 +22,34 @@
             </div>
         </div>
 
-        <!-- 2. SECCIÓN: DATOS PERSONALES -->
-        <h2 style="font-size: 18px; color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Datos Personales</h2>
-        
-        <div class="form-group">
-            <label>Nombre Completo:</label>
-            <input type="text" id="nombreInput" name="nombre" required>
-        </div>
-        <div class="form-group">
-            <label>DNI:</label>
-            <input type="text" id="dniInput" name="dni" required>
-        </div>
-        <div class="form-group">
-            <label>Email:</label>
-            <input type="email" id="emailInput" name="email" required>
-        </div>
-        <div class="form-group">
-            <label>Teléfono de Contacto:</label>
-            <input type="text" id="telefonoInput" name="telefono" required>
-        </div>
-        <div class="form-group">
-            <label>Domicilio / Dirección:</label>
-            <input type="text" id="direccionInput" name="direccion" required>
-        </div>
-        <div class="form-group">
-            <label>Disponibilidad Horaria:</label>
-            <input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required>
-        </div>
+        <!-- 2. DATOS PERSONALES -->
+        <h2>Datos Personales</h2>
+        <div class="form-group"><label>Nombre Completo:</label><input type="text" id="nombreInput" name="nombre" required></div>
+        <div class="form-group"><label>DNI:</label><input type="text" id="dniInput" name="dni" required></div>
+        <div class="form-group"><label>Email:</label><input type="email" id="emailInput" name="email" required></div>
+        <div class="form-group"><label>Teléfono de Contacto:</label><input type="text" id="telefonoInput" name="telefono" required></div>
+        <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
+        <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
-        <!-- 3. SECCIÓN: CAMPOS EDITABLES MANUALMENTE (Resumen, Experiencia, Estudios, Habilidades) -->
-        <h2 style="font-size: 18px; color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 30px;">Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
-
-        <div class="form-group">
-            <label>Resumen Profesional:</label>
-            <textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea>
-        </div>
-        <div class="form-group">
-            <label>Experiencia Laboral:</label>
-            <textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea>
-        </div>
-        <div class="form-group">
-            <label>Estudios y Cursos:</label>
-            <textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea>
-        </div>
-        <div class="form-group">
-            <label>Habilidades:</label>
-            <input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required>
-        </div>
+        <!-- 3. CAMPOS EDITABLES MANUALMENTE -->
+        <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
+        <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
+        <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
+        <div class="form-group"><label>Estudios y Cursos:</label><textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea></div>
+        <div class="form-group"><label>Habilidades:</label><input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required></div>
         
         <button type="submit" class="btn-submit">Enviar Postulación Final</button>
     </form>
 
-    <!-- Sección de éxito y pago -->
     <div id="resultadoSeccion">
         <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
         <p>Tus datos han sido registrados correctamente en nuestra base de datos.</p>
         <p><strong>¿Deseas descargar tu CV optimizado profesionalmente bajo formato ATS en líneas fluidas?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo de habilitación de descarga: $5,000 ARS</p>
-        
         <a href="https://mpago.la/19o6kwh" target="_blank" class="btn-pago">Abonar $5,000 y Descargar CV ATS</a>
     </div>
 </div>
 
-<script>
-    // Envío final de la postulación con los datos ingresados manualmente
-    document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const formData = new FormData(this);
-        const cvFile = document.getElementById('cvFile').files[0];
-        if (cvFile) formData.append('cvFile', cvFile);
-
-        const fotoPerfil = document.getElementById('fotoPerfil').files[0];
-        if (fotoPerfil) formData.append('fotoPerfil', fotoPerfil);
-
-        try {
-            const res = await fetch('/api/enviar-postulacion', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                document.getElementById('formPostulacion').style.display = 'none';
-                document.getElementById('resultadoSeccion').style.display = 'block';
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else {
-                alert('Hubo un error al enviar la postulación.');
-            }
-        } catch (e) {
-            alert('Error de conexión con el servidor.');
-        }
-    });
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>

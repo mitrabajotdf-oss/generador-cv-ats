@@ -2,8 +2,6 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
@@ -140,9 +138,8 @@ async function subirFotoACloudinary(filePath) {
 }
 
 // -------------------------------------------------------------------
-// 🌐 ENDPOINTS DE LA APLICACIÓN
+// 🌐 ENDPOINT DE RECEPCIÓN DE POSTULACIÓN
 // -------------------------------------------------------------------
-
 app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
     try {
         const { nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;

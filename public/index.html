@@ -84,7 +84,13 @@
         lista.forEach(c => {
             const tr = document.createElement('tr');
             
-            let btnDescargarHTML = c.cvUrl ? `<a href="${c.cvUrl}" target="_blank" download class="btn-accion btn-descargar">Descargar CV</a>` : `<span style="color: #95a5a6; font-size:12px;">Sin CV</span>`;
+            // Forzamos la descarga agregando el parámetro de Cloudinary fl_attachment si es una URL de Cloudinary
+            let urlFinal = c.cvUrl;
+            if (urlFinal && urlFinal.includes('cloudinary.com') && !urlFinal.includes('fl_attachment')) {
+                urlFinal = urlFinal.replace('/upload/', '/upload/fl_attachment/');
+            }
+
+            let btnDescargarHTML = urlFinal ? `<a href="${urlFinal}" target="_blank" download class="btn-accion btn-descargar">Descargar CV</a>` : `<span style="color: #95a5a6; font-size:12px;">Sin CV</span>`;
 
             tr.innerHTML = `
                 <td><strong>${c.nombre || 'Sin Nombre'}</strong></td>

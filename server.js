@@ -92,7 +92,7 @@ const candidatoSchema = new mongoose.Schema({
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 // -------------------------------------------------------------------
-// 🧠 MOTORES DE SÍNTESIS ATS (Líneas fluidas y ancho completo de una sola columna)
+// 🧠 MOTORES DE SÍNTESIS ATS (Líneas fluidas y formato de una sola columna)
 // -------------------------------------------------------------------
 function optimizarHabilidadesATS(textoBruto) {
     if (!textoBruto) return "Gestión Administrativa • Trabajo en Equipo • Adaptabilidad";
@@ -135,7 +135,6 @@ function generarPerfilATS(textoBruto) {
     return perfil;
 }
 
-// Motor unificado para transformar bloques de experiencia y estudios en texto fluido de ancho completo
 function formatearFluidoCompleto(texto) {
     if (!texto) return "";
     return texto
@@ -145,7 +144,6 @@ function formatearFluidoCompleto(texto) {
         .trim();
 }
 
-// Subida a Cloudinary únicamente para imágenes (foto de perfil)
 async function subirFotoACloudinary(filePath) {
     if (!filePath || !fs.existsSync(filePath)) return '';
     try {
@@ -185,10 +183,10 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             telefono: telefono || '',
             direccion: direccion || '',
             disponibilidad: disponibilidad || 'Inmediata',
-            resumen: generarPerfilATS(textoCompleto),
-            experiencia: formatearFluidoCompleto(experiencia || textoCompleto),
-            estudios: formatearFluidoCompleto(estudios),
-            habilidades: optimizarHabilidadesATS(textoCompleto),
+            resumen: resumen ? formatearFluidoCompleto(resumen) : generarPerfilATS(textoCompleto),
+            experiencia: experiencia ? formatearFluidoCompleto(experiencia) : formatearFluidoCompleto(textoCompleto),
+            estudios: estudios ? formatearFluidoCompleto(estudios) : 'Formación continua orientada a objetivos.',
+            habilidades: habilidades ? habilidades : optimizarHabilidadesATS(textoCompleto),
             cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlCloud,
             fecha: new Date().toLocaleString()
@@ -284,7 +282,8 @@ app.post('/api/upload-cv', authMiddleware, upload.fields([{ name: 'cvFile', maxC
             resumen: generarPerfilATS(extractedText),
             experiencia: formatearFluidoCompleto(extractedText),
             estudios: formatearFluidoCompleto(extractedText),
-            habilidades: optimizarHabilidadesATS(extractedText)
+            habilidades: optimizarHabilidadesATS(extractedText),
+            rawText: extractedText
         });
     } catch (error) {
         if (filePath && fs.existsSync(filePath)) {

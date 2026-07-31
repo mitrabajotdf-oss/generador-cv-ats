@@ -1,228 +1,99 @@
-:root {
-    --primary-color: #0f172a;
-    --secondary-color: #3b82f6;
-    --bg-color: #f8fafc;
-    --border-color: #cbd5e1;
-    --text-color: #334155;
-}
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: Arial, Helvetica, sans-serif; /* Fuentes seguras para ATS */
-}
-
 body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f9;
+    margin: 0;
     padding: 20px;
-    font-size: 14px;
+    color: #333;
 }
-
 .container {
-    max-width: 1400px;
+    max-width: 800px;
     margin: 0 auto;
+    background: #fff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
-
-header {
+h1 {
+    color: #2c3e50;
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 15px;
 }
-
-header h1 {
-    color: var(--primary-color);
-    font-size: 24px;
-    margin-bottom: 5px;
-}
-
-.grid-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
-}
-
-@media (max-width: 1024px) {
-    .grid-layout {
-        grid-template-columns: 1fr;
-    }
-}
-
-section {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-}
-
 h2 {
     font-size: 18px;
-    margin-bottom: 15px;
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--border-color);
+    color: #2c3e50;
+    border-bottom: 1px solid #ddd;
     padding-bottom: 5px;
+    margin-top: 30px;
 }
-
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
-
 label {
     display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
-    font-size: 13px;
-}
-
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-textarea,
-select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 13px;
+    font-weight: 600;
     margin-bottom: 8px;
+    color: #555;
 }
-
-fieldset {
-    border: 1px solid var(--border-color);
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 15px;
+input[type="text"], input[type="email"], textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 14px;
 }
-
-legend {
-    font-weight: bold;
-    font-size: 13px;
-    padding: 0 5px;
+textarea {
+    height: 120px;
+    resize: vertical;
 }
-
-.input-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+.upload-section {
+    background: #e8f8f5;
+    border: 2px dashed #16a085;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    text-align: center;
 }
-
-.btn-primary {
-    background-color: var(--secondary-color);
+.btn-submit {
+    background: #3498db;
     color: white;
-    padding: 10px 15px;
     border: none;
-    border-radius: 4px;
+    padding: 14px 20px;
+    border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
     width: 100%;
-}
-
-.btn-secondary {
-    background-color: #64748b;
-    color: white;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    margin-top: 5px;
-}
-
-.btn-small {
-    background-color: #e2e8f0;
-    color: var(--text-color);
-    padding: 4px 8px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 11px;
-    margin-bottom: 10px;
-}
-
-/* Vista Previa Formato ATS en Columnas */
-.cv-page {
-    display: grid;
-    grid-template-columns: 30% 70%;
-    background: #ffffff;
-    border: 1px solid var(--border-color);
-    min-height: 600px;
-    max-height: 1122px; /* Altura aprox de una página A4 a 96 DPI */
-    overflow: hidden;
-    margin-bottom: 20px;
-    font-size: 12px;
-}
-
-.cv-sidebar {
-    background-color: #f1f5f9;
-    padding: 15px;
-    border-right: 1px solid var(--border-color);
-}
-
-.preview-photo-container img {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-}
-
-.cv-main {
-    padding: 15px;
-}
-
-.cv-main h2 {
     font-size: 16px;
-    border: none;
-    margin-bottom: 5px;
+    transition: background 0.2s;
 }
-
-.cv-sidebar h3, .cv-main h3 {
-    font-size: 13px;
-    color: var(--primary-color);
-    margin-top: 10px;
-    margin-bottom: 5px;
-    border-bottom: 1px solid var(--border-color);
+.btn-submit:hover {
+    background: #2980b9;
 }
-
-/* CRM Base de Datos */
-.crm-database {
-    margin-top: 20px;
+#resultadoSeccion {
+    display: none;
+    margin-top: 30px;
+    background: #e8f8f5;
+    border: 1px solid #a3e4d7;
+    padding: 25px;
+    border-radius: 8px;
+    text-align: center;
 }
-
-.filter-box {
-    margin-bottom: 10px;
+.btn-pago {
+    background: #009ee3;
+    color: white;
+    text-decoration: none;
+    padding: 12px 25px;
+    border-radius: 6px;
+    font-weight: bold;
+    display: inline-block;
+    margin-top: 15px;
 }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
+.btn-pago:hover {
+    background: #0082be;
 }
-
-th, td {
-    border: 1px solid var(--border-color);
-    padding: 8px;
+table th, table td {
+    padding: 10px;
     text-align: left;
-}
-
-th {
-    background-color: #e2e8f0;
-}
-
-/* Control estricto de impresión / páginas máximas */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    #cvPreview, #cvPreview * {
-        visibility: visible;
-    }
-    #cvPreview {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        max-height: 200vh; /* Máximo 2 páginas impresas */
-        page-break-after: always;
-    }
 }

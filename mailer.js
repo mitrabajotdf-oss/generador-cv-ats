@@ -13,8 +13,8 @@ async function enviarAlertaAdmin(datos) {
         await transporter.sendMail({
             from: 'mitrabajotdf@gmail.com',
             to: 'mitrabajotdf@gmail.com',
-            subject: 'Nueva postulación recibida',
-            text: `Nuevo candidato registrado: ${datos.nombre} - Teléfono: ${datos.telefono} - Email: ${datos.email}`
+            subject: '📋 Nuevo Postulante Registrado en la Base',
+            text: `Se ha cargado un nuevo postulante al sistema:\n\n- Nombre: ${datos.nombre}\n- DNI: ${datos.dni || 'No especificado'}\n- Teléfono: ${datos.telefono}\n- Email: ${datos.email}\n\nIngresá al panel de control para ver su perfil completo y filtros ATS.`
         });
         console.log("Alerta enviada al administrador con éxito.");
     } catch (e) {
@@ -28,8 +28,8 @@ async function enviarConfirmacionCandidato(email, nombre) {
         await transporter.sendMail({
             from: 'mitrabajotdf@gmail.com',
             to: email,
-            subject: 'Postulación recibida - Mi Trabajo TDF',
-            text: `Hola ${nombre},\n\nRecibimos tus datos correctamente en el sistema de Mi Trabajo TDF. Nos pondremos en contacto si tu perfil coincide con alguna búsqueda activa.\n\n¡Muchas gracias por postularte!`
+            subject: 'Postulación Recibida - Mi Trabajo TDF',
+            text: `Hola ${nombre},\n\n¡Recibimos tus datos correctamente en nuestra base de datos!\n\nTe avisamos que cuando haya una búsqueda activa que coincida con tus habilidades y perfil ATS, nos pondremos en contacto.\n\nMuchas gracias por confiar en Mi Trabajo TDF.`
         });
         console.log("Correo de confirmación enviado al candidato con éxito.");
     } catch (e) {

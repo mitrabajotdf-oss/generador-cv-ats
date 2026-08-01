@@ -38,7 +38,16 @@
         <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
-        <!-- 3. CAMPOS MANUALES ATS -->
+        <!-- 3. MEDIO PREFERIDO DE ENTREGA -->
+        <div class="form-group" style="background: #f4f6f7; padding: 15px; border-radius: 8px; border-left: 5px solid #16a085;">
+            <label style="color: #2c3e50; font-size: 15px; font-weight: bold;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado en caso de abonar?</label>
+            <select id="medioEntrega" name="medioEntrega" style="margin-top: 8px; width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;" required>
+                <option value="email">Por Email</option>
+                <option value="whatsapp">Por WhatsApp</option>
+            </select>
+        </div>
+
+        <!-- 4. CAMPOS MANUALES ATS -->
         <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
@@ -65,33 +74,53 @@
         <!-- Link de pago oficial de Mercado Pago -->
         <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:10px;">Abonar $5,000 con Mercado Pago</a>
         
-        <!-- Contenedor Post-Pago (Oculto por defecto hasta que se confirme el pago) -->
-        <div id="seccionDescarga" style="display: none; margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #27ae60;">🎉 ¡Pago Aprobado con Éxito!</p>
-            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50;">Tu transacción fue validada. Hacé clic en el botón de abajo para descargar tu CV optimizado:</p>
-            
-            <a id="btnDescargaDirecta" href="#" style="display:inline-block; background:#27ae60; color:white; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; font-size: 14px;">Descargar mi CV ATS Optimizado</a>
+        <!-- Contenedor Post-Pago (Oculto hasta que se valide el pago) -->
+        <div id="seccionProcesandoPago" style="display: none; margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: center;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #27ae60; font-size: 16px;">🎉 ¡Pago Aprobado con Éxito!</p>
+            <p id="mensajeEnvioAutomatico" style="margin: 0; font-size: 14px; color: #2c3e50;">Procesando y enviando tu CV optimizado al medio seleccionado...</p>
         </div>
     </div>
 </div>
 
 <script>
-    // Verificamos al cargar la página si Mercado Pago devolvió al usuario con pago aprobado
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('pago') === 'aprobado') {
-            // Ocultamos el formulario y mostramos directamente la sección de éxito con descarga habilitada
             document.getElementById('formPostulacion').style.display = 'none';
             document.getElementById('resultadoSeccion').style.display = 'block';
             
-            // Como viene de un retorno de pago externo, intentamos recuperar el ID guardado en sesión local
             const storedId = localStorage.getItem('candidatoIdActual');
+            const canalElegido = localStorage.getItem('canalEntregaActual') || 'email';
+
             if (storedId) {
-                document.getElementById('btnDescargaDirecta').href = `/api/descargar-cv/${storedId}`;
-                document.getElementById('seccionDescarga').style.display = 'block';
+                document.getElementById('seccionProcesandoPago').style.display = 'block';
+                
+                try {
+                    const res = await fetch(`/api/enviar-automatico/${storedId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ canal: canalElegido })
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        if (canalElegido === 'whatsapp' && data.whatsappLink) {
+                            document.getElementById('mensajeEnvioAutomatico.innerHTML').style.display = 'none';
+                            // Abrimos directamente el chat de WhatsApp con el archivo/mensaje listo
+                            window.location.href = data.whatsappLink;
+                        } else {
+                            document.getElementById('mensajeEnvioAutomatico').innerHTML = '✅ ¡Tu CV ATS optimizado ha sido enviado exitosamente a tu correo electrónico!';
+                        }
+                    } else {
+                        document.getElementById('mensajeEnvioAutomatico').innerHTML = '❌ Error al enviar automáticamente: ' + (data.error || 'Desconocido');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById('mensajeEnvioAutomatico').innerHTML = '❌ Error de conexión al procesar el envío.';
+                }
             } else {
-                document.getElementById('seccionDescarga').innerHTML = '<p style="color: red; font-weight: bold;">Pago aprobado, pero no se encontró la sesión del CV. Por favor contactanos por WhatsApp para enviártelo.</p>';
-                document.getElementById('seccionDescarga').style.display = 'block';
+                document.getElementById('seccionProcesandoPago').style.display = 'block';
+                document.getElementById('mensajeEnvioAutomatico').innerHTML = '⚠️ Pago aprobado, pero no se encontró la sesión del formulario.';
             }
         }
     });
@@ -104,6 +133,7 @@
         btn.textContent = 'Enviando postulación...';
 
         const formData = new FormData(this);
+        const medioSeleccionado = document.getElementById('medioEntrega').value;
 
         try {
             const res = await fetch('/api/enviar-postulacion', {
@@ -113,8 +143,8 @@
             const data = await res.json();
 
             if (data.success) {
-                // Guardamos el ID del candidato en la memoria del navegador para recuperarlo al volver de Mercado Pago
                 localStorage.setItem('candidatoIdActual', data.candidatoId);
+                localStorage.setItem('canalEntregaActual', medioSeleccionado);
                 
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';

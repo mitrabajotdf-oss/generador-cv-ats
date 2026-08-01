@@ -38,16 +38,7 @@
         <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
-        <!-- 3. MEDIO PREFERIDO DE ENTREGA -->
-        <div class="form-group" style="background: #f4f6f7; padding: 15px; border-radius: 8px; border-left: 5px solid #16a085;">
-            <label style="color: #2c3e50; font-size: 15px; font-weight: bold;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado en caso de abonar?</label>
-            <select id="medioEntrega" name="medioEntrega" style="margin-top: 8px; width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;" required>
-                <option value="email">Por Email</option>
-                <option value="whatsapp">Por WhatsApp</option>
-            </select>
-        </div>
-
-        <!-- 4. CAMPOS MANUALES ATS -->
+        <!-- 3. CAMPOS MANUALES ATS -->
         <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
@@ -64,15 +55,24 @@
         <!-- 💡 Aclaración con enfoque práctico -->
         <div style="background: #fcf3cf; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: left; font-size: 14px; color: #7d6608; border-left: 5px solid #f1c40f;">
             <p style="margin: 0; font-weight: bold;">📌 Información importante:</p>
-            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para que tu CV quede cargado en nuestra base de datos y participe en las búsquedas. Sin embargo, si preferís tener una copia profesional optimizada a mano para imprimir y entregar en mano en locales o empresas, tenés la opción opcional de abonarla.</p>
+            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para que tu CV quede cargado en nuestra base de datos y participe en las búsquedas. Sin embargo, si preferís tener una copia profesional optimizada a mano para imprimir y entregar en locales o empresas, tenés la opción opcional de abonarla.</p>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         <p><strong>¿Deseas descargar tu copia optimizada?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
         
+        <!-- Selector del medio de recepción (Ahora aparece tras enviar el formulario) -->
+        <div style="margin: 20px auto; max-width: 400px; text-align: left; background: #f4f6f7; padding: 15px; border-radius: 6px; border-left: 5px solid #16a085;">
+            <label style="color: #2c3e50; font-size: 14px; font-weight: bold; display: block; margin-bottom: 5px;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado al abonar?</label>
+            <select id="medioEntregaPost" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="email">Por Email</option>
+                <option value="whatsapp">Por WhatsApp</option>
+            </select>
+        </div>
+
         <!-- Link de pago oficial de Mercado Pago -->
-        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:10px;">Abonar $5,000 con Mercado Pago</a>
+        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:5px;">Abonar $5,000 con Mercado Pago</a>
         
         <!-- Contenedor Post-Pago (Oculto hasta que se valide el pago) -->
         <div id="seccionProcesandoPago" style="display: none; margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: center;">
@@ -105,8 +105,7 @@
 
                     if (data.success) {
                         if (canalElegido === 'whatsapp' && data.whatsappLink) {
-                            document.getElementById('mensajeEnvioAutomatico.innerHTML').style.display = 'none';
-                            // Abrimos directamente el chat de WhatsApp con el archivo/mensaje listo
+                            document.getElementById('mensajeEnvioAutomatico').innerHTML = '✅ ¡Redirigiendo a WhatsApp para enviarte tu CV!';
                             window.location.href = data.whatsappLink;
                         } else {
                             document.getElementById('mensajeEnvioAutomatico').innerHTML = '✅ ¡Tu CV ATS optimizado ha sido enviado exitosamente a tu correo electrónico!';
@@ -133,7 +132,6 @@
         btn.textContent = 'Enviando postulación...';
 
         const formData = new FormData(this);
-        const medioSeleccionado = document.getElementById('medioEntrega').value;
 
         try {
             const res = await fetch('/api/enviar-postulacion', {
@@ -144,8 +142,13 @@
 
             if (data.success) {
                 localStorage.setItem('candidatoIdActual', data.candidatoId);
-                localStorage.setItem('canalEntregaActual', medioSeleccionado);
                 
+                // Capturamos el canal elegido en la pantalla de éxito al hacer clic en pagar
+                document.querySelector('.btn-pago').addEventListener('click', function() {
+                    const medioSeleccionado = document.getElementById('medioEntregaPost').value;
+                    localStorage.setItem('canalEntregaActual', medioSeleccionado);
+                });
+
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });

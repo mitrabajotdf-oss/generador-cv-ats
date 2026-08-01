@@ -136,9 +136,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
                 <p><strong>DNI:</strong> ${dni}</p>
                 <p><strong>Email:</strong> ${email}</p>
                 <p><strong>Teléfono:</strong> ${telefono}</p>
-                <p><strong>Medio de Entrega elegido:</strong> ${medioEntrega}</p>
                 <hr>
-                <p>Entra a tu <a href="https://generador-cv-ats-1.onrender.com/">Panel de Gestión</a> para ver su perfil completo y generar su CV ATS una vez confirmado el pago de $5,000.</p>
+                <p>Entra a tu <a href="https://generador-cv-ats-1.onrender.com/">Panel de Gestión</a> para ver su perfil completo y enviar su CV ATS optimizado tras confirmar el pago.</p>
             `
         };
 
@@ -154,6 +153,69 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
     } catch (error) {
         console.error("Error crítico al procesar postulación:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 🚀 Endpoint nuevo para Enviar el CV ATS Optimizado al Candidato (vía Email o WhatsApp)
+app.post('/api/enviar-cv-optimizado/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { canal } = req.body; // 'email' o 'whatsapp'
+        const candidato = await Candidato.findOne({ id: id });
+
+        if (!candidato) {
+            return res.status(404).json({ success: false, error: 'Candidato no encontrado.' });
+        }
+
+        if (canal === 'email') {
+            if (!candidato.email) {
+                return res.status(400).json({ success: false, error: 'El candidato no tiene un correo registrado.' });
+            }
+
+            let mailAttachments = [];
+            if (candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
+                const filePath = path.join(__dirname, candidato.cvUrl);
+                if (fs.existsSync(filePath)) {
+                    mailAttachments.push({
+                        filename: `CV_ATS_${candidato.nombre.replace(/\s+/g, '_')}.pdf`,
+                        path: filePath
+                    });
+                }
+            }
+
+            const mailCandidato = {
+                from: 'mitrabajotdf@gmail.com',
+                to: candidato.email,
+                subject: `📄 Tu CV ATS Optimizado - Mi Trabajo TDF`,
+                html: `
+                    <h2>¡Hola ${candidato.nombre}!</h2>
+                    <p>Aquí tienes adjunto tu CV optimizado en formato ATS (una sola columna, limpio y listo para imprimir o presentar en empresas).</p>
+                    <p>¡Muchas gracias por confiar en Mi Trabajo TDF!</p>
+                `,
+                attachments: mailAttachments
+            };
+
+            await transporter.sendMail(mailCandidato);
+            return res.json({ success: true, message: '¡CV enviado por Email correctamente!' });
+
+        } else if (canal === 'whatsapp') {
+            if (!candidato.telefono) {
+                return res.status(400).json({ success: false, error: 'El candidato no tiene un teléfono registrado.' });
+            }
+
+            // Generar link directo de WhatsApp con mensaje prearmado
+            const telefonoLimpio = candidato.telefono.replace(/\D/g, '');
+            const mensajeWa = encodeURIComponent(`¡Hola ${candidato.nombre}! Aquí te enviamos tu CV ATS optimizado de Mi Trabajo TDF listo para imprimir y presentar.`);
+            const waLink = `https://wa.me/${telefonoLimpio}?text=${mensajeWa}`;
+
+            return res.json({ success: true, whatsappLink: waLink });
+        } else {
+            return res.status(400).json({ success: false, error: 'Canal de envío no válido.' });
+        }
+
+    } catch (error) {
+        console.error('Error al enviar CV optimizado:', error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });

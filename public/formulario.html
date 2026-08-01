@@ -62,27 +62,22 @@
         <p><strong>¿Deseas descargar tu copia optimizada?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
         
-        <!-- Selector de medio preferido para la entrega automática -->
-        <div style="margin: 20px auto; max-width: 400px; text-align: left; background: #f4f6f7; padding: 15px; border-radius: 6px;">
-            <label style="font-weight: bold; color: #2c3e50; font-size: 14px; display: block; margin-bottom: 5px;">📬 ¿Cómo querés recibir tu copia descargada una vez abonado?</label>
-            <select id="medioRecepcion" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="email">Recibir por Email</option>
-                <option value="whatsapp">Recibir por WhatsApp</option>
-            </select>
-        </div>
-
-        <!-- Link de pago oficial -->
-        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:5px;">Abonar $5,000 con Mercado Pago</a>
+        <!-- Link de pago oficial de Mercado Pago -->
+        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:10px;">Abonar $5,000 con Mercado Pago</a>
         
-        <!-- Mensaje automático aclaratorio -->
-        <div style="background: #eaf2f8; padding: 15px; border-radius: 6px; margin-top: 20px; text-align: left; font-size: 14px; color: #2c3e50;">
-            <p style="margin: 0; font-weight: bold; color: #2980b9;">ℹ️ Envío automatizado:</p>
-            <p style="margin: 5px 0 0 0;">Una vez acreditado el pago, el sistema procesará y enviará automáticamente tu CV ATS optimizado al medio que seleccionaste arriba.</p>
+        <!-- Contenedor Post-Pago para la descarga automática -->
+        <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #2980b9;">📥 ¿Ya realizaste el pago?</p>
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50;">Hacé clic en el botón de abajo para descargar tu CV optimizado al instante en tu dispositivo:</p>
+            
+            <a id="btnDescargaDirecta" href="#" style="display:inline-block; background:#27ae60; color:white; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; font-size: 14px;">Descargar mi CV ATS Optimizado</a>
         </div>
     </div>
 </div>
 
 <script>
+    let candidatoIdGlobal = null;
+
     document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -100,6 +95,11 @@
             const data = await res.json();
 
             if (data.success) {
+                candidatoIdGlobal = data.candidatoId;
+                
+                // Actualizamos el enlace del botón de descarga directa usando el ID único del candidato
+                document.getElementById('btnDescargaDirecta').href = `/api/descargar-cv/${candidatoIdGlobal}`;
+
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });

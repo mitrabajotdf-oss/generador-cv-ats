@@ -65,10 +65,10 @@
         <!-- Link de pago oficial de Mercado Pago -->
         <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:10px;">Abonar $5,000 con Mercado Pago</a>
         
-        <!-- Contenedor Post-Pago para la descarga automática -->
-        <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #2980b9;">📥 ¿Ya realizaste el pago?</p>
-            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50;">Hacé clic en el botón de abajo para descargar tu CV optimizado al instante en tu dispositivo:</p>
+        <!-- Contenedor Post-Pago (Oculto por defecto hasta que se confirme el pago) -->
+        <div id="seccionDescarga" style="display: none; margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #27ae60;">🎉 ¡Pago Aprobado con Éxito!</p>
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50;">Tu transacción fue validada. Hacé clic en el botón de abajo para descargar tu CV optimizado:</p>
             
             <a id="btnDescargaDirecta" href="#" style="display:inline-block; background:#27ae60; color:white; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; font-size: 14px;">Descargar mi CV ATS Optimizado</a>
         </div>
@@ -76,7 +76,25 @@
 </div>
 
 <script>
-    let candidatoIdGlobal = null;
+    // Verificamos al cargar la página si Mercado Pago devolvió al usuario con pago aprobado
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('pago') === 'aprobado') {
+            // Ocultamos el formulario y mostramos directamente la sección de éxito con descarga habilitada
+            document.getElementById('formPostulacion').style.display = 'none';
+            document.getElementById('resultadoSeccion').style.display = 'block';
+            
+            // Como viene de un retorno de pago externo, intentamos recuperar el ID guardado en sesión local
+            const storedId = localStorage.getItem('candidatoIdActual');
+            if (storedId) {
+                document.getElementById('btnDescargaDirecta').href = `/api/descargar-cv/${storedId}`;
+                document.getElementById('seccionDescarga').style.display = 'block';
+            } else {
+                document.getElementById('seccionDescarga').innerHTML = '<p style="color: red; font-weight: bold;">Pago aprobado, pero no se encontró la sesión del CV. Por favor contactanos por WhatsApp para enviártelo.</p>';
+                document.getElementById('seccionDescarga').style.display = 'block';
+            }
+        }
+    });
 
     document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -95,11 +113,9 @@
             const data = await res.json();
 
             if (data.success) {
-                candidatoIdGlobal = data.candidatoId;
+                // Guardamos el ID del candidato en la memoria del navegador para recuperarlo al volver de Mercado Pago
+                localStorage.setItem('candidatoIdActual', data.candidatoId);
                 
-                // Actualizamos el enlace del botón de descarga directa usando el ID único del candidato
-                document.getElementById('btnDescargaDirecta').href = `/api/descargar-cv/${candidatoIdGlobal}`;
-
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });

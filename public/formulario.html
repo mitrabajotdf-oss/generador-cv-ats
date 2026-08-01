@@ -55,75 +55,25 @@
         <!-- 💡 Aclaración con enfoque práctico -->
         <div style="background: #fcf3cf; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: left; font-size: 14px; color: #7d6608; border-left: 5px solid #f1c40f;">
             <p style="margin: 0; font-weight: bold;">📌 Información importante:</p>
-            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para que tu CV quede cargado en nuestra base de datos y participe en las búsquedas. Sin embargo, si preferís tener una copia profesional optimizada a mano para imprimir y entregar en locales o empresas, tenés la opción opcional de abonarla.</p>
+            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para que tu CV quede cargado en nuestra base de datos y participe en las búsquedas. Sin embargo, si preferís tener una copia profesional optimizada a mano para imprimir y entregar en mano en locales o empresas, tenés la opción opcional de abonarla.</p>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         <p><strong>¿Deseas descargar tu copia optimizada?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
         
-        <!-- Selector del medio de recepción (Ahora aparece tras enviar el formulario) -->
-        <div style="margin: 20px auto; max-width: 400px; text-align: left; background: #f4f6f7; padding: 15px; border-radius: 6px; border-left: 5px solid #16a085;">
-            <label style="color: #2c3e50; font-size: 14px; font-weight: bold; display: block; margin-bottom: 5px;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado al abonar?</label>
-            <select id="medioEntregaPost" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="email">Por Email</option>
-                <option value="whatsapp">Por WhatsApp</option>
-            </select>
-        </div>
-
         <!-- Link de pago oficial de Mercado Pago -->
         <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:5px;">Abonar $5,000 con Mercado Pago</a>
         
-        <!-- Contenedor Post-Pago (Oculto hasta que se valide el pago) -->
-        <div id="seccionProcesandoPago" style="display: none; margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: center;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #27ae60; font-size: 16px;">🎉 ¡Pago Aprobado con Éxito!</p>
-            <p id="mensajeEnvioAutomatico" style="margin: 0; font-size: 14px; color: #2c3e50;">Procesando y enviando tu CV optimizado al medio seleccionado...</p>
+        <!-- 📱 Aviso claro con tu número de WhatsApp -->
+        <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left; border-left: 5px solid #2980b9;">
+            <p style="margin: 0 0 5px 0; font-weight: bold; color: #2980b9;">📲 Instrucción para recibir tu CV optimizado:</p>
+            <p style="margin: 0; font-size: 14px; color: #2c3e50;">Una vez realizado el pago, envianos el comprobante por WhatsApp al <strong>+54 9 2964-659057</strong> indicando tu nombre completo y te enviaremos tu copia optimizada de inmediato.</p>
         </div>
     </div>
 </div>
 
 <script>
-    window.addEventListener('DOMContentLoaded', async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('pago') === 'aprobado') {
-            document.getElementById('formPostulacion').style.display = 'none';
-            document.getElementById('resultadoSeccion').style.display = 'block';
-            
-            const storedId = localStorage.getItem('candidatoIdActual');
-            const canalElegido = localStorage.getItem('canalEntregaActual') || 'email';
-
-            if (storedId) {
-                document.getElementById('seccionProcesandoPago').style.display = 'block';
-                
-                try {
-                    const res = await fetch(`/api/enviar-automatico/${storedId}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ canal: canalElegido })
-                    });
-                    const data = await res.json();
-
-                    if (data.success) {
-                        if (canalElegido === 'whatsapp' && data.whatsappLink) {
-                            document.getElementById('mensajeEnvioAutomatico').innerHTML = '✅ ¡Redirigiendo a WhatsApp para enviarte tu CV!';
-                            window.location.href = data.whatsappLink;
-                        } else {
-                            document.getElementById('mensajeEnvioAutomatico').innerHTML = '✅ ¡Tu CV ATS optimizado ha sido enviado exitosamente a tu correo electrónico!';
-                        }
-                    } else {
-                        document.getElementById('mensajeEnvioAutomatico').innerHTML = '❌ Error al enviar automáticamente: ' + (data.error || 'Desconocido');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    document.getElementById('mensajeEnvioAutomatico').innerHTML = '❌ Error de conexión al procesar el envío.';
-                }
-            } else {
-                document.getElementById('seccionProcesandoPago').style.display = 'block';
-                document.getElementById('mensajeEnvioAutomatico').innerHTML = '⚠️ Pago aprobado, pero no se encontró la sesión del formulario.';
-            }
-        }
-    });
-
     document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -141,14 +91,6 @@
             const data = await res.json();
 
             if (data.success) {
-                localStorage.setItem('candidatoIdActual', data.candidatoId);
-                
-                // Capturamos el canal elegido en la pantalla de éxito al hacer clic en pagar
-                document.querySelector('.btn-pago').addEventListener('click', function() {
-                    const medioSeleccionado = document.getElementById('medioEntregaPost').value;
-                    localStorage.setItem('canalEntregaActual', medioSeleccionado);
-                });
-
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });

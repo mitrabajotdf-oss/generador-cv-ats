@@ -1,4 +1,63 @@
-<div id="resultadoSeccion" style="display: none; background: #fff; padding: 20px; border-radius: 8px; text-align: center;">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Postulación y Optimización ATS - Mi Trabajo TDF</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Bolsa de Empleo TDF - Envía tu Postulación & CV ATS</h1>
+    
+    <form id="formPostulacion">
+        
+        <!-- 📌 PUESTO AL QUE SE POSTULA (Opcional) -->
+        <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
+            <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
+            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
+        </div>
+
+        <!-- 1. ARCHIVOS -->
+        <div class="upload-section">
+            <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
+            <input type="file" id="cvFile" name="cvFile" accept=".pdf,.docx" style="margin-top: 10px;" required>
+            <div style="margin-top: 15px;">
+                <label>Foto de Perfil (Opcional):</label>
+                <input type="file" id="fotoPerfil" name="fotoPerfil" accept="image/*">
+            </div>
+        </div>
+
+        <!-- 2. DATOS PERSONALES -->
+        <h2>Datos Personales</h2>
+        <div class="form-group"><label>Nombre Completo:</label><input type="text" id="nombreInput" name="nombre" required></div>
+        <div class="form-group"><label>DNI:</label><input type="text" id="dniInput" name="dni" required></div>
+        <div class="form-group"><label>Email:</label><input type="email" id="emailInput" name="email" required></div>
+        <div class="form-group"><label>Teléfono de Contacto:</label><input type="text" id="telefonoInput" name="telefono" required></div>
+        <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
+        <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
+
+        <!-- 3. MEDIO PREFERIDO DE ENTREGA DEL CV OPTIMIZADO -->
+        <div class="form-group" style="background: #f4f6f7; padding: 15px; border-radius: 8px; border-left: 5px solid #16a085;">
+            <label style="color: #2c3e50; font-size: 15px; font-weight: bold;">📬 ¿Por dónde preferís recibir tu CV ATS optimizado en caso de abonar?</label>
+            <select id="medioEntrega" name="medioEntrega" style="margin-top: 8px; width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ccc;" required>
+                <option value="Email">Por Email</option>
+                <option value="WhatsApp">Por WhatsApp</option>
+            </select>
+        </div>
+
+        <!-- 4. CAMPOS MANUALES ATS -->
+        <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
+        <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
+        <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
+        <div class="form-group"><label>Estudios y Cursos:</label><textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea></div>
+        <div class="form-group"><label>Habilidades:</label><input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required></div>
+        
+        <button type="submit" id="btnEnviar" class="btn-submit">Enviar Postulación Final</button>
+    </form>
+
+    <div id="resultadoSeccion" style="display: none; background: #fff; padding: 20px; border-radius: 8px; text-align: center;">
         <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
         <p>Tus datos y tu CV original ya han sido guardados correctamente en la base de datos de nuestra bolsa de empleo.</p>
         
@@ -21,3 +80,41 @@
             <p style="margin: 5px 0 0 0;">Una vez realizado el pago optativo, validaremos la transacción y te enviaremos tu CV ATS a través del medio que seleccionaste (<strong>Email o WhatsApp</strong>).</p>
         </div>
     </div>
+</div>
+
+<script>
+    document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('btnEnviar');
+        btn.disabled = true;
+        btn.textContent = 'Enviando postulación...';
+
+        const formData = new FormData(this);
+
+        try {
+            const res = await fetch('/api/enviar-postulacion', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('formPostulacion').style.display = 'none';
+                document.getElementById('resultadoSeccion').style.display = 'block';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                alert('No se pudo guardar: ' + (data.error || 'Error desconocido'));
+                btn.disabled = false;
+                btn.textContent = 'Enviar Postulación Final';
+            }
+        } catch (err) {
+            console.error('Error de red:', err);
+            alert('Error de conexión con el servidor.');
+            btn.disabled = false;
+            btn.textContent = 'Enviar Postulación Final';
+        }
+    });
+</script>
+</body>
+</html>

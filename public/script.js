@@ -63,8 +63,8 @@ if (formPostulacion) {
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                // Solicitamos el link y generamos el QR en segundo plano de forma segura
-                generarQrYLinkPago(globalCandidatoId);
+                // Solicitamos el link de pago seguro
+                generarLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
                 if (btn) {
@@ -83,8 +83,8 @@ if (formPostulacion) {
     });
 }
 
-// 📱 Función para generar el código QR en pantalla y el link de pago
-async function generarQrYLinkPago(candidatoId) {
+// 💳 Función para configurar el link de pago directo sin errores de QR
+async function generarLinkPago(candidatoId) {
     try {
         const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
             method: 'POST'
@@ -94,23 +94,18 @@ async function generarQrYLinkPago(candidatoId) {
         if (data.success) {
             const linkPago = data.sandbox_init_point || data.init_point;
 
+            // Ocultamos el contenedor de QR viejo para evitar confusiones
             const contenedorQR = document.getElementById('codigoQR');
             if (contenedorQR) {
-                contenedorQR.innerHTML = '';
-                new QRCode(contenedorQR, {
-                    text: linkPago,
-                    width: 180,
-                    height: 180,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.H
-                });
+                contenedorQR.style.display = 'none';
             }
 
+            // Mostramos y enlazamos el botón directo de Mercado Pago
             const botonMP = document.getElementById('linkBotonMP');
             if (botonMP) {
                 botonMP.href = linkPago;
                 botonMP.style.display = 'inline-block';
+                botonMP.textContent = 'Pagar $5,000 con Mercado Pago';
             }
         } else {
             console.error('No se pudo generar la preferencia de pago:', data.error);

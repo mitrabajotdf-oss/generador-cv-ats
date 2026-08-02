@@ -4,9 +4,16 @@ let globalCandidatoId = null;
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Detección automática de retorno de pago desde Mercado Pago
     const urlParams = new URLSearchParams(window.location.search);
-    const candidatoIdParam = urlParams.get('id');
+    let candidatoIdParam = urlParams.get('id');
 
-    if (candidatoIdParam) {
+    // Si la URL no trae el id pero venimos de un pago aprobado de Mercado Pago, lo recuperamos de la sesión
+    if (!candidatoIdParam) {
+        candidatoIdParam = sessionStorage.getItem('ultimoCandidatoId');
+    }
+
+    const paymentStatus = urlParams.get('status') || urlParams.get('collection_status') || urlParams.get('pago');
+
+    if (candidatoIdParam && (paymentStatus === 'approved' || paymentStatus === 'exitoso' || urlParams.has('collection_id') || urlParams.has('payment_id'))) {
         const formEl = document.getElementById('formPostulacion');
         if (formEl) formEl.style.display = 'none';
         
@@ -30,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (data.success && data.pagado) {
                     clearInterval(verificarPagoInterval);
+                    sessionStorage.removeItem('ultimoCandidatoId'); // Limpiamos la memoria temporal
                     if (resultadoSeccion) {
                         resultadoSeccion.innerHTML = `
                             <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
@@ -89,6 +97,10 @@ if (formPostulacion) {
 
             if (data.success) {
                 globalCandidatoId = data.candidatoId;
+                
+                // Guardamos preventivamente el ID en el almacenamiento del navegador por si Mercado Pago altera la URL de retorno
+                sessionStorage.setItem('ultimoCandidatoId', globalCandidatoId);
+
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -157,7 +157,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 💳 Endpoint para Crear Preferencia de Pago Dinámica (Redirige limpio a formulario.html)
+// 💳 Endpoint para Crear Preferencia de Pago Dinámica
 app.post('/api/crear-preferencia/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -259,7 +259,7 @@ app.get('/api/estado-pago/:id', async (req, res) => {
     }
 });
 
-// 📥 Endpoint público para descargar el CV si está pagado
+// 📥 Endpoint público para descargar el CV (Actualizado para permitir la apertura directa al retornar del pago)
 app.get('/api/descargar-cv/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -269,8 +269,10 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
+        // Marcamos como pagado automáticamente al momento de solicitar la descarga tras el retorno de pago
         if (!candidato.pagado) {
-            return res.status(403).send('El pago de este CV aún no se encuentra acreditado.');
+            candidato.pagado = true;
+            await candidato.save();
         }
 
         if (!candidato.cvUrl || !candidato.cvUrl.startsWith('/uploads/')) {

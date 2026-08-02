@@ -32,7 +32,7 @@ if (formPostulacion) {
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                // Solicitamos el QR y link de pago en segundo plano de manera segura
+                // Solicitamos el link y generamos el QR en segundo plano de forma segura
                 generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
@@ -52,7 +52,7 @@ if (formPostulacion) {
     });
 }
 
-// 📱 Función segura para generar el QR y el botón en pantalla sin trabar el envío
+// 📱 Función para generar el código QR en pantalla y el link de pago
 async function generarQrYLinkPago(candidatoId) {
     try {
         const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
@@ -126,6 +126,7 @@ if (listaCandidatosDiv) {
     cargarCandidatos();
 }
 
+// Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS
 function verCVATS(c) {
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`

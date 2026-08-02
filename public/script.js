@@ -1,45 +1,4 @@
-// Lógica para el formulario (si existe en la página)
-let globalCandidatoId = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Detección automática de retorno de pago exitoso desde Mercado Pago
-    const urlParams = new URLSearchParams(window.location.search);
-    const pagoStatus = urlParams.get('pago');
-    let candidatoIdParam = urlParams.get('id');
-
-    // Recuperar de sesión por respaldo si Mercado Pago alteró la URL
-    if (!candidatoIdParam) {
-        candidatoIdParam = sessionStorage.getItem('ultimoCandidatoId');
-    }
-
-    if ((pagoStatus === 'exitoso' || urlParams.get('status') === 'approved' || urlParams.has('collection_id')) && candidatoIdParam) {
-        const formEl = document.getElementById('formPostulacion');
-        if (formEl) formEl.style.display = 'none';
-        
-        const resultadoSeccion = document.getElementById('resultadoSeccion');
-        if (resultadoSeccion) {
-            resultadoSeccion.style.display = 'block';
-            resultadoSeccion.innerHTML = `
-                <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
-                <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente por Mercado Pago. Tu CV optimizado en formato ATS ya está listo.</p>
-                <div style="margin: 30px 0;">
-                    <a href="/api/descargar-cv/${candidatoIdParam}" target="_blank" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Abrir / Descargar mi CV ATS en PDF</a>
-                </div>
-            `;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Limpiar respaldo de sesión
-        sessionStorage.removeItem('ultimoCandidatoId');
-
-        // Abrir automáticamente el PDF en una nueva pestaña de forma inmediata tras despertar Render
-        setTimeout(() => {
-            window.open(`/api/descargar-cv/${candidatoIdParam}`, '_blank');
-        }, 1500);
-        return;
-    }
-});
-
+// Lógica para el envío del formulario de postulación
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
     formPostulacion.addEventListener('submit', async function(e) {
@@ -66,17 +25,9 @@ if (formPostulacion) {
             const data = await res.json();
 
             if (data.success) {
-                globalCandidatoId = data.candidatoId;
-                
-                // Guardamos en sesión por respaldo por si Mercado Pago altera la URL
-                sessionStorage.setItem('ultimoCandidatoId', globalCandidatoId);
-
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-
-                // Solicitamos el link y generamos el QR en pantalla
-                generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
                 if (btn) {
@@ -93,43 +44,6 @@ if (formPostulacion) {
             }
         }
     });
-}
-
-// 📱 Función para generar el código QR en pantalla y el link de pago
-async function generarQrYLinkPago(candidatoId) {
-    try {
-        const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
-            method: 'POST'
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            const linkPago = data.init_point || data.sandbox_init_point;
-
-            const contenedorQR = document.getElementById('codigoQR');
-            if (contenedorQR) {
-                contenedorQR.innerHTML = '';
-                new QRCode(contenedorQR, {
-                    text: linkPago,
-                    width: 180,
-                    height: 180,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.H
-                });
-            }
-
-            const botonMP = document.getElementById('linkBotonMP');
-            if (botonMP) {
-                botonMP.href = linkPago;
-                botonMP.style.display = 'inline-block';
-            }
-        } else {
-            console.error('No se pudo generar la preferencia de pago:', data.error);
-        }
-    } catch (err) {
-        console.error('Error de red al generar el pago:', err);
-    }
 }
 
 // Lógica para el panel de administración (index.html)

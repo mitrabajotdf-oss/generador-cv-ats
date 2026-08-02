@@ -1,4 +1,3 @@
-// Lógica para el formulario (si existe en la página)
 let globalCandidatoId = null;
 
 const formPostulacion = document.getElementById('formPostulacion');
@@ -9,7 +8,7 @@ if (formPostulacion) {
         const btn = document.getElementById('btnEnviar');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Enviando postulación...';
+            btn.textContent = 'Enviando postulación y generando pago...';
         }
 
         const formData = new FormData(this);
@@ -27,10 +26,13 @@ if (formPostulacion) {
             const data = await res.json();
 
             if (data.success) {
-                globalCandidatoId = data.candidatoId; // Guardamos el ID para generar el pago dinámico
+                globalCandidatoId = data.candidatoId;
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                // Una vez guardado, solicitamos la preferencia a Mercado Pago y generamos el QR en pantalla
+                generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
                 if (btn) {
@@ -49,40 +51,42 @@ if (formPostulacion) {
     });
 }
 
-// 💳 Lógica para generar el link dinámico de Mercado Pago sin expiración previa
-const btnPagarMP = document.getElementById('btnPagarMP');
-if (btnPagarMP) {
-    btnPagarMP.addEventListener('click', async function() {
-        if (!globalCandidatoId) {
-            alert('Error: No se identificó el ID del candidato.');
-            return;
-        }
+// 📱 Función para pedir la preferencia de pago y renderizar el código QR automáticamente
+async function generarQrYLinkPago(candidatoId) {
+    try {
+        const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
 
-        const btnPagar = this;
-        btnPagar.disabled = true;
-        btnPagar.textContent = 'Generando link de pago seguro...';
+        if (data.success) {
+            const linkPago = data.sandbox_init_point || data.init_point;
 
-        try {
-            const res = await fetch(`/api/crear-preferencia/${globalCandidatoId}`, {
-                method: 'POST'
+            // Limpiamos contenedor por seguridad y dibujamos el código QR
+            const contenedorQR = document.getElementById('codigoQR');
+            contenedorQR.innerHTML = '';
+            
+            new QRCode(contenedorQR, {
+                text: linkPago,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
             });
-            const data = await res.json();
 
-            if (data.success) {
-                // Redirige al link fresco generado por Mercado Pago
-                window.location.href = data.sandbox_init_point || data.init_point;
-            } else {
-                alert('No se pudo crear el pago: ' + (data.error || 'Error desconocido'));
-                btnPagar.disabled = false;
-                btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
+            // Habilitamos también el botón por si están en el celu y quieren tocar directo
+            const botonMP = document.getElementById('linkBotonMP');
+            if (botonMP) {
+                botonMP.href = linkPago;
+                botonMP.style.display = 'inline-block';
             }
-        } catch (err) {
-            console.error('Error de red:', err);
-            alert('Error de conexión al generar el pago.');
-            btnPagar.disabled = false;
-            btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
+        } else {
+            console.error('Error al crear preferencia para QR:', data.error);
         }
-    });
+    } catch (err) {
+        console.error('Error de red al crear preferencia:', err);
+    }
 }
 
 // Lógica para el panel de administración (index.html)
@@ -122,7 +126,6 @@ if (listaCandidatosDiv) {
     cargarCandidatos();
 }
 
-// Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS (Una sola columna, líneas fluidas)
 function verCVATS(c) {
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`

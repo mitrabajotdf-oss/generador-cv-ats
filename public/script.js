@@ -1,6 +1,37 @@
 // Lógica para el formulario (si existe en la página)
 let globalCandidatoId = null;
 
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Detección automática de retorno de pago exitoso desde Mercado Pago
+    const urlParams = new URLSearchParams(window.location.search);
+    const pagoStatus = urlParams.get('pago');
+    const candidatoIdParam = urlParams.get('id');
+
+    if (pagoStatus === 'exitoso' && candidatoIdParam) {
+        const formEl = document.getElementById('formPostulacion');
+        if (formEl) formEl.style.display = 'none';
+        
+        const resultadoSeccion = document.getElementById('resultadoSeccion');
+        if (resultadoSeccion) {
+            resultadoSeccion.style.display = 'block';
+            resultadoSeccion.innerHTML = `
+                <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
+                <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente por Mercado Pago. Tu CV optimizado en formato ATS ya está listo para descargarse.</p>
+                <div style="margin: 30px 0;">
+                    <a href="/api/descargar-cv/${candidatoIdParam}" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Descargar mi CV ATS en PDF</a>
+                </div>
+            `;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Disparar la descarga automática de forma inmediata
+        setTimeout(() => {
+            window.location.href = `/api/descargar-cv/${candidatoIdParam}`;
+        }, 1500);
+        return;
+    }
+});
+
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
     formPostulacion.addEventListener('submit', async function(e) {

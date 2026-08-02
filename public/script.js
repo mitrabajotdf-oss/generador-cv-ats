@@ -21,9 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
             resultadoSeccion.style.display = 'block';
             resultadoSeccion.innerHTML = `
                 <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
-                <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente por Mercado Pago. Tu CV optimizado en formato ATS ya se está descargando automáticamente.</p>
+                <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente por Mercado Pago. Tu CV optimizado en formato ATS ya está listo.</p>
                 <div style="margin: 30px 0;">
-                    <a href="/api/descargar-cv/${candidatoIdParam}" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Descargar mi CV ATS en PDF</a>
+                    <a href="/api/descargar-cv/${candidatoIdParam}" target="_blank" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Abrir / Descargar mi CV ATS en PDF</a>
                 </div>
             `;
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Limpiar respaldo de sesión
         sessionStorage.removeItem('ultimoCandidatoId');
 
-        // Disparar la descarga automática de forma inmediata dándole unos segundos para que Render despierte
+        // Abrir automáticamente el PDF en una nueva pestaña de forma inmediata tras despertar Render
         setTimeout(() => {
-            window.location.href = `/api/descargar-cv/${candidatoIdParam}`;
-        }, 2000);
+            window.open(`/api/descargar-cv/${candidatoIdParam}`, '_blank');
+        }, 1500);
         return;
     }
 });

@@ -14,11 +14,13 @@
     <h1>Bolsa de Empleo TDF - Envía tu Postulación & CV ATS</h1>
     
     <form id="formPostulacion">
+        <!-- 📌 PUESTO AL QUE SE POSTULA (Opcional) -->
         <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
             <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
             <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
         </div>
 
+        <!-- 1. ARCHIVOS -->
         <div class="upload-section">
             <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
             <input type="file" id="cvFile" name="cvFile" accept=".pdf,.docx" style="margin-top: 10px;" required>
@@ -28,6 +30,7 @@
             </div>
         </div>
 
+        <!-- 2. DATOS PERSONALES -->
         <h2>Datos Personales</h2>
         <div class="form-group"><label>Nombre Completo:</label><input type="text" id="nombreInput" name="nombre" required></div>
         <div class="form-group"><label>DNI:</label><input type="text" id="dniInput" name="dni" required></div>
@@ -36,6 +39,7 @@
         <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
+        <!-- 3. CAMPOS MANUALES ATS -->
         <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
@@ -49,29 +53,31 @@
         <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
         <p>Tus datos y tu CV original ya han sido guardados correctamente en la base de datos de nuestra bolsa de empleo.</p>
         
+        <!-- 💡 Aclaración con enfoque práctico -->
         <div style="background: #fcf3cf; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: left; font-size: 14px; color: #7d6608; border-left: 5px solid #f1c40f;">
             <p style="margin: 0; font-weight: bold;">📌 Información importante:</p>
-            <p style="margin: 5px 0 0 0;">No es necesario abonar nada para participar en las búsquedas. Si querés tu copia optimizada profesional, podés abonarla opcionalmente.</p>
+            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para que tu CV quede cargado en nuestra base de datos y participe en las búsquedas. Sin embargo, si preferís tener una copia profesional optimizada a mano para imprimir y entregar en mano en locales o empresas, tenés la opción opcional de abonarla.</p>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <p><strong>Copia CV Optimizado ATS</strong></p>
+        <p><strong>¿Deseas descargar tu copia optimizada?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
         
-        <!-- 📱 Contenedor del Código QR dinámico generado en pantalla -->
+        <!-- 📱 Código QR dinámico que aparecerá en pantalla -->
         <div style="margin: 20px 0; display: flex; flex-direction: column; align-items: center;">
-            <p style="font-size: 14px; color: #555; margin-bottom: 10px;">Escaneá este código QR con la cámara de tu celular para abonar al instante:</p>
-            <div id="codigoQR" style="padding: 10px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block;"></div>
+            <p style="font-size: 14px; color: #555; margin-bottom: 10px;">Escaneá este código QR con la cámara de tu celular para abonar:</p>
+            <div id="codigoQR" style="padding: 10px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block; min-height: 180px; min-width: 180px;"></div>
         </div>
 
-        <!-- Botón alternativo por si prefieren pagar desde la PC -->
+        <!-- Botón opcional por si quieren pagar desde la PC -->
         <div style="margin-top: 15px;">
-            <a id="linkBotonMP" href="#" target="_blank" style="display:none; background:#009ee3; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">Pagar desde este dispositivo</a>
+            <a id="linkBotonMP" href="#" target="_blank" style="display:none; background:#009ee3; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">Abonar $5,000 con Mercado Pago</a>
         </div>
         
+        <!-- 📱 Aviso claro con tu número de WhatsApp -->
         <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left; border-left: 5px solid #2980b9;">
-            <p style="margin: 0 0 5px 0; font-weight: bold; color: #2980b9;">📲 Instrucción:</p>
-            <p style="margin: 0; font-size: 14px; color: #2c3e50;">Una vez realizado el pago, envianos el comprobante por WhatsApp al <strong>+54 9 2964-659057</strong> indicando tu nombre completo.</p>
+            <p style="margin: 0 0 5px 0; font-weight: bold; color: #2980b9;">📲 Instrucción para recibir tu CV optimizado:</p>
+            <p style="margin: 0; font-size: 14px; color: #2c3e50;">Una vez realizado el pago, envianos el comprobante por WhatsApp al <strong>+54 9 2964-659057</strong> indicando tu nombre completo y te enviaremos tu copia optimizada de inmediato.</p>
         </div>
     </div>
 </div>

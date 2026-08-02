@@ -1,13 +1,12 @@
 // Lógica para el formulario (si existe en la página)
 let globalCandidatoId = null;
 
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Detección automática de retorno de pago exitoso desde Mercado Pago
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Detección automática de retorno de pago desde Mercado Pago
     const urlParams = new URLSearchParams(window.location.search);
-    const pagoStatus = urlParams.get('pago');
     const candidatoIdParam = urlParams.get('id');
 
-    if (pagoStatus === 'exitoso' && candidatoIdParam) {
+    if (candidatoIdParam) {
         const formEl = document.getElementById('formPostulacion');
         if (formEl) formEl.style.display = 'none';
         
@@ -15,19 +14,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (resultadoSeccion) {
             resultadoSeccion.style.display = 'block';
             resultadoSeccion.innerHTML = `
-                <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
-                <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente por Mercado Pago. Tu CV optimizado en formato ATS ya se está descargando automáticamente.</p>
-                <div style="margin: 30px 0;">
-                    <a href="/api/descargar-cv/${candidatoIdParam}" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Descargar mi CV ATS en PDF</a>
-                </div>
+                <h2 style="color: #2980b9; margin-top:0;">⏳ Verificando el estado de tu pago...</h2>
+                <p style="font-size: 16px; color: #2c3e50;">Estamos consultando con Mercado Pago la acreditación. En unos segundos se descargará tu CV ATS automáticamente.</p>
             `;
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Disparar la descarga automática del archivo de forma inmediata
-        setTimeout(() => {
-            window.location.href = `/api/descargar-cv/${candidatoIdParam}`;
-        }, 1500);
+        // Bucle inteligente para verificar periódicamente si el pago ya impactó
+        let intentos = 0;
+        const verificarPagoInterval = setInterval(async () => {
+            intentos++;
+            try {
+                const res = await fetch(`/api/estado-pago/${candidatoIdParam}`);
+                const data = await res.json();
+
+                if (data.success && data.pagado) {
+                    clearInterval(verificarPagoInterval);
+                    if (resultadoSeccion) {
+                        resultadoSeccion.innerHTML = `
+                            <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Pago Acreditado con Éxito!</h2>
+                            <p style="font-size: 16px; color: #2c3e50;">Tu pago fue procesado correctamente. Tu CV optimizado en formato ATS ya está listo.</p>
+                            <div style="margin: 30px 0;">
+                                <a href="/api/descargar-cv/${candidatoIdParam}" class="btn-submit" style="display:inline-block; background:#27ae60; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Descargar mi CV ATS en PDF</a>
+                            </div>
+                        `;
+                    }
+                    // Disparar la descarga automática de forma limpia
+                    window.location.href = `/api/descargar-cv/${candidatoIdParam}`;
+                } else if (intentos > 20) { // ~40 segundos de espera máxima por si el webhook demora
+                    clearInterval(verificarPagoInterval);
+                    if (resultadoSeccion) {
+                        resultadoSeccion.innerHTML = `
+                            <h2 style="color: #e67e22; margin-top:0;">📌 Pago en proceso de acreditación</h2>
+                            <p style="font-size: 16px; color: #2c3e50;">Si ya abonaste, el sistema puede demorar unos segundos más en impactar. Hacé clic en el botón para descargar tu CV:</p>
+                            <div style="margin: 30px 0;">
+                                <a href="/api/descargar-cv/${candidatoIdParam}" class="btn-submit" style="display:inline-block; background:#2980b9; color:white; padding:15px 30px; text-decoration:none; border-radius:8px; font-weight:bold; font-size: 18px;">🔄 Descargar mi CV ATS</a>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (err) {
+                console.error('Error verificando pago:', err);
+            }
+        }, 2000);
+
         return;
     }
 });
@@ -63,7 +93,7 @@ if (formPostulacion) {
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                // Solicitamos la preferencia y generamos el código QR funcional en pantalla
+                // Generamos el código QR en pantalla
                 generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
@@ -92,7 +122,6 @@ async function generarQrYLinkPago(candidatoId) {
         const data = await res.json();
 
         if (data.success) {
-            // Usamos init_point o sandbox_init_point según corresponda
             const linkPago = data.init_point || data.sandbox_init_point;
 
             const contenedorQR = document.getElementById('codigoQR');

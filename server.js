@@ -72,7 +72,7 @@ const candidatoSchema = new mongoose.Schema({
     cvUrl: String,
     fotoUrl: String,
     fecha: String,
-    pagado: { type: Boolean, default: false } // 💳 Control de pago automático
+    pagado: { type: Boolean, default: false }
 });
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
@@ -126,7 +126,6 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
 
         await nuevoCandidato.save();
 
-        // ✉️ Enviar correo electrónico de notificación al administrador (informativo)
         const mailOptions = {
             from: 'mitrabajotdf@gmail.com',
             to: 'mitrabajotdf@gmail.com',
@@ -144,22 +143,18 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
         };
 
         transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error('❌ Error al enviar el correo de notificación:', error);
-            } else {
-                console.log('✅ Correo de notificación enviado:', info.response);
-            }
+            if (error) console.error('❌ Error correo:', error);
         });
 
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });
 
     } catch (error) {
-        console.error("Error crítico al procesar postulación:", error);
+        console.error("Error crítico:", error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 💳 Endpoint para Crear Preferencia de Pago Dinámica en Mercado Pago
+// 💳 Endpoint para Crear Preferencia de Pago Dinámica
 app.post('/api/crear-preferencia/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -171,7 +166,7 @@ app.post('/api/crear-preferencia/:id', async (req, res) => {
 
         const mpAccessToken = process.env.MP_ACCESS_TOKEN;
         if (!mpAccessToken) {
-            return res.status(500).json({ success: false, error: 'Falta configurar el Token de Mercado Pago en el servidor.' });
+            return res.status(500).json({ success: false, error: 'Falta configurar el Token de Mercado Pago.' });
         }
 
         const preferenceData = {
@@ -179,7 +174,7 @@ app.post('/api/crear-preferencia/:id', async (req, res) => {
                 {
                     title: `CV Optimizado ATS - ${candidato.nombre}`,
                     quantity: 1,
-                    unit_price: 1000 // Monto de prueba o configuración
+                    unit_price: 5000
                 }
             ],
             external_reference: String(candidato.id),
@@ -213,29 +208,23 @@ app.post('/api/crear-preferencia/:id', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('❌ Error creando preferencia de pago:', error);
+        console.error('❌ Error creando preferencia:', error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 💳 Webhook para recibir notificaciones automáticas de Mercado Pago
+// 💳 Webhook Mercado Pago
 app.post('/api/webhook-mercadopago', async (req, res) => {
     try {
         const notification = req.body;
-        
         if (notification.type === 'payment' || notification.action === 'payment.created' || notification.action === 'payment.updated') {
             const paymentId = notification.data?.id || notification.id;
-            
             if (paymentId) {
                 const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN || 'APP_USR-TU_TOKEN_AQUI'}`
-                    }
+                    headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` }
                 });
-                
                 if (mpResponse.ok) {
                     const paymentData = await mpResponse.json();
-                    
                     if (paymentData.status === 'approved') {
                         const externalRef = paymentData.external_reference;
                         if (externalRef) {
@@ -243,88 +232,13 @@ app.post('/api/webhook-mercadopago', async (req, res) => {
                         } else {
                             await Candidato.findOneAndUpdate({}, { $set: { pagado: true } }, { sort: { _id: -1 } });
                         }
-                        console.log(`✅ Pago ${paymentId} aprobado y registrado en el servidor.`);
                     }
                 }
             }
         }
-        
         return res.status(200).send('OK');
     } catch (error) {
-        console.error('❌ Error procesando webhook de MP:', error);
         return res.status(500).send('Error');
-    }
-});
-
-// 🚀 Endpoint para Descarga Directa del CV Optimizado (Validando Pago)
-app.get('/api/descargar-cv/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-
-        if (!candidato || !candidato.cvUrl) {
-            return res.status(404).send('Archivo no encontrado.');
-        }
-
-        const filePath = path.join(__dirname, candidato.cvUrl);
-        if (fs.existsSync(filePath)) {
-            res.download(filePath, `CV_ATS_${candidato.nombre.replace(/\s+/g, '_')}${path.extname(filePath)}`);
-        } else {
-            res.status(404).send('El archivo físico no se encuentra en el servidor.');
-        }
-    } catch (error) {
-        res.status(500).send('Error al procesar la descarga.');
-    }
-});
-
-// 🚀 Endpoint para Envío Automático por Email o WhatsApp Post-Pago
-app.post('/api/enviar-automatico/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const { canal } = req.body;
-        const candidato = await Candidato.findOne({ id: id });
-
-        if (!candidato) {
-            return res.status(404).json({ success: false, error: 'Candidato no encontrado.' });
-        }
-
-        if (canal === 'email') {
-            if (!candidato.email) return res.status(400).json({ success: false, error: 'Sin email registrado.' });
-
-            let mailAttachments = [];
-            if (candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
-                const filePath = path.join(__dirname, candidato.cvUrl);
-                if (fs.existsSync(filePath)) {
-                    mailAttachments.push({
-                        filename: `CV_ATS_${candidato.nombre.replace(/\s+/g, '_')}.pdf`,
-                        path: filePath
-                    });
-                }
-            }
-
-            await transporter.sendMail({
-                from: 'mitrabajotdf@gmail.com',
-                to: candidato.email,
-                subject: `📄 Tu CV ATS Optimizado - Mi Trabajo TDF`,
-                html: `<h2>¡Hola ${candidato.nombre}!</h2><p>Aquí tienes adjunto tu CV optimizado en formato ATS listo para imprimir y presentar.</p>`,
-                attachments: mailAttachments
-            });
-
-            return res.json({ success: true, message: 'Enviado por Email correctamente.' });
-
-        } else if (canal === 'whatsapp') {
-            if (!candidato.telefono) return res.status(400).json({ success: false, error: 'Sin teléfono registrado.' });
-
-            const telefonoLimpio = candidato.telefono.replace(/\D/g, '');
-            const mensajeWa = encodeURIComponent(`¡Hola ${candidato.nombre}! Aquí tienes tu CV ATS optimizado de Mi Trabajo TDF listo para imprimir.`);
-            const waLink = `https://wa.me/${telefonoLimpio}?text=${mensajeWa}`;
-
-            return res.json({ success: true, whatsappLink: waLink });
-        }
-
-        return res.status(400).json({ success: false, error: 'Canal inválido.' });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -333,7 +247,7 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
         const listaCandidatos = await Candidato.find().sort({ id: -1 });
         return res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'Error al cargar candidatos.' });
+        return res.json({ success: false });
     }
 });
 
@@ -341,18 +255,14 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });
-        
         if (candidato && candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
             const filePath = path.join(__dirname, candidato.cvUrl);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
-
         await Candidato.deleteOne({ id: id });
-        return res.json({ success: true, message: 'Candidato eliminado.' });
+        return res.json({ success: true });
     } catch (error) {
-        return res.status(500).json({ success: false, error: 'No se pudo eliminar.' });
+        return res.json({ success: false });
     }
 });
 
@@ -361,5 +271,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor ATS corriendo en puerto ${PORT}`);
+    console.log(`Servidor corriendo en puerto ${PORT}`);
 });

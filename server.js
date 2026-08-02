@@ -86,20 +86,23 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación
-app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1 }, { name: 'fotoPerfil', maxCount: 1 }]), async (req, res) => {
+// 🌐 Endpoint de Recepción de Postulación (Usamos upload.any() para evitar errores de campos inesperados)
+app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
         let cvUrlLocal = '';
         let fotoUrlLocal = '';
 
-        if (req.files) {
-            if (req.files.cvFile && req.files.cvFile[0]) {
-                cvUrlLocal = `/uploads/${path.basename(req.files.cvFile[0].path)}`;
+        if (req.files && req.files.length > 0) {
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile') || req.files[0];
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+
+            if (cvFile) {
+                cvUrlLocal = `/uploads/${path.basename(cvFile.path)}`;
             }
-            if (req.files.fotoPerfil && req.files.fotoPerfil[0]) {
-                fotoUrlLocal = `/uploads/${path.basename(req.files.fotoPerfil[0].path)}`;
+            if (fotoPerfil) {
+                fotoUrlLocal = `/uploads/${path.basename(fotoPerfil.path)}`;
             }
         }
 

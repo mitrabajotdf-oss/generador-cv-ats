@@ -1,8 +1,16 @@
 // Lógica para el formulario (si existe en la página)
+let globalCandidatoId = null;
+
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
     formPostulacion.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        const btn = document.getElementById('btnEnviar');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Enviando postulación...';
+        }
 
         const formData = new FormData(this);
         const cvFile = document.getElementById('cvFile').files[0];
@@ -19,15 +27,60 @@ if (formPostulacion) {
             const data = await res.json();
 
             if (data.success) {
+                globalCandidatoId = data.candidatoId; // Guardamos el ID para generar el pago dinámico
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Postulación Final';
+                }
             }
         } catch (e) {
             console.error(e);
             alert('Error de conexión con el servidor.');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Enviar Postulación Final';
+            }
+        }
+    });
+}
+
+// 💳 Lógica para generar el link dinámico de Mercado Pago sin expiración previa
+const btnPagarMP = document.getElementById('btnPagarMP');
+if (btnPagarMP) {
+    btnPagarMP.addEventListener('click', async function() {
+        if (!globalCandidatoId) {
+            alert('Error: No se identificó el ID del candidato.');
+            return;
+        }
+
+        const btnPagar = this;
+        btnPagar.disabled = true;
+        btnPagar.textContent = 'Generando link de pago seguro...';
+
+        try {
+            const res = await fetch(`/api/crear-preferencia/${globalCandidatoId}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Redirige al link fresco generado por Mercado Pago
+                window.location.href = data.sandbox_init_point || data.init_point;
+            } else {
+                alert('No se pudo crear el pago: ' + (data.error || 'Error desconocido'));
+                btnPagar.disabled = false;
+                btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
+            }
+        } catch (err) {
+            console.error('Error de red:', err);
+            alert('Error de conexión al generar el pago.');
+            btnPagar.disabled = false;
+            btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
         }
     });
 }

@@ -138,7 +138,7 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
                 <p><strong>Email:</strong> ${email}</p>
                 <p><strong>Teléfono:</strong> ${telefono}</p>
                 <hr>
-                <p>El perfil ya se encuentra guardado en tu <a href="https://generador-cv-ats-1.onrender.com/">Panel de Gestión</a>.</p>
+                <p>El perfil ya se encuentra guardado en tu Panel de Gestión.</p>
             `
         };
 
@@ -179,9 +179,9 @@ app.post('/api/crear-preferencia/:id', async (req, res) => {
             ],
             external_reference: String(candidato.id),
             back_urls: {
-                success: `https://generador-cv-ats-1.onrender.com/`,
-                failure: `https://generador-cv-ats-1.onrender.com/`,
-                pending: `https://generador-cv-ats-1.onrender.com/`
+                success: 'https://generador-cv-ats-1.onrender.com/',
+                failure: 'https://generador-cv-ats-1.onrender.com/',
+                pending: 'https://generador-cv-ats-1.onrender.com/'
             },
             auto_return: 'approved'
         };

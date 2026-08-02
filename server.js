@@ -86,7 +86,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación (Usamos upload.any() para evitar errores de campos inesperados)
+// 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -157,7 +157,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 💳 Endpoint para Crear Preferencia de Pago Dinámica
+// 💳 Endpoint para Crear Preferencia de Pago Dinámica (Redirige limpio a formulario.html)
 app.post('/api/crear-preferencia/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -182,9 +182,9 @@ app.post('/api/crear-preferencia/:id', async (req, res) => {
             ],
             external_reference: String(candidato.id),
             back_urls: {
-                success: 'https://generador-cv-ats-1.onrender.com/',
-                failure: 'https://generador-cv-ats-1.onrender.com/',
-                pending: 'https://generador-cv-ats-1.onrender.com/'
+                success: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=exitoso&id=${candidato.id}`,
+                failure: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=fallido&id=${candidato.id}`,
+                pending: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=pendiente&id=${candidato.id}`
             },
             auto_return: 'approved'
         };
@@ -242,6 +242,49 @@ app.post('/api/webhook-mercadopago', async (req, res) => {
         return res.status(200).send('OK');
     } catch (error) {
         return res.status(500).send('Error');
+    }
+});
+
+// 🔍 Endpoint público para consultar si un candidato ya pagó
+app.get('/api/estado-pago/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) {
+            return res.json({ success: false, error: 'Candidato no encontrado' });
+        }
+        return res.json({ success: true, pagado: candidato.pagado, cvUrl: candidato.cvUrl });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 📥 Endpoint público para descargar el CV si está pagado
+app.get('/api/descargar-cv/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        
+        if (!candidato) {
+            return res.status(404).send('Candidato no encontrado.');
+        }
+
+        if (!candidato.pagado) {
+            return res.status(403).send('El pago de este CV aún no se encuentra acreditado.');
+        }
+
+        if (!candidato.cvUrl || !candidato.cvUrl.startsWith('/uploads/')) {
+            return res.status(404).send('Archivo de CV no disponible.');
+        }
+
+        const filePath = path.join(__dirname, candidato.cvUrl);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).send('El archivo físico no se encuentra en el servidor.');
+        }
+
+        return res.download(filePath);
+    } catch (error) {
+        return res.status(500).send('Error al procesar la descarga.');
     }
 });
 

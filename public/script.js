@@ -63,7 +63,7 @@ if (formPostulacion) {
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                // Solicitamos la preferencia y generamos el código QR en pantalla
+                // Solicitamos la preferencia y generamos el código QR funcional en pantalla
                 generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
@@ -83,7 +83,7 @@ if (formPostulacion) {
     });
 }
 
-// 📱 Función para generar el código QR en pantalla y el link de respaldo
+// 📱 Función para generar el código QR funcional en pantalla y el link de respaldo
 async function generarQrYLinkPago(candidatoId) {
     try {
         const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
@@ -92,7 +92,8 @@ async function generarQrYLinkPago(candidatoId) {
         const data = await res.json();
 
         if (data.success) {
-            const linkPago = data.sandbox_init_point || data.init_point;
+            // Usamos init_point o sandbox_init_point según corresponda
+            const linkPago = data.init_point || data.sandbox_init_point;
 
             const contenedorQR = document.getElementById('codigoQR');
             if (contenedorQR) {

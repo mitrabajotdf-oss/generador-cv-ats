@@ -62,8 +62,8 @@
         <p><strong>¿Deseas descargar tu copia optimizada?</strong></p>
         <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
         
-        <!-- Link de pago oficial de Mercado Pago -->
-        <a href="https://mpago.la/1saGJW8" target="_blank" class="btn-pago" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; margin-top:5px;">Abonar $5,000 con Mercado Pago</a>
+        <!-- 💳 Botón dinámico que generará el link fresco al hacer clic -->
+        <button id="btnPagarMP" style="display:inline-block; background:#009ee3; color:white; padding:12px 24px; border:none; cursor:pointer; border-radius:5px; font-weight:bold; font-size: 16px; margin-top:5px;">Abonar $5,000 con Mercado Pago</button>
         
         <!-- 📱 Aviso claro con tu número de WhatsApp -->
         <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left; border-left: 5px solid #2980b9;">
@@ -74,6 +74,8 @@
 </div>
 
 <script>
+    let globalCandidatoId = null;
+
     document.getElementById('formPostulacion').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -91,6 +93,7 @@
             const data = await res.json();
 
             if (data.success) {
+                globalCandidatoId = data.candidatoId; // Guardamos el ID para generar el pago
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -104,6 +107,39 @@
             alert('Error de conexión con el servidor.');
             btn.disabled = false;
             btn.textContent = 'Enviar Postulación Final';
+        }
+    });
+
+    // 💳 Generación dinámica de la preferencia de pago al hacer clic en el botón
+    document.getElementById('btnPagarMP').addEventListener('click', async function() {
+        if (!globalCandidatoId) {
+            alert('Error: No se identificó el ID del candidato.');
+            return;
+        }
+
+        const btnPagar = this;
+        btnPagar.disabled = true;
+        btnPagar.textContent = 'Generando link de pago seguro...';
+
+        try {
+            const res = await fetch(`/api/crear-preferencia/${globalCandidatoId}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Redirige al usuario al link fresco de Mercado Pago (sandbox_init_point para pruebas o init_point)
+                window.location.href = data.sandbox_init_point || data.init_point;
+            } else {
+                alert('No se pudo crear el pago: ' + (data.error || 'Error desconocido'));
+                btnPagar.disabled = false;
+                btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
+            }
+        } catch (err) {
+            console.error('Error de red:', err);
+            alert('Error de conexión al generar el pago.');
+            btnPagar.disabled = false;
+            btnPagar.textContent = 'Abonar $5,000 con Mercado Pago';
         }
     });
 </script>

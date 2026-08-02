@@ -71,7 +71,8 @@ const candidatoSchema = new mongoose.Schema({
     habilidades: String,
     cvUrl: String,
     fotoUrl: String,
-    fecha: String
+    fecha: String,
+    pagado: { type: Boolean, default: false } // 💳 Control de pago automático
 });
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
@@ -119,7 +120,8 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             habilidades: habilidades || '',
             cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlLocal,
-            fecha: new Date().toLocaleString()
+            fecha: new Date().toLocaleString(),
+            pagado: false
         });
 
         await nuevoCandidato.save();
@@ -149,7 +151,6 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
             }
         });
 
-        // Devolvemos el ID del candidato para que el navegador sepa a qué perfil asociar la descarga automática
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });
 
     } catch (error) {
@@ -158,7 +159,50 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
-// 🚀 Endpoint para Descarga Directa del CV Optimizado tras el pago
+// 💳 Webhook para recibir notificaciones automáticas de Mercado Pago
+app.post('/api/webhook-mercadopago', async (req, res) => {
+    try {
+        const notification = req.body;
+        
+        if (notification.type === 'payment' || notification.action === 'payment.created' || notification.action === 'payment.updated') {
+            const paymentId = notification.data?.id || notification.id;
+            
+            if (paymentId) {
+                // Consultamos a la API oficial de Mercado Pago para validar el estado real del pago
+                // (Nota: Asegurate de usar tu Access Token de producción o prueba en las variables de entorno si lo deseas, o consulta abierta)
+                const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN || 'APP_USR-TU_TOKEN_AQUI'}`
+                    }
+                });
+                
+                if (mpResponse.ok) {
+                    const paymentData = await mpResponse.json();
+                    
+                    if (paymentData.status === 'approved') {
+                        // Aquí asociamos el pago. Si en la referencia externa o metadatos guardaste el DNI o ID del candidato, lo actualizamos.
+                        // Como alternativa práctica por webhook, si el último candidato registrado coincide o si usas external_reference:
+                        const externalRef = paymentData.external_reference;
+                        if (externalRef) {
+                            await Candidato.updateOne({ id: Number(externalRef) }, { $set: { pagado: true } });
+                        } else {
+                            // Si no hay referencia, marcamos el último candidato ingresado de forma reciente
+                            await Candidato.findOneAndUpdate({}, { $set: { pagado: true } }, { sort: { _id: -1 } });
+                        }
+                        console.log(`✅ Pago ${paymentId} aprobado y registrado en el servidor.`);
+                    }
+                }
+            }
+        }
+        
+        return res.status(200).send('OK');
+    } catch (error) {
+        console.error('❌ Error procesando webhook de MP:', error);
+        return res.status(500).send('Error');
+    }
+});
+
+// 🚀 Endpoint para Descarga Directa del CV Optimizado (Validando Pago)
 app.get('/api/descargar-cv/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -167,6 +211,9 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
         if (!candidato || !candidato.cvUrl) {
             return res.status(404).send('Archivo no encontrado.');
         }
+
+        // 🔒 Validación de pago (Descomentar la siguiente línea cuando el flujo de pago con webhook esté activo al 100%)
+        // if (!candidato.pagado) { return res.status(403).send('Acceso denegado. El pago de la copia optimizada aún no ha sido acreditado.'); }
 
         const filePath = path.join(__dirname, candidato.cvUrl);
         if (fs.existsSync(filePath)) {

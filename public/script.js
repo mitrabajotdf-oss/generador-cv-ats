@@ -1,3 +1,4 @@
+// Lógica para el formulario (si existe en la página)
 let globalCandidatoId = null;
 
 const formPostulacion = document.getElementById('formPostulacion');
@@ -8,7 +9,7 @@ if (formPostulacion) {
         const btn = document.getElementById('btnEnviar');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Enviando postulación y generando pago...';
+            btn.textContent = 'Enviando postulación...';
         }
 
         const formData = new FormData(this);
@@ -31,7 +32,7 @@ if (formPostulacion) {
                 document.getElementById('resultadoSeccion').style.display = 'block';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
 
-                // Una vez guardado, solicitamos la preferencia a Mercado Pago y generamos el QR en pantalla
+                // Solicitamos el QR y link de pago en segundo plano de manera segura
                 generarQrYLinkPago(globalCandidatoId);
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
@@ -51,7 +52,7 @@ if (formPostulacion) {
     });
 }
 
-// 📱 Función para pedir la preferencia de pago y renderizar el código QR automáticamente
+// 📱 Función segura para generar el QR y el botón en pantalla sin trabar el envío
 async function generarQrYLinkPago(candidatoId) {
     try {
         const res = await fetch(`/api/crear-preferencia/${candidatoId}`, {
@@ -62,30 +63,29 @@ async function generarQrYLinkPago(candidatoId) {
         if (data.success) {
             const linkPago = data.sandbox_init_point || data.init_point;
 
-            // Limpiamos contenedor por seguridad y dibujamos el código QR
             const contenedorQR = document.getElementById('codigoQR');
-            contenedorQR.innerHTML = '';
-            
-            new QRCode(contenedorQR, {
-                text: linkPago,
-                width: 180,
-                height: 180,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
+            if (contenedorQR) {
+                contenedorQR.innerHTML = '';
+                new QRCode(contenedorQR, {
+                    text: linkPago,
+                    width: 180,
+                    height: 180,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
 
-            // Habilitamos también el botón por si están en el celu y quieren tocar directo
             const botonMP = document.getElementById('linkBotonMP');
             if (botonMP) {
                 botonMP.href = linkPago;
                 botonMP.style.display = 'inline-block';
             }
         } else {
-            console.error('Error al crear preferencia para QR:', data.error);
+            console.error('No se pudo generar la preferencia de pago:', data.error);
         }
     } catch (err) {
-        console.error('Error de red al crear preferencia:', err);
+        console.error('Error de red al generar el pago:', err);
     }
 }
 

@@ -159,6 +159,65 @@ app.post('/api/enviar-postulacion', upload.fields([{ name: 'cvFile', maxCount: 1
     }
 });
 
+// 💳 Endpoint para Crear Preferencia de Pago Dinámica en Mercado Pago
+app.post('/api/crear-preferencia/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+
+        if (!candidato) {
+            return res.status(404).json({ success: false, error: 'Candidato no encontrado.' });
+        }
+
+        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpAccessToken) {
+            return res.status(500).json({ success: false, error: 'Falta configurar el Token de Mercado Pago en el servidor.' });
+        }
+
+        const preferenceData = {
+            items: [
+                {
+                    title: `CV Optimizado ATS - ${candidato.nombre}`,
+                    quantity: 1,
+                    unit_price: 1000 // Monto de prueba o configuración
+                }
+            ],
+            external_reference: String(candidato.id),
+            back_urls: {
+                success: `https://generador-cv-ats-1.onrender.com/`,
+                failure: `https://generador-cv-ats-1.onrender.com/`,
+                pending: `https://generador-cv-ats-1.onrender.com/`
+            },
+            auto_return: 'approved'
+        };
+
+        const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${mpAccessToken}`
+            },
+            body: JSON.stringify(preferenceData)
+        });
+
+        const preferenceResult = await mpResponse.json();
+
+        if (mpResponse.ok) {
+            return res.json({
+                success: true,
+                init_point: preferenceResult.init_point,
+                sandbox_init_point: preferenceResult.sandbox_init_point
+            });
+        } else {
+            return res.status(500).json({ success: false, error: preferenceResult.message || 'Error al crear preferencia en MP' });
+        }
+
+    } catch (error) {
+        console.error('❌ Error creando preferencia de pago:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 💳 Webhook para recibir notificaciones automáticas de Mercado Pago
 app.post('/api/webhook-mercadopago', async (req, res) => {
     try {
@@ -168,8 +227,6 @@ app.post('/api/webhook-mercadopago', async (req, res) => {
             const paymentId = notification.data?.id || notification.id;
             
             if (paymentId) {
-                // Consultamos a la API oficial de Mercado Pago para validar el estado real del pago
-                // (Nota: Asegurate de usar tu Access Token de producción o prueba en las variables de entorno si lo deseas, o consulta abierta)
                 const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
                     headers: {
                         'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN || 'APP_USR-TU_TOKEN_AQUI'}`
@@ -180,13 +237,10 @@ app.post('/api/webhook-mercadopago', async (req, res) => {
                     const paymentData = await mpResponse.json();
                     
                     if (paymentData.status === 'approved') {
-                        // Aquí asociamos el pago. Si en la referencia externa o metadatos guardaste el DNI o ID del candidato, lo actualizamos.
-                        // Como alternativa práctica por webhook, si el último candidato registrado coincide o si usas external_reference:
                         const externalRef = paymentData.external_reference;
                         if (externalRef) {
                             await Candidato.updateOne({ id: Number(externalRef) }, { $set: { pagado: true } });
                         } else {
-                            // Si no hay referencia, marcamos el último candidato ingresado de forma reciente
                             await Candidato.findOneAndUpdate({}, { $set: { pagado: true } }, { sort: { _id: -1 } });
                         }
                         console.log(`✅ Pago ${paymentId} aprobado y registrado en el servidor.`);
@@ -212,9 +266,6 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
             return res.status(404).send('Archivo no encontrado.');
         }
 
-        // 🔒 Validación de pago (Descomentar la siguiente línea cuando el flujo de pago con webhook esté activo al 100%)
-        // if (!candidato.pagado) { return res.status(403).send('Acceso denegado. El pago de la copia optimizada aún no ha sido acreditado.'); }
-
         const filePath = path.join(__dirname, candidato.cvUrl);
         if (fs.existsSync(filePath)) {
             res.download(filePath, `CV_ATS_${candidato.nombre.replace(/\s+/g, '_')}${path.extname(filePath)}`);
@@ -230,7 +281,7 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
 app.post('/api/enviar-automatico/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { canal } = req.body; // 'email' o 'whatsapp'
+        const { canal } = req.body;
         const candidato = await Candidato.findOne({ id: id });
 
         if (!candidato) {

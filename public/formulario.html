@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Postulación y Optimización ATS - Mi Trabajo TDF</title>
+    <title>Postulación y Bolsa de Empleo - Mi Trabajo TDF</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Librería externa para generar códigos QR -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>Bolsa de Empleo TDF - Envía tu Postulación & CV ATS</h1>
+    <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
     
     <form id="formPostulacion">
         <!-- PUESTO REQUERIDO -->
         <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
             <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
-            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
+            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;" required>
         </div>
 
         <!-- ARCHIVOS -->
@@ -40,7 +38,7 @@
         <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
 
         <!-- CAMPOS MANUALES ATS -->
-        <h2>Optimización de Contenido (Formato ATS Una Sola Columna)</h2>
+        <h2>Información Profesional</h2>
         <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
         <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
         <div class="form-group"><label>Estudios y Cursos:</label><textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea></div>
@@ -49,34 +47,24 @@
         <button type="submit" id="btnEnviar" class="btn-submit">Enviar Postulación Final</button>
     </form>
 
-    <!-- SECCIÓN DE RESULTADO Y QR -->
-    <div id="resultadoSeccion" style="display: none; background: #fff; padding: 20px; border-radius: 8px; text-align: center;">
-        <h2 style="color: #117a65; margin-top:0;">¡Postulación Enviada con Éxito!</h2>
-        <p>Tus datos y tu CV original ya han sido guardados correctamente en la base de datos de nuestra bolsa de empleo.</p>
+    <!-- SECCIÓN DE RESULTADO CON MENSAJE PROFESIONAL -->
+    <div id="resultadoSeccion" style="display: none; background: #fff; padding: 30px; border-radius: 8px; text-align: center;">
+        <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Postulación Enviada con Éxito!</h2>
+        <p style="font-size: 16px; color: #2c3e50; line-height: 1.6;">
+            Tu postulación fue enviada con éxito.
+        </p>
         
-        <div style="background: #fcf3cf; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: left; font-size: 14px; color: #7d6608; border-left: 5px solid #f1c40f;">
-            <p style="margin: 0; font-weight: bold;">📌 Información importante:</p>
-            <p style="margin: 5px 0 0 0;">No es necesario abonar absolutamente nada para participar de las búsquedas. Si querés una copia optimizada a mano, tenés la opción de abonarla.</p>
+        <div style="background: #eaf2f8; padding: 25px; border-radius: 8px; margin: 25px 0; text-align: left; border-left: 5px solid #2980b9;">
+            <p style="margin: 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
+                Si querés tener tu CV optimizado por si necesitás entregarlo de manera física, me enviás un mensaje al WhatsApp <strong>+54 9 2964 659057</strong> y te digo cómo hacemos.
+            </p>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="https://wa.me/5492964659057?text=Hola,%20acabo%20de%20enviar%20mi%20postulación%20y%20me%20interesa%20obtener%20más%20información%20sobre%20el%20CV%20optimizado." target="_blank" style="display: inline-block; background: #25d366; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px;">💬 Enviar mensaje por WhatsApp</a>
+            </div>
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <p><strong>Copia CV Optimizado ATS</strong></p>
-        <p style="font-size: 18px; font-weight: bold; color: #2c3e50;">Costo opcional: $5,000 ARS</p>
-        
-        <!-- Contenedor del Código QR generado dinámicamente -->
-        <div style="margin: 20px 0; display: flex; flex-direction: column; align-items: center;">
-            <p style="font-size: 14px; color: #555; margin-bottom: 10px;">Escaneá este código QR con la cámara de tu celular para abonar:</p>
-            <div id="codigoQR" style="padding: 10px; background: white; border: 1px solid #ddd; border-radius: 8px; display: inline-block;"></div>
-        </div>
-
-        <!-- Botón alternativo para pagar desde la PC -->
-        <div style="margin-top: 15px;">
-            <a id="linkBotonMP" href="#" target="_blank" style="display:none; background:#009ee3; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">Abonar $5,000 con Mercado Pago</a>
-        </div>
-        
-        <div style="margin-top: 25px; background: #eaf2f8; padding: 15px; border-radius: 6px; text-align: left; border-left: 5px solid #2980b9;">
-            <p style="margin: 0 0 5px 0; font-weight: bold; color: #2980b9;">📲 Instrucción:</p>
-            <p style="margin: 0; font-size: 14px; color: #2c3e50;">Una vez realizado el pago, el sistema te redirigirá automáticamente para descargar tu CV optimizado en PDF.</p>
+        <div style="margin-top: 30px;">
+            <a href="/formulario.html" class="btn-submit" style="display:inline-block; background:#3498db; color:white; padding:12px 25px; text-decoration:none; border-radius:6px; font-weight:bold;">Enviar otra postulación</a>
         </div>
     </div>
 </div>

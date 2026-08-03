@@ -68,6 +68,14 @@ if (listaCandidatosDiv) {
     }
 
     cargarCandidatos();
+
+    // Conectar el input buscador de index.html en tiempo real
+    const inputBuscador = document.getElementById('buscador');
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', (e) => {
+            filtrarCandidatos(e.target.value);
+        });
+    }
 }
 
 // Función para renderizar la tabla de candidatos
@@ -98,7 +106,7 @@ function renderizarTabla(candidatos) {
     listaCandidatosDiv.innerHTML = html;
 }
 
-// Función global para filtrar candidatos en tiempo real (puedes conectarla a un input con oninput="filtrarCandidatos(this.value)")
+// Función para filtrar candidatos en tiempo real (busca en nombre, DNI, puesto y habilidades)
 function filtrarCandidatos(textoBusqueda) {
     const texto = textoBusqueda.toLowerCase().trim();
     if (!texto) {

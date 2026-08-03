@@ -82,7 +82,6 @@ if (listaCandidatosDiv) {
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
-    // Separa las palabras clave de la búsqueda (ej: "atencion", "publico", "ventas")
     const palabras = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
     if (palabras.length === 0) return 0;
 
@@ -101,10 +100,8 @@ function calcularAfinidad(candidato, textoBusqueda) {
         }
     });
 
-    // Calcula un porcentaje base segun las palabras encontradas
     let porcentaje = Math.round((coincidencias / palabras.length) * 100);
     
-    // Da un pequeño extra de peso si la habilidad coincide directamente
     if (candidato.habilidades && candidato.habilidades.toLowerCase().includes(textoBusqueda)) {
         porcentaje = Math.max(porcentaje, 85);
     }
@@ -121,17 +118,21 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         return;
     }
 
-    // Si hay texto de búsqueda, calculamos el porcentaje y ordenamos de mayor a menor afinidad
     let listaProcesada = candidatos.map(c => {
         const porc = textoBusqueda ? calcularAfinidad(c, textoBusqueda) : 0;
-        return { ...c, porcentaje: porc };
+        return { ... c, porcentaje: porc };
     });
 
     if (textoBusqueda) {
         listaProcesada.sort((a, b) => b.porcentaje - a.porcentaje);
     }
 
-    let html = '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 10px; background:white;">';
+    let html = '<div style="margin-bottom: 15px; background: #eaf2f8; padding: 10px 15px; border-radius: 6px; display: inline-block;">';
+    html += '<label style="cursor: pointer; font-weight: bold; color: #2c3e50;">';
+    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 8px;" onchange="actualizarPreferenciaFoto()"> Incluir Foto de Perfil en la vista de CV ATS';
+    html += '</label></div>';
+
+    html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
     html += '<tr style="background:#f2f2f2;"><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th>';
     if (textoBusqueda) html += '<th>Afinidad ATS</th>';
     html += '<th>Fecha</th><th>Acciones ATS</th></tr>';
@@ -141,9 +142,14 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         if (c.porcentaje >= 75) badgeColor = '#27ae60';
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
+        let avatarHtml = '';
+        if (c.fotoPerfil) {
+            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px;">`;
+        }
+
         html += `<tr>
             <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
-            <td style="padding:10px;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
+            <td style="padding:10px; vertical-align: middle;">${avatarHtml}${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
             <td style="padding:10px;">${c.email}<br><small>${c.telefono}</small></td>`;
         
         if (textoBusqueda) {
@@ -163,6 +169,11 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     });
     html += '</table>';
     listaCandidatosDiv.innerHTML = html;
+}
+
+// Función auxiliar para leer si el checkbox está activo al abrir el CV
+function actualizarPreferenciaFoto() {
+    // Solo actualiza el estado visual del checkbox en memoria si es necesario
 }
 
 // Función para filtrar candidatos en tiempo real
@@ -194,6 +205,9 @@ function filtrarCandidatos(textoBusqueda) {
 
 // Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS
 function verCVATS(c) {
+    const incluirFotoChk = document.getElementById('chkIncluirFoto');
+    const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
+
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
         <!DOCTYPE html>
@@ -203,7 +217,9 @@ function verCVATS(c) {
             <title>CV ATS - ${c.nombre}</title>
             <style>
                 body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #000; max-width: 800px; margin: 40px auto; padding: 20px; }
-                h1 { font-size: 22px; text-transform: uppercase; margin-bottom: 5px; text-align: center; }
+                .header-container { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 5px; }
+                .foto-perfil { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc; }
+                h1 { font-size: 22px; text-transform: uppercase; margin: 0; text-align: center; }
                 .contacto { text-align: center; font-size: 14px; margin-bottom: 25px; color: #333; }
                 h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin-top: 25px; margin-bottom: 8px; }
                 p { font-size: 14px; text-align: justify; margin: 0 0 10px 0; }
@@ -213,7 +229,13 @@ function verCVATS(c) {
             </style>
         </head>
         <body>
-            <h1>${c.nombre}</h1>
+            <div class="header-container">
+                ${mostrarFoto && c.fotoPerfil ? `<img src="${c.fotoPerfil}" class="foto-perfil" alt="Foto de perfil">` : ''}
+                <div>
+                    <h1>${c.nombre}</h1>
+                </div>
+            </div>
+
             <div class="contacto">
                 ${c.direccion} | Tel: ${c.telefono} | Email: ${c.email} | DNI: ${c.dni}
                 ${c.puestoRequerido ? `<br><strong>Objetivo / Puesto:</strong> ${c.puestoRequerido}` : ''}

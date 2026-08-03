@@ -145,7 +145,7 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función para renderizar la tabla de candidatos
+// Función para renderizar la tabla de candidatos con una columna dedicada a la Foto
 function renderizarTabla(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
@@ -169,7 +169,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     html += '</label></div>';
 
     html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
-    html += '<tr style="background:#f2f2f2;"><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th>';
+    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th>';
     if (textoBusqueda) html += '<th>Afinidad ATS</th>';
     html += '<th>Fecha</th><th>Acciones ATS</th></tr>';
     
@@ -178,33 +178,27 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         if (c.porcentaje >= 75) badgeColor = '#27ae60';
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
-        let avatarHtml = '';
+        let avatarHtml = '<span style="color:#999; font-size:12px;">Sin foto</span>';
         if (c.fotoPerfil) {
-            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 10px; border: 1px solid #bdc3c7;">`;
+            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
         }
 
         html += `<tr>
-            <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
-            <td style="padding:10px; vertical-align: middle;">
-                <div style="display: flex; align-items: center;">
-                    ${avatarHtml}
-                    <div>
-                        ${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small>
-                    </div>
-                </div>
-            </td>
-            <td style="padding:10px;">${c.email}<br><small>${c.telefono}</small></td>`;
+            <td style="padding:10px; text-align:center; vertical-align: middle;">${avatarHtml}</td>
+            <td style="padding:10px; font-weight:bold; color:#2980b9; vertical-align: middle;">${c.puestoRequerido || 'General'}</td>
+            <td style="padding:10px; vertical-align: middle;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
+            <td style="padding:10px; vertical-align: middle;">${c.email}<br><small>${c.telefono}</small></td>`;
         
         if (textoBusqueda) {
-            html += `<td style="padding:10px; text-align:center;">
+            html += `<td style="padding:10px; text-align:center; vertical-align: middle;">
                 <span style="background:${badgeColor}; color:white; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:13px;">
                     ${c.porcentaje}%
                 </span>
             </td>`;
         }
 
-        html += `<td style="padding:10px;">${c.fecha}</td>
-            <td style="padding:10px; text-align:center;">
+        html += `<td style="padding:10px; vertical-align: middle;">${c.fecha}</td>
+            <td style="padding:10px; text-align:center; vertical-align: middle;">
                 <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
                 <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
             </td>

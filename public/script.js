@@ -109,6 +109,47 @@ function calcularAfinidad(candidato, textoBusqueda) {
     return Math.min(porcentaje, 100);
 }
 
+// Función inteligente para extraer y enriquecer habilidades leyendo la experiencia
+function enriquecerHabilidadesATS(candidato) {
+    let habilidadesManuales = candidato.habilidades || '';
+    const experienciaTexto = (candidato.experiencia || '').toLowerCase();
+    
+    // Diccionario de palabras clave técnicas comunes a detectar en la experiencia
+    const diccionarioKeywords = [
+        { term: 'atención al cliente', label: 'Atención al Cliente' },
+        { term: 'caja', label: 'Manejo de Caja' },
+        { term: 'ventas', label: 'Ventas y Comercialización' },
+        { term: 'excel', label: 'Microsoft Excel' },
+        { term: 'administrativo', label: 'Gestión Administrativa' },
+        { term: 'repositor', label: 'Reposición y Stock' },
+        { term: 'limpieza', label: 'Mantenimiento y Limpieza' },
+        { term: 'logística', label: 'Logística y Distribución' },
+        { term: 'chofer', label: 'Conducción y Logística' },
+        { term: 'gastronomía', label: 'Atención Gastronómica' },
+        { term: 'cocina', label: 'Gastronomía y Cocina' }
+    ];
+
+    let detectadas = [];
+    diccionarioKeywords.forEach(item => {
+        if (experienciaTexto.includes(item.term)) {
+            // Si el usuario ya la tiene cargada, no la duplicamos
+            if (!habilidadesManuales.toLowerCase().includes(item.term)) {
+                detectadas.push(item.label);
+            }
+        }
+    });
+
+    if (detectadas.length > 0) {
+        if (habilidadesManuales.trim() !== '') {
+            return habilidadesManuales + ' • ' + detectadas.join(' • ');
+        } else {
+            return detectadas.join(' • ');
+        }
+    }
+
+    return habilidadesManuales || 'No especificadas.';
+}
+
 // Función para renderizar la tabla de candidatos
 function renderizarTabla(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
@@ -120,7 +161,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
 
     let listaProcesada = candidatos.map(c => {
         const porc = textoBusqueda ? calcularAfinidad(c, textoBusqueda) : 0;
-        return { ... c, porcentaje: porc };
+        return { ...c, porcentaje: porc };
     });
 
     if (textoBusqueda) {
@@ -129,7 +170,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
 
     let html = '<div style="margin-bottom: 15px; background: #eaf2f8; padding: 10px 15px; border-radius: 6px; display: inline-block;">';
     html += '<label style="cursor: pointer; font-weight: bold; color: #2c3e50;">';
-    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 8px;" onchange="actualizarPreferenciaFoto()"> Incluir Foto de Perfil en la vista de CV ATS';
+    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 8px;"> Incluir Foto de Perfil en la vista de CV ATS';
     html += '</label></div>';
 
     html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
@@ -171,11 +212,6 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     listaCandidatosDiv.innerHTML = html;
 }
 
-// Función auxiliar para leer si el checkbox está activo al abrir el CV
-function actualizarPreferenciaFoto() {
-    // Solo actualiza el estado visual del checkbox en memoria si es necesario
-}
-
 // Función para filtrar candidatos en tiempo real
 function filtrarCandidatos(textoBusqueda) {
     const texto = textoBusqueda.toLowerCase().trim();
@@ -207,6 +243,9 @@ function filtrarCandidatos(textoBusqueda) {
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
+
+    // Enriquecemos las habilidades leyendo automáticamente la experiencia
+    const habilidadesFinales = enriquecerHabilidadesATS(c);
 
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
@@ -252,7 +291,7 @@ function verCVATS(c) {
             <p>${c.estudios || 'No especificados.'}</p>
 
             <h2>Habilidades y Competencias</h2>
-            <p class="habilidades-lista">${c.habilidades || 'No especificadas.'}</p>
+            <p class="habilidades-lista">${habilidadesFinales}</p>
 
             <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar como PDF ATS</button>
         </body>

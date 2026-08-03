@@ -47,7 +47,9 @@ if (formPostulacion) {
 }
 
 // Lógica para el panel de administración (index.html)
+let todosLosCandidatos = [];
 const listaCandidatosDiv = document.getElementById('listaCandidatos');
+
 if (listaCandidatosDiv) {
     async function cargarCandidatos() {
         try {
@@ -55,23 +57,8 @@ if (listaCandidatosDiv) {
             const data = await res.json();
             
             if (data.success && data.candidatos.length > 0) {
-                let html = '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 10px; background:white;">';
-                html += '<tr style="background:#f2f2f2;"><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>Fecha</th><th>Acciones ATS</th></tr>';
-                
-                data.candidatos.forEach(c => {
-                    html += `<tr>
-                        <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
-                        <td style="padding:10px;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
-                        <td style="padding:10px;">${c.email}<br><small>${c.telefono}</small></td>
-                        <td style="padding:10px;">${c.fecha}</td>
-                        <td style="padding:10px; text-align:center;">
-                            <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
-                            <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
-                        </td>
-                    </tr>`;
-                });
-                html += '</table>';
-                listaCandidatosDiv.innerHTML = html;
+                todosLosCandidatos = data.candidatos;
+                renderizarTabla(todosLosCandidatos);
             } else {
                 listaCandidatosDiv.innerHTML = '<p>No hay postulantes registrados todavía.</p>';
             }
@@ -81,6 +68,61 @@ if (listaCandidatosDiv) {
     }
 
     cargarCandidatos();
+}
+
+// Función para renderizar la tabla de candidatos
+function renderizarTabla(candidatos) {
+    if (!listaCandidatosDiv) return;
+
+    if (candidatos.length === 0) {
+        listaCandidatosDiv.innerHTML = '<p>No se encontraron candidatos con ese criterio de búsqueda.</p>';
+        return;
+    }
+
+    let html = '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 10px; background:white;">';
+    html += '<tr style="background:#f2f2f2;"><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>Fecha</th><th>Acciones ATS</th></tr>';
+    
+    candidatos.forEach(c => {
+        html += `<tr>
+            <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
+            <td style="padding:10px;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
+            <td style="padding:10px;">${c.email}<br><small>${c.telefono}</small></td>
+            <td style="padding:10px;">${c.fecha}</td>
+            <td style="padding:10px; text-align:center;">
+                <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
+                <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
+            </td>
+        </tr>`;
+    });
+    html += '</table>';
+    listaCandidatosDiv.innerHTML = html;
+}
+
+// Función global para filtrar candidatos en tiempo real (puedes conectarla a un input con oninput="filtrarCandidatos(this.value)")
+function filtrarCandidatos(textoBusqueda) {
+    const texto = textoBusqueda.toLowerCase().trim();
+    if (!texto) {
+        renderizarTabla(todosLosCandidatos);
+        return;
+    }
+
+    const filtrados = todosLosCandidatos.filter(c => {
+        const puesto = (c.puestoRequerido || '').toLowerCase();
+        const nombre = (c.nombre || '').toLowerCase();
+        const dni = (c.dni || '').toLowerCase();
+        const habilidades = (c.habilidades || '').toLowerCase();
+        const resumen = (c.resumen || '').toLowerCase();
+        const experiencia = (c.experiencia || '').toLowerCase();
+
+        return puesto.includes(texto) || 
+               nombre.includes(texto) || 
+               dni.includes(texto) || 
+               habilidades.includes(texto) || 
+               resumen.includes(texto) || 
+               experiencia.includes(texto);
+    });
+
+    renderizarTabla(filtrados);
 }
 
 // Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS

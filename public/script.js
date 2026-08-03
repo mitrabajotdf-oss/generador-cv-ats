@@ -132,7 +132,6 @@ function enriquecerHabilidadesATS(candidato) {
     let detectadas = [];
     diccionarioKeywords.forEach(item => {
         if (experienciaTexto.includes(item.term)) {
-            // Si el usuario ya la tiene cargada, no la duplicamos
             if (!habilidadesManuales.toLowerCase().includes(item.term)) {
                 detectadas.push(item.label);
             }
@@ -203,7 +202,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
 
         html += `<td style="padding:10px;">${c.fecha}</td>
             <td style="padding:10px; text-align:center;">
-                <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
+                <button onclick='verCVATS(${JSON.stringify(c)}, document.getElementById("chkIncluirFoto").checked)' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
                 <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
             </td>
         </tr>`;
@@ -240,10 +239,7 @@ function filtrarCandidatos(textoBusqueda) {
 }
 
 // Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS
-function verCVATS(c) {
-    const incluirFotoChk = document.getElementById('chkIncluirFoto');
-    const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
-
+function verCVATS(c, mostrarFoto) {
     // Enriquecemos las habilidades leyendo automáticamente la experiencia
     const habilidadesFinales = enriquecerHabilidadesATS(c);
 

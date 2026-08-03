@@ -78,16 +78,17 @@ if (listaCandidatosDiv) {
     }
 }
 
-// Función para calcular un porcentaje de afinidad basado en las palabras clave ingresadas
+// Función para calcular un porcentaje de afinidad basado en múltiples palabras clave
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
     const palabras = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
     if (palabras.length === 0) return 0;
 
+    const habilidadesEnriquecidas = enriquecerHabilidadesATS(candidato);
     const textoCompleto = `
         ${candidato.puestoRequerido || ''} 
-        ${candidato.habilidades || ''} 
+        ${habilidadesEnriquecidas} 
         ${candidato.resumen || ''} 
         ${candidato.experiencia || ''} 
         ${candidato.estudios || ''}
@@ -101,11 +102,6 @@ function calcularAfinidad(candidato, textoBusqueda) {
     });
 
     let porcentaje = Math.round((coincidencias / palabras.length) * 100);
-    
-    if (candidato.habilidades && candidato.habilidades.toLowerCase().includes(textoBusqueda)) {
-        porcentaje = Math.max(porcentaje, 85);
-    }
-
     return Math.min(porcentaje, 100);
 }
 
@@ -210,7 +206,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     listaCandidatosDiv.innerHTML = html;
 }
 
-// Función para filtrar candidatos en tiempo real
+// Función para filtrar candidatos permitiendo múltiples habilidades o palabras clave
 function filtrarCandidatos(textoBusqueda) {
     const texto = textoBusqueda.toLowerCase().trim();
     if (!texto) {
@@ -218,20 +214,27 @@ function filtrarCandidatos(textoBusqueda) {
         return;
     }
 
+    // Separa el texto de búsqueda en varias palabras clave individuales
+    const palabras = texto.split(/\s+/).filter(p => p.length > 2);
+
     const filtrados = todosLosCandidatos.filter(c => {
         const puesto = (c.puestoRequerido || '').toLowerCase();
         const nombre = (c.nombre || '').toLowerCase();
         const dni = (c.dni || '').toLowerCase();
-        const habilidades = (c.habilidades || '').toLowerCase();
+        const habilidadesEnriquecidas = enriquecerHabilidadesATS(c).toLowerCase();
         const resumen = (c.resumen || '').toLowerCase();
         const experiencia = (c.experiencia || '').toLowerCase();
 
-        return puesto.includes(texto) || 
-               nombre.includes(texto) || 
-               dni.includes(texto) || 
-               habilidades.includes(texto) || 
-               resumen.includes(texto) || 
-               experiencia.includes(texto);
+        const textoTotal = `${puesto} ${nombre} ${dni} ${habilidadesEnriquecidas} ${resumen} ${experiencia}`;
+
+        // Si hay varias palabras, evaluamos que al menos coincidan o busca por el texto global
+        if (palabras.length > 1) {
+            // Retorna verdadero si el candidato contiene la mayoría de las palabras clave buscadas
+            let matches = palabras.filter(palabra => textoTotal.includes(palabra));
+            return matches.length > 0;
+        } else {
+            return textoTotal.includes(texto);
+        }
     });
 
     renderizarTabla(filtrados, texto);

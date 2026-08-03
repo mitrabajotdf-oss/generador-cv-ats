@@ -121,7 +121,8 @@ function enriquecerHabilidadesATS(candidato) {
         { term: 'logística', label: 'Logística y Distribución' },
         { term: 'chofer', label: 'Conducción y Logística' },
         { term: 'gastronomía', label: 'Atención Gastronómica' },
-        { term: 'cocina', label: 'Gastronomía y Cocina' }
+        { term: 'cocina', label: 'Gastronomía y Cocina' },
+        { term: 'carga', label: 'Carga y Descarga' }
     ];
 
     let detectadas = [];
@@ -179,12 +180,19 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
 
         let avatarHtml = '';
         if (c.fotoPerfil) {
-            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px;">`;
+            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 10px; border: 1px solid #bdc3c7;">`;
         }
 
         html += `<tr>
             <td style="padding:10px; font-weight:bold; color:#2980b9;">${c.puestoRequerido || 'General'}</td>
-            <td style="padding:10px; vertical-align: middle;">${avatarHtml}${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
+            <td style="padding:10px; vertical-align: middle;">
+                <div style="display: flex; align-items: center;">
+                    ${avatarHtml}
+                    <div>
+                        ${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small>
+                    </div>
+                </div>
+            </td>
             <td style="padding:10px;">${c.email}<br><small>${c.telefono}</small></td>`;
         
         if (textoBusqueda) {
@@ -214,7 +222,6 @@ function filtrarCandidatos(textoBusqueda) {
         return;
     }
 
-    // Separa el texto de búsqueda en varias palabras clave individuales
     const palabras = texto.split(/\s+/).filter(p => p.length > 2);
 
     const filtrados = todosLosCandidatos.filter(c => {
@@ -227,9 +234,7 @@ function filtrarCandidatos(textoBusqueda) {
 
         const textoTotal = `${puesto} ${nombre} ${dni} ${habilidadesEnriquecidas} ${resumen} ${experiencia}`;
 
-        // Si hay varias palabras, evaluamos que al menos coincidan o busca por el texto global
         if (palabras.length > 1) {
-            // Retorna verdadero si el candidato contiene la mayoría de las palabras clave buscadas
             let matches = palabras.filter(palabra => textoTotal.includes(palabra));
             return matches.length > 0;
         } else {
@@ -245,7 +250,6 @@ function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
 
-    // Enriquecemos las habilidades leyendo automáticamente la experiencia
     const habilidadesFinales = enriquecerHabilidadesATS(c);
 
     const ventanaATS = window.open('', '_blank');

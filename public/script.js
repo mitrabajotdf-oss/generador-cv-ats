@@ -403,7 +403,7 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Función auxiliar para procesar la subida directa de archivos desde el panel
+// Función auxiliar con autenticación Basic incluida para subir archivos desde el panel
 async function subirArchivosDesdePanel(idCandidato) {
     const inputCv = document.getElementById(`panelCv_${idCandidato}`);
     const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);
@@ -418,8 +418,13 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 
     try {
+        const credencialesAuth = 'Basic ' + btoa('MitrabajoTDF:EmpleoRG');
+
         const res = await fetch(`/api/candidatos/actualizar-archivos/${idCandidato}`, {
             method: 'POST',
+            headers: {
+                'Authorization': credencialesAuth
+            },
             body: formData
         });
         const data = await res.json();

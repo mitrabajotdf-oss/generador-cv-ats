@@ -233,7 +233,7 @@ function renderizarSubcarpetasPostulantes() {
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
         let avatarHtml = '<div style="width: 50px; height: 50px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid #cbd5e1;">Sin foto</div>';
-        const imgSource = c.fotoUrl || c.fotoPerfil;
+        const imgSource = c.fotoUrl;
         if (imgSource) {
             avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
@@ -361,13 +361,13 @@ function filtrarSubcarpetas(texto) {
     renderizarExploradorCarpetas();
 }
 
-// Visor del CV ATS
+// Visor del CV ATS (Utiliza el texto íntegro extraído sin filtros)
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
 
     const habilidadesFinales = enriquecerHabilidadesATS(c);
-    const fotoSrc = c.fotoUrl || c.fotoPerfil;
+    const fotoSrc = c.fotoUrl;
 
     let experienciaFinal = c.experiencia || '';
     if (c.textoExtraidoCV && c.textoExtraidoCV.trim() !== '') {

@@ -73,7 +73,7 @@ const candidatoSchema = new mongoose.Schema({
     habilidades: String,
     cvUrl: String,
     fotoUrl: String,
-    textoExtraidoCV: String, // Campo nuevo para el texto extraído del archivo subido
+    textoExtraidoCV: String, 
     fecha: String,
     pagado: { type: Boolean, default: false }
 });
@@ -89,7 +89,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación (Actualizado con lectura de PDF/Word)
+// 🌐 Endpoint de Recepción de Postulación (Lectura de PDF/Word y Fotos)
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -104,8 +104,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
             if (cvFile) {
                 cvUrlLocal = `/uploads/${path.basename(cvFile.path)}`;
-                
-                // Procesar la lectura del archivo adjunto (PDF o Word)
                 try {
                     const filePath = cvFile.path;
                     const buffer = fs.readFileSync(filePath);
@@ -175,6 +173,76 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     } catch (error) {
         console.error("Error crítico:", error);
         return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 🏢 Endpoint Protegido: Genera el CV con Foto para enviar a Empresas
+app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+
+        if (!candidato) {
+            return res.status(404).send('Candidato no encontrado.');
+        }
+
+        // HTML limpio que incluye la foto corporativa para el cliente/empresa
+        const htmlCV = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>CV - ${candidato.nombre}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; }
+                .header { display: flex; align-items: center; gap: 25px; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 20px; }
+                .foto { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0056b3; }
+                .info h1 { margin: 0; color: #0056b3; }
+                .section { margin-bottom: 20px; }
+                .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; }
+                .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                @media print { .btn-print { display: none; } }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                ${candidato.fotoUrl ? `<img src="${candidato.fotoUrl}" class="foto" alt="Foto de perfil">` : ''}
+                <div class="info">
+                    <h1>${candidato.nombre}</h1>
+                    <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido}</p>
+                    <p>📧 ${candidato.email} | 📞 ${candidato.telefono} | 📍 ${candidato.direccion}</p>
+                    <p><strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Resumen Profesional</h3>
+                <p>${candidato.resumen || 'No especificado'}</p>
+            </div>
+
+            <div class="section">
+                <h3>Experiencia Laboral</h3>
+                <p style="white-space: pre-line;">${candidato.experiencia || candidato.textoExtraidoCV || 'No especificada'}</p>
+            </div>
+
+            <div class="section">
+                <h3>Estudios y Formación</h3>
+                <p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p>
+            </div>
+
+            <div class="section">
+                <h3>Habilidades</h3>
+                <p>${candidato.habilidades || 'No especificadas'}</p>
+            </div>
+
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+        </body>
+        </html>
+        `;
+
+        return res.send(htmlCV);
+    } catch (error) {
+        return res.status(500).send('Error al generar el CV para la empresa.');
     }
 });
 
@@ -280,7 +348,7 @@ app.get('/api/estado-pago/:id', async (req, res) => {
     }
 });
 
-// 📥 Endpoint público para descargar el CV
+// 📥 Endpoint público para descargar el CV original
 app.get('/api/descargar-cv/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);

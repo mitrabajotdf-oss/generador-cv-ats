@@ -4,23 +4,214 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Gestión de Candidatos & ATS</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --light: #f8f9fa;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-link-form {
+            background: var(--secondary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-link-form:hover {
+            background: #2980b9;
+        }
+
+        .search-card {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-card input[type="text"] {
+            width: 100%;
+            max-width: 450px;
+            padding: 10px 15px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-card input[type="text"]:focus {
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+        }
+
+        .avatar-placeholder {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-puesto {
+            font-weight: 600;
+            color: #0284c7;
+            background: #e0f2fe;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        .btn-accion {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 4px;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+
+        .btn-accion:hover {
+            opacity: 0.85;
+        }
+
+        .btn-ats { background: var(--success); color: white; }
+        .btn-empresa { background: var(--secondary); color: white; }
+        .btn-descargar { background: #0284c7; color: white; }
+        .btn-eliminar { background: var(--danger); color: white; }
+
+        .settings-bar {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1e40af;
+        }
+    </style>
 </head>
 <body>
-<div class="container" style="max-width: 1000px;">
-    <h1>Panel de Gestión y Filtros ATS</h1>
-    <p><strong>Link de Formulario para Redes / WhatsApp:</strong> <a href="/formulario.html" target="_blank">https://generador-cv-ats-1.onrender.com/formulario.html</a></p>
-    
-    <div class="form-group" style="margin-top: 20px;">
-        <input type="text" id="buscador" placeholder="🔍 Buscar por nombre, DNI, email o habilidades..." style="padding: 10px; width: 100%;">
+
+    <div class="container">
+        <header>
+            <h1>💼 Panel de Reclutamiento & ATS</h1>
+            <a href="/formulario.html" target="_blank" class="btn-link-form">🔗 Enlace de Postulación (Formulario)</a>
+        </header>
+
+        <div class="search-card">
+            <input type="text" id="buscador" placeholder="🔍 Buscar por nombre, DNI, habilidades o palabras clave...">
+            <div style="font-size: 13px; color: #64748b;">Sistema inteligente de afinidad y filtrado corporativo activo.</div>
+        </div>
+
+        <div class="table-container">
+            <div id="listaCandidatos" style="padding: 30px; text-align: center; color: #64748b;">
+                Cargando postulantes...
+            </div>
+        </div>
     </div>
 
-    <h2>📥 Candidatos Recibidos</h2>
-    <div id="listaCandidatos">
-        <p>Cargando postulantes...</p>
-    </div>
-</div>
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

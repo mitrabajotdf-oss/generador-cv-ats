@@ -46,7 +46,7 @@ if (formPostulacion) {
     });
 }
 
-// Lógica para el panel de administración en formato carpetas
+// Lógica para el panel de administración en formato carpetas con espacio de búsquedas
 let todosLosCandidatos = [];
 const listaCandidatosDiv = document.getElementById('listaCandidatos');
 
@@ -76,7 +76,7 @@ if (listaCandidatosDiv) {
 
     cargarCandidatos();
 
-    // Conectar el input buscador en tiempo real
+    // Conectar el input buscador principal en tiempo real
     const inputBuscador = document.getElementById('buscador');
     if (inputBuscador) {
         inputBuscador.addEventListener('input', (e) => {
@@ -85,7 +85,7 @@ if (listaCandidatosDiv) {
     }
 }
 
-// Función para calcular afinidad por palabras clave
+// Función para calcular afinidad por palabras clave de búsqueda
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
@@ -113,7 +113,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
     return Math.min(porcentaje, 100);
 }
 
-// Enriquecer habilidades leyendo la experiencia
+// Enriquecer habilidades leyendo la experiencia y CV
 function enriquecerHabilidadesATS(candidato) {
     let habilidadesManuales = candidato.habilidades || '';
     const experienciaTexto = ((candidato.experiencia || '') + ' ' + (candidato.textoExtraidoCV || '')).toLowerCase();
@@ -153,7 +153,7 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función principal para renderizar los postulantes en formato de CARPETAS / LEGAJOS
+// Renderizar los legajos en formato de carpetas con panel de búsquedas integrado
 function renderizarTarjetasCarpetas(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
@@ -171,13 +171,25 @@ function renderizarTarjetasCarpetas(candidatos, textoBusqueda = '') {
         listaProcesada.sort((a, b) => b.porcentaje - a.porcentaje);
     }
 
-    let html = '<div style="margin-bottom: 20px; background: #e0f2fe; border: 1px solid #bae6fd; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">';
-    html += '<span style="font-weight: 600; color: #0369a1;">📁 Vista de Legajos / Carpetas Activa</span>';
-    html += '<label style="cursor: pointer; font-weight: 600; color: #0369a1; font-size: 13px;">';
-    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 6px;"> Incluir Foto de Perfil en la vista de CV ATS';
-    html += '</label></div>';
+    // Sección de Control Superior (Espacio de Búsquedas y Filtros)
+    let html = `
+    <div style="background: white; border: 1px solid #cbd5e1; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+            <h3 style="margin: 0; font-size: 16px; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                🔍 Espacio de Carga de Búsquedas & Filtros ATS
+            </h3>
+            <label style="cursor: pointer; font-weight: 600; color: #0284c7; font-size: 13px; background: #e0f2fe; padding: 6px 12px; border-radius: 6px;">
+                <input type="checkbox" id="chkIncluirFoto" style="margin-right: 6px;"> Incluir Foto de Perfil en la vista de CV ATS
+            </label>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="buscadorBusquedas" placeholder="Ingresa puesto, habilidades clave o requisitos (Ej: Excel, administrativo, ventas)..." value="${textoBusqueda}" style="flex: 1; min-width: 280px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none;">
+            <button onclick="aplicarEspacioBusqueda()" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">Filtrar Perfiles</button>
+            <button onclick="limpiarEspacioBusqueda()" style="background: #64748b; color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 14px;">Limpiar</button>
+        </div>
+    </div>`;
 
-    // Contenedor en cuadrícula (Grid) para las carpetas
+    // Cuadrícula de Legajos (Carpetas de Candidatos)
     html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">';
     
     listaProcesada.forEach(c => {
@@ -199,9 +211,8 @@ function renderizarTarjetasCarpetas(candidatos, textoBusqueda = '') {
                </div>` 
             : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">📂 Sin archivo de CV adjunto</div>';
 
-        // Diseño individual de la tarjeta-carpeta
         html += `
-        <div style="background: white; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s;">
+        <div style="background: white; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;">
             
             <!-- Cabecera de la Carpeta -->
             <div style="background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px;">
@@ -252,7 +263,24 @@ function renderizarTarjetasCarpetas(candidatos, textoBusqueda = '') {
     listaCandidatosDiv.innerHTML = html;
 }
 
-// Función para filtrar candidatos en tiempo real
+// Función para aplicar la búsqueda desde el nuevo espacio superior
+function aplicarEspacioBusqueda() {
+    const inputBusqueda = document.getElementById('buscadorBusquedas');
+    if (inputBusqueda) {
+        filtrarCandidatos(inputBusqueda.value);
+    }
+}
+
+// Función para limpiar la búsqueda
+function limpiarEspacioBusqueda() {
+    const inputBusqueda = document.getElementById('buscadorBusquedas');
+    if (inputBusqueda) {
+        inputBusqueda.value = '';
+    }
+    renderizarTarjetasCarpetas(todosLosCandidatos, '');
+}
+
+// Función para filtrar candidatos
 function filtrarCandidatos(textoBusqueda) {
     const texto = textoBusqueda.toLowerCase().trim();
     if (!texto) {
@@ -284,7 +312,7 @@ function filtrarCandidatos(textoBusqueda) {
     renderizarTarjetasCarpetas(filtrados, texto);
 }
 
-// Función para abrir la ventana del CV ATS optimizado
+// Visor del CV ATS
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;

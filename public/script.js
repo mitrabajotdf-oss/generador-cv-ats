@@ -92,6 +92,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
         ${candidato.resumen || ''} 
         ${candidato.experiencia || ''} 
         ${candidato.estudios || ''}
+        ${candidato.textoExtraidoCV || ''}
     `.toLowerCase();
 
     let coincidencias = 0;
@@ -108,7 +109,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
 // Función inteligente para extraer y enriquecer habilidades leyendo la experiencia
 function enriquecerHabilidadesATS(candidato) {
     let habilidadesManuales = candidato.habilidades || '';
-    const experienciaTexto = (candidato.experiencia || '').toLowerCase();
+    const experienciaTexto = ((candidato.experiencia || '') + ' ' + (candidato.textoExtraidoCV || '')).toLowerCase();
     
     const diccionarioKeywords = [
         { term: 'atención al cliente', label: 'Atención al Cliente' },
@@ -145,7 +146,7 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función para renderizar la tabla de candidatos con una columna dedicada a la Foto
+// Función para renderizar la tabla de candidatos con columnas para la Foto y el CV Original adjunto
 function renderizarTabla(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
@@ -169,7 +170,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     html += '</label></div>';
 
     html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
-    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th>';
+    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>CV Original</th>';
     if (textoBusqueda) html += '<th>Afinidad ATS</th>';
     html += '<th>Fecha</th><th>Acciones ATS</th></tr>';
     
@@ -179,15 +180,22 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
         let avatarHtml = '<span style="color:#999; font-size:12px;">Sin foto</span>';
-        if (c.fotoPerfil) {
-            avatarHtml = `<img src="${c.fotoPerfil}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
+        const imgSource = c.fotoUrl || c.fotoPerfil;
+        if (imgSource) {
+            avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
         }
+
+        // Botón para acceder al archivo CV original que subió el postulante
+        const linkCvOriginal = c.cvUrl 
+            ? `<a href="${c.cvUrl}" target="_blank" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📄 Ver Archivo</a>` 
+            : '<span style="color:#999; font-size:11px;">No adjunto</span>';
 
         html += `<tr>
             <td style="padding:10px; text-align:center; vertical-align: middle;">${avatarHtml}</td>
             <td style="padding:10px; font-weight:bold; color:#2980b9; vertical-align: middle;">${c.puestoRequerido || 'General'}</td>
             <td style="padding:10px; vertical-align: middle;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
-            <td style="padding:10px; vertical-align: middle;">${c.email}<br><small>${c.telefono}</small></td>`;
+            <td style="padding:10px; vertical-align: middle;">${c.email}<br><small>${c.telefono}</small></td>
+            <td style="padding:10px; text-align:center; vertical-align: middle;">${linkCvOriginal}</td>`;
         
         if (textoBusqueda) {
             html += `<td style="padding:10px; text-align:center; vertical-align: middle;">
@@ -200,6 +208,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         html += `<td style="padding:10px; vertical-align: middle;">${c.fecha}</td>
             <td style="padding:10px; text-align:center; vertical-align: middle;">
                 <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
+                <a href="/api/cv-empresa/${c.id}" target="_blank" style="background:#2980b9; color:white; text-decoration:none; padding:5px 10px; border-radius:4px; font-size:11px; display:inline-block; margin-bottom:5px;">🏢 CV con Foto (Empresa)</a><br>
                 <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
             </td>
         </tr>`;
@@ -225,8 +234,9 @@ function filtrarCandidatos(textoBusqueda) {
         const habilidadesEnriquecidas = enriquecerHabilidadesATS(c).toLowerCase();
         const resumen = (c.resumen || '').toLowerCase();
         const experiencia = (c.experiencia || '').toLowerCase();
+        const textoExtraido = (c.textoExtraidoCV || '').toLowerCase();
 
-        const textoTotal = `${puesto} ${nombre} ${dni} ${habilidadesEnriquecidas} ${resumen} ${experiencia}`;
+        const textoTotal = `${puesto} ${nombre} ${dni} ${habilidadesEnriquecidas} ${resumen} ${experiencia} ${textoExtraido}`;
 
         if (palabras.length > 1) {
             let matches = palabras.filter(palabra => textoTotal.includes(palabra));
@@ -245,6 +255,7 @@ function verCVATS(c) {
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
 
     const habilidadesFinales = enriquecerHabilidadesATS(c);
+    const fotoSrc = c.fotoUrl || c.fotoPerfil;
 
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
@@ -268,26 +279,26 @@ function verCVATS(c) {
         </head>
         <body>
             <div class="header-container">
-                ${mostrarFoto && c.fotoPerfil ? `<img src="${c.fotoPerfil}" class="foto-perfil" alt="Foto de perfil">` : ''}
+                ${mostrarFoto && fotoSrc ? `<img src="${fotoSrc}" class="foto-perfil" alt="Foto de perfil">` : ''}
                 <div>
                     <h1>${c.nombre}</h1>
                 </div>
             </div>
 
             <div class="contacto">
-                ${c.direccion} | Tel: ${c.telefono} | Email: ${c.email} | DNI: ${c.dni}
+                ${c.direccion || ''} | Tel: ${c.telefono || ''} | Email: ${c.email || ''} | DNI: ${c.dni || ''}
                 ${c.puestoRequerido ? `<br><strong>Objetivo / Puesto:</strong> ${c.puestoRequerido}` : ''}
-                <br><strong>Disponibilidad:</strong> ${c.disponibilidad}
+                <br><strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
             </div>
 
             <h2>Resumen Profesional</h2>
             <p>${c.resumen || 'No especificado.'}</p>
 
             <h2>Experiencia Laboral</h2>
-            <p>${c.experiencia || 'No especificada.'}</p>
+            <p style="white-space: pre-line;">${c.experiencia || c.textoExtraidoCV || 'No especificada.'}</p>
 
             <h2>Estudios y Formación</h2>
-            <p>${c.estudios || 'No especificados.'}</p>
+            <p style="white-space: pre-line;">${c.estudios || 'No especificados.'}</p>
 
             <h2>Habilidades y Competencias</h2>
             <p class="habilidades-lista">${habilidadesFinales}</p>

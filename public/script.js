@@ -106,7 +106,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
     return Math.min(porcentaje, 100);
 }
 
-// Función inteligente para extraer y enriquecer habilidades leyendo la experiencia
+// Función inteligente para extraer y enriquecer habilidades uniendo formulario y texto extraído del CV
 function enriquecerHabilidadesATS(candidato) {
     let habilidadesManuales = candidato.habilidades || '';
     const experienciaTexto = ((candidato.experiencia || '') + ' ' + (candidato.textoExtraidoCV || '')).toLowerCase();
@@ -146,7 +146,7 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función para renderizar la tabla de candidatos con columnas para la Foto y el CV Original adjunto
+// Función para renderizar la tabla con visualización de foto, descarga de archivo original y opciones de CV
 function renderizarTabla(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
@@ -172,7 +172,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
     html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>CV Original</th>';
     if (textoBusqueda) html += '<th>Afinidad ATS</th>';
-    html += '<th>Fecha</th><th>Acciones ATS</th></tr>';
+    html += '<th>Fecha</th><th>Acciones ATS / Empresa</th></tr>';
     
     listaProcesada.forEach(c => {
         let badgeColor = '#7f8c8d';
@@ -185,7 +185,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
             avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
         }
 
-        // CORRECCIÓN: Apuntamos al endpoint del servidor /api/descargar-cv/ para forzar la bajada del archivo sin errores de CORS
+        // Enlace seguro al servidor para la descarga física del archivo original
         const linkCvOriginal = c.cvUrl 
             ? `<a href="/api/descargar-cv/${c.id}" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
             : '<span style="color:#999; font-size:11px;">No adjunto</span>';
@@ -207,7 +207,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
 
         html += `<td style="padding:10px; vertical-align: middle;">${c.fecha}</td>
             <td style="padding:10px; text-align:center; vertical-align: middle;">
-                <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS</button><br>
+                <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS (Sin Foto)</button><br>
                 <a href="/api/cv-empresa/${c.id}" target="_blank" style="background:#2980b9; color:white; text-decoration:none; padding:5px 10px; border-radius:4px; font-size:11px; display:inline-block; margin-bottom:5px;">🏢 CV con Foto (Empresa)</a><br>
                 <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
             </td>
@@ -249,7 +249,7 @@ function filtrarCandidatos(textoBusqueda) {
     renderizarTabla(filtrados, texto);
 }
 
-// Función para abrir una ventana limpia con el CV formateado estrictamente en formato ATS
+// Función para abrir la ventana del CV ATS optimizado (por defecto sin foto, a menos que tildes la casilla)
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;

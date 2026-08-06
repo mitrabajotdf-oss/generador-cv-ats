@@ -186,8 +186,8 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
         }
 
         if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
-            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile' || f.fieldname.startsWith('panelCv'));
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil' || f.fieldname.startsWith('panelFoto'));
 
             if (cvFile) {
                 candidato.cvUrl = `/uploads/${path.basename(cvFile.path)}`;
@@ -214,8 +214,9 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             return res.json({ success: true, message: 'Archivos actualizados con éxito' });
         }
 
-        return res.json({ success: false, error: 'No se enviaron archivos' });
+        return res.json({ success: false, error: 'No se detectaron archivos' });
     } catch (error) {
+        console.error("Error en actualización desde panel:", error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });

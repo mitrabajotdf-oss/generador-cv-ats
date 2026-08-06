@@ -1,8 +1,6 @@
-// Lógica para el envío del formulario de postulación y autocompletado inteligente por CV
+// Lógica para el envío del formulario y autocompletado
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
-    
-    // Autocompletar campos automáticamente al adjuntar el CV
     const cvInputFile = document.getElementById('cvFile');
     if (cvInputFile) {
         cvInputFile.addEventListener('change', async function(e) {
@@ -19,7 +17,6 @@ if (formPostulacion) {
             formData.append('cvFile', file);
 
             try {
-                // Endpoint temporal para parsear el texto del CV cargado
                 const res = await fetch('/api/extraer-cv', {
                     method: 'POST',
                     body: formData
@@ -30,7 +27,7 @@ if (formPostulacion) {
                     procesarYAutocompletarCampos(data.texto);
                 }
             } catch (err) {
-                console.error('No se pudo autocompletar automáticamente:', err);
+                console.error('Error al autocompletar:', err);
             } finally {
                 if (btnEnviar) {
                     btnEnviar.disabled = false;
@@ -85,11 +82,9 @@ if (formPostulacion) {
     });
 }
 
-// Función para extraer inteligentemente datos del texto del CV y rellenar los inputs
 function procesarYAutocompletarCampos(texto) {
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    // 1. Intentar detectar Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) {
@@ -97,7 +92,6 @@ function procesarYAutocompletarCampos(texto) {
         if (inputEmail) inputEmail.value = matchEmail[0];
     }
 
-    // 2. Intentar detectar Teléfono (formato argentino / general)
     const regexTel = /(\+?54\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/;
     const matchTel = texto.match(regexTel);
     if (matchTel) {
@@ -105,7 +99,6 @@ function procesarYAutocompletarCampos(texto) {
         if (inputTel) inputTel.value = matchTel[0];
     }
 
-    // 3. Intentar detectar DNI
     const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
     const matchDni = texto.match(regexDni);
     if (matchDni && matchDni[1]) {
@@ -113,38 +106,25 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Nombre (suele ser la primera línea del documento)
     if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
         const inputNombre = document.getElementById('nombre');
-        if (inputNombre && !inputNombre.value) {
-            inputNombre.value = lineas[0];
-        }
+        if (inputNombre && !inputNombre.value) inputNombre.value = lineas[0];
     }
 
-    // 5. Rellenar Resumen, Experiencia y Estudios con bloques del texto completo
     const inputResumen = document.getElementById('resumen');
-    if (inputResumen && !inputResumen.value) {
-        inputResumen.value = texto.substring(0, 400) + '...';
-    }
+    if (inputResumen && !inputResumen.value) inputResumen.value = texto.substring(0, 400) + '...';
 
     const inputExperiencia = document.getElementById('experiencia');
-    if (inputExperiencia && !inputExperiencia.value) {
-        inputExperiencia.value = texto;
-    }
+    if (inputExperiencia && !inputExperiencia.value) inputExperiencia.value = texto;
 
     const inputEstudios = document.getElementById('estudios');
-    if (inputEstudios && !inputEstudios.value) {
-        inputEstudios.value = 'Extraído automáticamente del CV adjunto. Ver documento original para más detalle.';
-    }
+    if (inputEstudios && !inputEstudios.value) inputEstudios.value = 'Extraído automáticamente del CV adjunto.';
 
-    // 6. Habilidades automáticas
     const inputHabilidades = document.getElementById('habilidades');
-    if (inputHabilidades && !inputHabilidades.value) {
-        inputHabilidades.value = 'Administración • Gestión • Trabajo en Equipo • Herramientas Informáticas';
-    }
+    if (inputHabilidades && !inputHabilidades.value) inputHabilidades.value = 'Administración • Gestión • Trabajo en Equipo';
 }
 
-// Variables globales para el panel estructurado por carpetas
+// Variables globales del panel
 let todosLosCandidatos = [];
 let carpetasBusquedas = [
     { id: 1, empresa: 'Estudio Notarial Bitsh', titulo: 'Administrativo Contable', keywords: 'excel administración tango gestión' },
@@ -162,9 +142,7 @@ if (listaCandidatosDiv) {
             listaCandidatosDiv.innerHTML = '<p style="text-align:center; padding: 20px; color:#64748b;">Cargando directorios del servidor...</p>';
             const res = await fetch('/api/candidatos');
             
-            if (!res.ok) {
-                throw new Error(`Error HTTP: ${res.status}`);
-            }
+            if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
 
             const data = await res.json();
             
@@ -200,9 +178,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
 
     let coincidencias = 0;
     palabras.forEach(palabra => {
-        if (textoCompleto.includes(palabra)) {
-            coincidencias++;
-        }
+        if (textoCompleto.includes(palabra)) coincidencias++;
     });
 
     let porcentaje = Math.round((coincidencias / palabras.length) * 100);
@@ -218,7 +194,7 @@ function renderizarExploradorCarpetas() {
             <div style="font-size: 36px;">📁</div>
             <div>
                 <div style="font-size: 16px; font-weight: bold; color: #1e293b;">Carpeta: Postulantes</div>
-                <div style="font-size: 13px; color: #64748b;">${todosLosCandidatos.length} Legajos guardados en subcarpetas</div>
+                <div style="font-size: 13px; color: #64748b;">${todosLosCandidatos.length} Legajos guardados</div>
             </div>
         </div>
         <div onclick="cambiarDirectorio('busquedas')" style="flex: 1; min-width: 280px; background: ${directorioActual === 'busquedas' ? '#f0f9ff' : '#ffffff'}; border: 2px solid ${directorioActual === 'busquedas' ? '#0284c7' : '#cbd5e1'}; padding: 18px 22px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px;">
@@ -245,6 +221,7 @@ function cambiarDirectorio(dir) {
     renderizarExploradorCarpetas();
 }
 
+// Subcarpetas de Postulantes con archivos adjuntos visibles y separados
 function renderizarSubcarpetasPostulantes() {
     let listaFiltrada = todosLosCandidatos;
     
@@ -259,12 +236,9 @@ function renderizarSubcarpetasPostulantes() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 250px;">
-            <input type="text" id="buscadorGeneral" placeholder="🔍 Buscar subcarpeta de postulante..." oninput="filtrarSubcarpetas(this.value)" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none;">
+            <input type="text" id="buscadorGeneral" placeholder="🔍 Buscar legajo de postulante..." oninput="filtrarSubcarpetas(this.value)" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none;">
         </div>
         ${busquedaSeleccionadaFiltro ? `<div style="background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">Filtrando por Requisitos: "${busquedaSeleccionadaFiltro}" <button onclick="busquedaSeleccionadaFiltro=''; renderizarExploradorCarpetas();" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; margin-left:5px;">✕</button></div>` : ''}
-        <label style="cursor: pointer; font-weight: 600; color: #0284c7; font-size: 13px;">
-            <input type="checkbox" id="chkIncluirFoto" style="margin-right: 6px;"> Incluir Foto en CV ATS
-        </label>
     </div>`;
 
     if (listaFiltrada.length === 0) {
@@ -272,7 +246,7 @@ function renderizarSubcarpetasPostulantes() {
         return html;
     }
 
-    html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">';
+    html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">';
 
     listaFiltrada.forEach(c => {
         let badgeColor = '#64748b';
@@ -284,13 +258,20 @@ function renderizarSubcarpetasPostulantes() {
             avatarHtml = `<img src="${c.fotoUrl}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
 
-        const nombreArchivoMostrable = c.nombreArchivoCV || 'Documento CV';
+        const nombreArchivoCV = c.nombreArchivoCV || 'Documento CV';
         const linkCvOriginal = c.cvUrl 
-            ? `<div style="background: #f1f5f9; padding: 8px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;" title="${nombreArchivoMostrable}">📄 ${nombreArchivoMostrable}</span>
-                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:4px 10px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+            ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${nombreArchivoCV}">📄 ${nombreArchivoCV}</span>
+                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar CV</a>
                </div>` 
-            : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">📂 Sin archivo de CV adjunto</div>';
+            : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">📂 Sin archivo de CV</div>';
+
+        const linkFotoPerfil = c.fotoUrl 
+            ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📷 Foto de Perfil</span>
+                   <a href="${c.fotoUrl}" target="_blank" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">👁️ Ver Foto</a>
+               </div>` 
+            : '';
 
         html += `
         <div style="background: white; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;">
@@ -313,15 +294,17 @@ function renderizarSubcarpetasPostulantes() {
                     <span style="font-size: 12px; font-weight: 600; color: #64748b;">Afinidad ATS:</span>
                     <span style="background:${badgeColor}; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:12px; margin-left: 5px;">${c.porcentaje}%</span>
                 </div>` : ''}
+                
                 <div style="margin-top: 10px;">
                     <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">Archivos en Subcarpeta:</div>
                     ${linkCvOriginal}
+                    ${linkFotoPerfil}
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
-                <button onclick='verCVATS(${JSON.stringify(c)})' style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 Ver CV ATS (Sin Foto)</button>
+                <button onclick='verCVATS(${JSON.stringify(c)})' style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 CV ATS Optimizado (Sin Foto)</button>
                 <div style="display: flex; gap: 6px;">
-                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Empresa</a>
+                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Corporativo (Con Foto)</a>
                     <button onclick="eliminarCandidato(${c.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️ Eliminar</button>
                 </div>
             </div>
@@ -406,13 +389,9 @@ function filtrarSubcarpetas(texto) {
     renderizarExploradorCarpetas();
 }
 
+// Visor del CV ATS Optimizado (Sin foto)
 function verCVATS(c) {
-    const incluirFotoChk = document.getElementById('chkIncluirFoto');
-    const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
-
-    const habilidadesFinales = c.habilidades || 'Administración • Gestión';
-    const fotoSrc = c.fotoUrl;
-
+    const habilidadesFinales = c.habilidades || 'Administración • Gestión • Trabajo en Equipo';
     let experienciaFinal = c.experiencia || c.textoExtraidoCV || '';
 
     const ventanaATS = window.open('', '_blank');
@@ -421,11 +400,9 @@ function verCVATS(c) {
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <title>CV ATS - ${c.nombre}</title>
+            <title>CV ATS Optimizado - ${c.nombre}</title>
             <style>
                 body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #000; max-width: 800px; margin: 40px auto; padding: 20px; }
-                .header-container { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 5px; }
-                .foto-perfil { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc; }
                 h1 { font-size: 22px; text-transform: uppercase; margin: 0; text-align: center; }
                 .contacto { text-align: center; font-size: 14px; margin-bottom: 25px; color: #333; }
                 h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin-top: 25px; margin-bottom: 8px; }
@@ -436,13 +413,7 @@ function verCVATS(c) {
             </style>
         </head>
         <body>
-            <div class="header-container">
-                ${mostrarFoto && fotoSrc ? `<img src="${fotoSrc}" class="foto-perfil" alt="Foto de perfil">` : ''}
-                <div>
-                    <h1>${c.nombre}</h1>
-                </div>
-            </div>
-
+            <h1>${c.nombre}</h1>
             <div class="contacto">
                 ${c.direccion || ''} | Tel: ${c.telefono || ''} | Email: ${c.email || ''} | DNI: ${c.dni || ''}
                 ${c.puestoRequerido ? `<br><strong>Objetivo / Puesto:</strong> ${c.puestoRequerido}` : ''}

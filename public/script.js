@@ -46,14 +46,14 @@ if (formPostulacion) {
     });
 }
 
-// Lógica para el panel de administración (index.html) con protección contra bloqueos
+// Lógica para el panel de administración en formato carpetas
 let todosLosCandidatos = [];
 const listaCandidatosDiv = document.getElementById('listaCandidatos');
 
 if (listaCandidatosDiv) {
     async function cargarCandidatos() {
         try {
-            listaCandidatosDiv.innerHTML = '<p>Cargando postulantes...</p>';
+            listaCandidatosDiv.innerHTML = '<p>Cargando legajos de postulantes...</p>';
             const res = await fetch('/api/candidatos');
             
             if (!res.ok) {
@@ -64,7 +64,7 @@ if (listaCandidatosDiv) {
             
             if (data.success && data.candidatos && data.candidatos.length > 0) {
                 todosLosCandidatos = data.candidatos.map(c => ({ ...c, porcentaje: 0 }));
-                renderizarTabla(todosLosCandidatos);
+                renderizarTarjetasCarpetas(todosLosCandidatos);
             } else {
                 listaCandidatosDiv.innerHTML = '<p>No hay postulantes registrados todavía.</p>';
             }
@@ -76,7 +76,7 @@ if (listaCandidatosDiv) {
 
     cargarCandidatos();
 
-    // Conectar el input buscador de index.html en tiempo real
+    // Conectar el input buscador en tiempo real
     const inputBuscador = document.getElementById('buscador');
     if (inputBuscador) {
         inputBuscador.addEventListener('input', (e) => {
@@ -85,7 +85,7 @@ if (listaCandidatosDiv) {
     }
 }
 
-// Función para calcular un porcentaje de afinidad basado en múltiples palabras clave
+// Función para calcular afinidad por palabras clave
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
@@ -113,7 +113,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
     return Math.min(porcentaje, 100);
 }
 
-// Función inteligente para extraer y enriquecer habilidades uniendo formulario y texto extraído del CV
+// Enriquecer habilidades leyendo la experiencia
 function enriquecerHabilidadesATS(candidato) {
     let habilidadesManuales = candidato.habilidades || '';
     const experienciaTexto = ((candidato.experiencia || '') + ' ' + (candidato.textoExtraidoCV || '')).toLowerCase();
@@ -153,8 +153,8 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función para renderizar la tabla con visualización de foto, nombre del archivo y descarga segura
-function renderizarTabla(candidatos, textoBusqueda = '') {
+// Función principal para renderizar los postulantes en formato de CARPETAS / LEGAJOS
+function renderizarTarjetasCarpetas(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
     if (candidatos.length === 0) {
@@ -171,65 +171,92 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
         listaProcesada.sort((a, b) => b.porcentaje - a.porcentaje);
     }
 
-    let html = '<div style="margin-bottom: 15px; background: #eaf2f8; padding: 10px 15px; border-radius: 6px; display: inline-block;">';
-    html += '<label style="cursor: pointer; font-weight: bold; color: #2c3e50;">';
-    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 8px;"> Incluir Foto de Perfil en la vista de CV ATS';
+    let html = '<div style="margin-bottom: 20px; background: #e0f2fe; border: 1px solid #bae6fd; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">';
+    html += '<span style="font-weight: 600; color: #0369a1;">📁 Vista de Legajos / Carpetas Activa</span>';
+    html += '<label style="cursor: pointer; font-weight: 600; color: #0369a1; font-size: 13px;">';
+    html += '<input type="checkbox" id="chkIncluirFoto" style="margin-right: 6px;"> Incluir Foto de Perfil en la vista de CV ATS';
     html += '</label></div>';
 
-    html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
-    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>CV Original Adjunto</th>';
-    if (textoBusqueda) html += '<th>Afinidad ATS</th>';
-    html += '<th>Fecha</th><th>Acciones ATS / Empresa</th></tr>';
+    // Contenedor en cuadrícula (Grid) para las carpetas
+    html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">';
     
     listaProcesada.forEach(c => {
-        let badgeColor = '#7f8c8d';
+        let badgeColor = '#64748b';
         if (c.porcentaje >= 75) badgeColor = '#27ae60';
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
-        let avatarHtml = '<span style="color:#999; font-size:12px;">Sin foto</span>';
+        let avatarHtml = '<div style="width: 60px; height: 60px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 2px solid #cbd5e1;">Sin foto</div>';
         const imgSource = c.fotoUrl || c.fotoPerfil;
         if (imgSource) {
-            avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
+            avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
 
-        // Mostramos el nombre real del archivo adjunto y el botón de descarga directa
         const nombreArchivoMostrable = c.nombreArchivoCV || 'Documento CV';
         const linkCvOriginal = c.cvUrl 
-            ? `<div style="margin-bottom:4px; font-size:11px; color:#2c3e50; font-weight:bold; word-break:break-all;">📎 ${nombreArchivoMostrable}</div><a href="/api/descargar-cv/${c.id}" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
-            : '<span style="color:#999; font-size:11px;">No adjunto</span>';
+            ? `<div style="background: #f1f5f9; padding: 8px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;" title="${nombreArchivoMostrable}">📎 ${nombreArchivoMostrable}</span>
+                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:4px 10px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+               </div>` 
+            : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">📂 Sin archivo de CV adjunto</div>';
 
-        html += `<tr>
-            <td style="padding:10px; text-align:center; vertical-align: middle;">${avatarHtml}</td>
-            <td style="padding:10px; font-weight:bold; color:#2980b9; vertical-align: middle;">${c.puestoRequerido || 'General'}</td>
-            <td style="padding:10px; vertical-align: middle;">${c.nombre}<br><small style="color:#7f8c8d;">DNI: ${c.dni}</small></td>
-            <td style="padding:10px; vertical-align: middle;">${c.email}<br><small>${c.telefono}</small></td>
-            <td style="padding:10px; text-align:center; vertical-align: middle;">${linkCvOriginal}</td>`;
-        
-        if (textoBusqueda) {
-            html += `<td style="padding:10px; text-align:center; vertical-align: middle;">
-                <span style="background:${badgeColor}; color:white; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:13px;">
-                    ${c.porcentaje}%
-                </span>
-            </td>`;
-        }
+        // Diseño individual de la tarjeta-carpeta
+        html += `
+        <div style="background: white; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s;">
+            
+            <!-- Cabecera de la Carpeta -->
+            <div style="background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px;">
+                ${avatarHtml}
+                <div style="overflow: hidden;">
+                    <div style="font-size: 12px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">${c.puestoRequerido || 'General'}</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.nombre}">${c.nombre}</div>
+                    <div style="font-size: 12px; color: #64748b;">DNI: ${c.dni || 'No especificado'}</div>
+                </div>
+            </div>
 
-        html += `<td style="padding:10px; vertical-align: middle;">${c.fecha}</td>
-            <td style="padding:10px; text-align:center; vertical-align: middle;">
-                <button onclick='verCVATS(${JSON.stringify(c)})' style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; margin-bottom:5px;">📄 Ver CV ATS (Sin Foto)</button><br>
-                <a href="/api/cv-empresa/${c.id}" target="_blank" style="background:#2980b9; color:white; text-decoration:none; padding:5px 10px; border-radius:4px; font-size:11px; display:inline-block; margin-bottom:5px;">🏢 CV con Foto (Empresa)</a><br>
-                <button onclick="eliminarCandidato(${c.id})" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Eliminar</button>
-            </td>
-        </tr>`;
+            <!-- Contenido del Legajo -->
+            <div style="padding: 15px 20px; flex-grow: 1;">
+                <div style="font-size: 13px; color: #334155; margin-bottom: 8px;">
+                    <strong>📧 Email:</strong> ${c.email || 'No cargado'}<br>
+                    <strong>📞 Tel:</strong> ${c.telefono || 'No cargado'}<br>
+                    <strong>📅 Postulación:</strong> ${c.fecha}
+                </div>
+
+                ${textoBusqueda ? `
+                <div style="margin-bottom: 10px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #64748b;">Afinidad ATS:</span>
+                    <span style="background:${badgeColor}; color:white; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:12px; margin-left: 5px;">
+                        ${c.porcentaje}%
+                    </span>
+                </div>` : ''}
+
+                <!-- Archivo adjunto dentro de la carpeta -->
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">Archivos en Legajo:</div>
+                    ${linkCvOriginal}
+                </div>
+            </div>
+
+            <!-- Botones de Acción inferior -->
+            <div style="background: #f8fafc; padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
+                <button onclick='verCVATS(${JSON.stringify(c)})' style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 Ver CV ATS (Sin Foto)</button>
+                <div style="display: flex; gap: 6px;">
+                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Empresa</a>
+                    <button onclick="eliminarCandidato(${c.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️ Eliminar</button>
+                </div>
+            </div>
+
+        </div>`;
     });
-    html += '</table>';
+
+    html += '</div>';
     listaCandidatosDiv.innerHTML = html;
 }
 
-// Función para filtrar candidatos permitiendo múltiples habilidades o palabras clave
+// Función para filtrar candidatos en tiempo real
 function filtrarCandidatos(textoBusqueda) {
     const texto = textoBusqueda.toLowerCase().trim();
     if (!texto) {
-        renderizarTabla(todosLosCandidatos, '');
+        renderizarTarjetasCarpetas(todosLosCandidatos, '');
         return;
     }
 
@@ -254,10 +281,10 @@ function filtrarCandidatos(textoBusqueda) {
         }
     });
 
-    renderizarTabla(filtrados, texto);
+    renderizarTarjetasCarpetas(filtrados, texto);
 }
 
-// Función para abrir la ventana del CV ATS optimizado (unificando formulario y archivo subido)
+// Función para abrir la ventana del CV ATS optimizado
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
@@ -329,7 +356,7 @@ function verCVATS(c) {
 }
 
 async function eliminarCandidato(id) {
-    if (!confirm('¿Estás seguro de eliminar este candidato?')) return;
+    if (!confirm('¿Estás seguro de eliminar este legajo?')) return;
     try {
         const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE' });
         const data = await res.json();

@@ -64,7 +64,6 @@ if (formPostulacion) {
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
 
-                // Configurar los enlaces de WhatsApp con el mensaje automático en la pantalla de éxito
                 const nombrePostulante = document.getElementById('nombre').value || 'Postulante';
                 const telefonoWhatsApp = '5492964659057';
 
@@ -96,12 +95,11 @@ if (formPostulacion) {
     });
 }
 
-// Función de interpretación inteligente del CV y autocompletado de campos
+// Función de interpretación inteligente del CV y autocompletado
 function procesarYAutocompletarCampos(texto) {
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const textoBajo = texto.toLowerCase();
 
-    // 1. Detección de Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) {
@@ -109,7 +107,6 @@ function procesarYAutocompletarCampos(texto) {
         if (inputEmail) inputEmail.value = matchEmail[0];
     }
 
-    // 2. Formato estricto de Teléfono con +54 9
     const regexTel = /(?:\+?54\s?9?\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/g;
     const matchesTel = texto.match(regexTel);
     if (matchesTel && matchesTel.length > 0) {
@@ -130,7 +127,6 @@ function procesarYAutocompletarCampos(texto) {
         if (inputTel && !inputTel.value) inputTel.value = '+54 9 2964 ';
     }
 
-    // 3. Detección de DNI
     const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
     const matchDni = texto.match(regexDni);
     if (matchDni && matchDni[1]) {
@@ -138,13 +134,11 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Nombre Completo
     if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
         const inputNombre = document.getElementById('nombre');
         if (inputNombre) inputNombre.value = lineas[0];
     }
 
-    // 5. Identificación inteligente del Resumen Profesional
     let resumenExtraido = '';
     const idxResumen = textoBajo.indexOf('resumen profesional');
     const idxExperiencia = textoBajo.indexOf('experiencia');
@@ -156,7 +150,6 @@ function procesarYAutocompletarCampos(texto) {
     const inputResumen = document.getElementById('resumen');
     if (inputResumen) inputResumen.value = resumenExtraido;
 
-    // 6. Identificación de la Experiencia Laboral
     let experienciaExtraida = '';
     if (idxExperiencia !== -1) {
         const idxEstudios = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : texto.length;
@@ -167,7 +160,6 @@ function procesarYAutocompletarCampos(texto) {
     const inputExperiencia = document.getElementById('experiencia');
     if (inputExperiencia) inputExperiencia.value = experienciaExtraida;
 
-    // 7. Identificación de Estudios y Formación
     let estudiosExtraidos = '';
     const idxEstudios = textoBajo.indexOf('estudios');
     const idxHabilidades = textoBajo.indexOf('habilidades');
@@ -178,7 +170,6 @@ function procesarYAutocompletarCampos(texto) {
     const inputEstudios = document.getElementById('estudios');
     if (inputEstudios) inputEstudios.value = estudiosExtraidos || 'Formación académica detallada en CV adjunto.';
 
-    // 8. Extracción y relación automática de Habilidades basadas en la experiencia
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
         { term: 'tango', label: 'Manejo de Tango Gestión' },
@@ -380,6 +371,14 @@ function renderizarSubcarpetasPostulantes() {
                     <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">Archivos en Subcarpeta:</div>
                     ${linkCvOriginal}
                     ${linkFotoPerfil}
+                    
+                    <!-- Opción para subir o reponer archivos directamente desde el panel -->
+                    <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
+                        <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
+                        <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;">
+                        <input type="file" id="panelFoto_${c.id}" accept="image/*" style="font-size: 11px; margin-bottom: 6px; display:block;">
+                        <button onclick="subirArchivosDesdePanel(${c.id})" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: 100%;">Guardar Archivos Nuevos</button>
+                    </div>
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
@@ -394,6 +393,37 @@ function renderizarSubcarpetasPostulantes() {
 
     html += '</div>';
     return html;
+}
+
+// Función auxiliar para procesar la subida directa de archivos desde el panel
+async function subirArchivosDesdePanel(idCandidato) {
+    const inputCv = document.getElementById(`panelCv_${idCandidato}`);
+    const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);
+    
+    const formData = new FormData();
+    if (inputCv && inputCv.files[0]) formData.append('cvFile', inputCv.files[0]);
+    if (inputFoto && inputFoto.files[0]) formData.append('fotoPerfil', inputFoto.files[0]);
+
+    if (!inputCv.files[0] && !inputFoto.files[0]) {
+        alert('Por favor selecciona al menos un archivo para subir.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/candidatos/actualizar-archivos/${idCandidato}`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('¡Archivos actualizados correctamente en el legajo!');
+            cargarCandidatos();
+        } else {
+            alert('Error al actualizar: ' + (data.error || 'Desconocido'));
+        }
+    } catch (e) {
+        alert('Error de conexión con el servidor.');
+    }
 }
 
 function renderizarSubcarpetasBusquedas() {

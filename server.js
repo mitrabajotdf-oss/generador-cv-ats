@@ -81,15 +81,6 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// 📧 Configuración de Nodemailer
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'mitrabajotdf@gmail.com',
-        pass: 'yuwg fbla hnms llki'
-    }
-});
-
 // 🌐 Endpoint auxiliar para autocompletar el formulario al adjuntar el CV
 app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     try {
@@ -184,6 +175,51 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
+// 🌐 Endpoint para actualizar / subir archivos faltantes directamente desde el Panel de Gestión
+app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        
+        if (!candidato) {
+            return res.json({ success: false, error: 'Candidato no encontrado' });
+        }
+
+        if (req.files && req.files.length > 0) {
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+
+            if (cvFile) {
+                candidato.cvUrl = `/uploads/${path.basename(cvFile.path)}`;
+                candidato.nombreArchivoCV = cvFile.originalname;
+                try {
+                    const buffer = fs.readFileSync(cvFile.path);
+                    if (cvFile.mimetype === 'application/pdf') {
+                        const dataPdf = await pdfParse(buffer);
+                        candidato.textoExtraidoCV = dataPdf.text;
+                    } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
+                        const resultWord = await mammoth.extractRawText({ buffer: buffer });
+                        candidato.textoExtraidoCV = resultWord.value;
+                    }
+                } catch (e) {
+                    console.error('Error leyendo nuevo CV:', e);
+                }
+            }
+
+            if (fotoPerfil) {
+                candidato.fotoUrl = `/uploads/${path.basename(fotoPerfil.path)}`;
+            }
+
+            await candidato.save();
+            return res.json({ success: true, message: 'Archivos actualizados con éxito' });
+        }
+
+        return res.json({ success: false, error: 'No se enviaron archivos' });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 🏢 Endpoint: Genera el CV con Foto para Empresas
 app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     try {
@@ -256,7 +292,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
 });
 
 // 📥 Endpoint para descargar el CV original
-app.get('/api/descargar-cv/:id', async (req, res) => {
+app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });

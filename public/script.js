@@ -40,6 +40,13 @@ if (formPostulacion) {
     formPostulacion.addEventListener('submit', async function(e) {
         e.preventDefault();
 
+        const cvFileCheck = document.getElementById('cvFile').files[0];
+        if (!cvFileCheck) {
+            alert('⚠️ Por favor adjunta tu archivo de CV (PDF o DOCX) para continuar.');
+            document.getElementById('cvFile').focus();
+            return;
+        }
+
         const btn = document.getElementById('btnEnviar');
         if (btn) {
             btn.disabled = true;
@@ -47,11 +54,12 @@ if (formPostulacion) {
         }
 
         const formData = new FormData(this);
-        const cvFile = document.getElementById('cvFile').files[0];
-        if (cvFile) formData.append('cvFile', cvFile);
+        formData.append('cvFile', cvFileCheck);
 
         const fotoPerfil = document.getElementById('fotoPerfil').files[0];
-        if (fotoPerfil) formData.append('fotoPerfil', fotoPerfil);
+        if (fotoPerfil) {
+            formData.append('fotoPerfil', fotoPerfil);
+        }
 
         try {
             const res = await fetch('/api/enviar-postulacion', {

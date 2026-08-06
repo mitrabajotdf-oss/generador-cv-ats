@@ -1,6 +1,45 @@
-// Lógica para el envío del formulario de postulación
+// Lógica para el envío del formulario de postulación y autocompletado inteligente por CV
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
+    
+    // Autocompletar campos automáticamente al adjuntar el CV
+    const cvInputFile = document.getElementById('cvFile');
+    if (cvInputFile) {
+        cvInputFile.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const btnEnviar = document.getElementById('btnEnviar');
+            if (btnEnviar) {
+                btnEnviar.disabled = true;
+                btnEnviar.textContent = 'Analizando CV y autocompletando formulario...';
+            }
+
+            const formData = new FormData();
+            formData.append('cvFile', file);
+
+            try {
+                // Endpoint temporal para parsear el texto del CV cargado
+                const res = await fetch('/api/extraer-cv', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success && data.texto) {
+                    procesarYAutocompletarCampos(data.texto);
+                }
+            } catch (err) {
+                console.error('No se pudo autocompletar automáticamente:', err);
+            } finally {
+                if (btnEnviar) {
+                    btnEnviar.disabled = false;
+                    btnEnviar.textContent = 'Enviar Postulación Final';
+                }
+            }
+        });
+    }
+
     formPostulacion.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -46,6 +85,65 @@ if (formPostulacion) {
     });
 }
 
+// Función para extraer inteligentemente datos del texto del CV y rellenar los inputs
+function procesarYAutocompletarCampos(texto) {
+    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    // 1. Intentar detectar Email
+    const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+    const matchEmail = texto.match(regexEmail);
+    if (matchEmail) {
+        const inputEmail = document.getElementById('email');
+        if (inputEmail) inputEmail.value = matchEmail[0];
+    }
+
+    // 2. Intentar detectar Teléfono (formato argentino / general)
+    const regexTel = /(\+?54\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/;
+    const matchTel = texto.match(regexTel);
+    if (matchTel) {
+        const inputTel = document.getElementById('telefono');
+        if (inputTel) inputTel.value = matchTel[0];
+    }
+
+    // 3. Intentar detectar DNI
+    const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
+    const matchDni = texto.match(regexDni);
+    if (matchDni && matchDni[1]) {
+        const inputDni = document.getElementById('dni');
+        if (inputDni) inputDni.value = matchDni[1];
+    }
+
+    // 4. Nombre (suele ser la primera línea del documento)
+    if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
+        const inputNombre = document.getElementById('nombre');
+        if (inputNombre && !inputNombre.value) {
+            inputNombre.value = lineas[0];
+        }
+    }
+
+    // 5. Rellenar Resumen, Experiencia y Estudios con bloques del texto completo
+    const inputResumen = document.getElementById('resumen');
+    if (inputResumen && !inputResumen.value) {
+        inputResumen.value = texto.substring(0, 400) + '...';
+    }
+
+    const inputExperiencia = document.getElementById('experiencia');
+    if (inputExperiencia && !inputExperiencia.value) {
+        inputExperiencia.value = texto;
+    }
+
+    const inputEstudios = document.getElementById('estudios');
+    if (inputEstudios && !inputEstudios.value) {
+        inputEstudios.value = 'Extraído automáticamente del CV adjunto. Ver documento original para más detalle.';
+    }
+
+    // 6. Habilidades automáticas
+    const inputHabilidades = document.getElementById('habilidades');
+    if (inputHabilidades && !inputHabilidades.value) {
+        inputHabilidades.value = 'Administración • Gestión • Trabajo en Equipo • Herramientas Informáticas';
+    }
+}
+
 // Variables globales para el panel estructurado por carpetas
 let todosLosCandidatos = [];
 let carpetasBusquedas = [
@@ -53,7 +151,7 @@ let carpetasBusquedas = [
     { id: 2, empresa: 'Comercial Austral', titulo: 'Atención al Cliente', keywords: 'atención al cliente ventas caja' },
     { id: 3, empresa: 'Logística Fueguina', titulo: 'Logística y Operaciones', keywords: 'logística chofer repositor carga' }
 ];
-let directorioActual = 'postulantes'; // 'postulantes' o 'busquedas'
+let directorioActual = 'postulantes';
 let busquedaSeleccionadaFiltro = '';
 
 const listaCandidatosDiv = document.getElementById('listaCandidatos');
@@ -85,17 +183,15 @@ if (listaCandidatosDiv) {
     cargarCandidatos();
 }
 
-// Cálculo de afinidad ATS
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
     const palabras = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
     if (palabras.length === 0) return 0;
 
-    const habilidadesEnriquecidas = enriquecerHabilidadesATS(candidato);
     const textoCompleto = `
         ${candidato.puestoRequerido || ''} 
-        ${habilidadesEnriquecidas} 
+        ${candidato.habilidades || ''} 
         ${candidato.resumen || ''} 
         ${candidato.experiencia || ''} 
         ${candidato.estudios || ''}
@@ -113,71 +209,25 @@ function calcularAfinidad(candidato, textoBusqueda) {
     return Math.min(porcentaje, 100);
 }
 
-function enriquecerHabilidadesATS(candidato) {
-    let habilidadesManuales = candidato.habilidades || '';
-    const experienciaTexto = ((candidato.experiencia || '') + ' ' + (candidato.textoExtraidoCV || '')).toLowerCase();
-    
-    const diccionarioKeywords = [
-        { term: 'atención al cliente', label: 'Atención al Cliente' },
-        { term: 'caja', label: 'Manejo de Caja' },
-        { term: 'ventas', label: 'Ventas y Comercialización' },
-        { term: 'excel', label: 'Microsoft Excel' },
-        { term: 'administrativo', label: 'Gestión Administrativa' },
-        { term: 'repositor', label: 'Reposición y Stock' },
-        { term: 'limpieza', label: 'Mantenimiento y Limpieza' },
-        { term: 'logística', label: 'Logística y Distribución' },
-        { term: 'chofer', label: 'Conducción y Logística' },
-        { term: 'gastronomía', label: 'Atención Gastronómica' },
-        { term: 'cocina', label: 'Gastronomía y Cocina' },
-        { term: 'carga', label: 'Carga y Descarga' }
-    ];
-
-    let detectadas = [];
-    diccionarioKeywords.forEach(item => {
-        if (experienciaTexto.includes(item.term)) {
-            if (!habilidadesManuales.toLowerCase().includes(item.term)) {
-                detectadas.push(item.label);
-            }
-        }
-    });
-
-    if (detectadas.length > 0) {
-        if (habilidadesManuales.trim() !== '') {
-            return habilidadesManuales + ' • ' + detectadas.join(' • ');
-        } else {
-            return detectadas.join(' • ');
-        }
-    }
-
-    return habilidadesManuales || 'No especificadas.';
-}
-
-// Renderizador principal del Explorador de Dos Carpetas
 function renderizarExploradorCarpetas() {
     if (!listaCandidatosDiv) return;
 
     let html = `
-    <!-- Directorio Principal: Las 2 Grandes Carpetas -->
     <div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
-        
-        <!-- Carpeta 1: Postulantes -->
-        <div onclick="cambiarDirectorio('postulantes')" style="flex: 1; min-width: 280px; background: ${directorioActual === 'postulantes' ? '#f0f9ff' : '#ffffff'}; border: 2px solid ${directorioActual === 'postulantes' ? '#0284c7' : '#cbd5e1'}; padding: 18px 22px; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 15px; transition: all 0.2s;">
+        <div onclick="cambiarDirectorio('postulantes')" style="flex: 1; min-width: 280px; background: ${directorioActual === 'postulantes' ? '#f0f9ff' : '#ffffff'}; border: 2px solid ${directorioActual === 'postulantes' ? '#0284c7' : '#cbd5e1'}; padding: 18px 22px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px;">
             <div style="font-size: 36px;">📁</div>
             <div>
                 <div style="font-size: 16px; font-weight: bold; color: #1e293b;">Carpeta: Postulantes</div>
                 <div style="font-size: 13px; color: #64748b;">${todosLosCandidatos.length} Legajos guardados en subcarpetas</div>
             </div>
         </div>
-
-        <!-- Carpeta 2: Búsquedas -->
-        <div onclick="cambiarDirectorio('busquedas')" style="flex: 1; min-width: 280px; background: ${directorioActual === 'busquedas' ? '#f0f9ff' : '#ffffff'}; border: 2px solid ${directorioActual === 'busquedas' ? '#0284c7' : '#cbd5e1'}; padding: 18px 22px; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 15px; transition: all 0.2s;">
+        <div onclick="cambiarDirectorio('busquedas')" style="flex: 1; min-width: 280px; background: ${directorioActual === 'busquedas' ? '#f0f9ff' : '#ffffff'}; border: 2px solid ${directorioActual === 'busquedas' ? '#0284c7' : '#cbd5e1'}; padding: 18px 22px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px;">
             <div style="font-size: 36px;">📂</div>
             <div>
                 <div style="font-size: 16px; font-weight: bold; color: #1e293b;">Carpeta: Búsquedas & Vacantes</div>
                 <div style="font-size: 13px; color: #64748b;">${carpetasBusquedas.length} Empresas / Perfiles creados</div>
             </div>
         </div>
-
     </div>`;
 
     if (directorioActual === 'postulantes') {
@@ -191,13 +241,10 @@ function renderizarExploradorCarpetas() {
 
 function cambiarDirectorio(dir) {
     directorioActual = dir;
-    if (dir === 'busquedas') {
-        busquedaSeleccionadaFiltro = '';
-    }
+    if (dir === 'busquedas') busquedaSeleccionadaFiltro = '';
     renderizarExploradorCarpetas();
 }
 
-// Subcarpetas de Postulantes
 function renderizarSubcarpetasPostulantes() {
     let listaFiltrada = todosLosCandidatos;
     
@@ -233,9 +280,8 @@ function renderizarSubcarpetasPostulantes() {
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
         let avatarHtml = '<div style="width: 50px; height: 50px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid #cbd5e1;">Sin foto</div>';
-        const imgSource = c.fotoUrl;
-        if (imgSource) {
-            avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
+        if (c.fotoUrl) {
+            avatarHtml = `<img src="${c.fotoUrl}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
 
         const nombreArchivoMostrable = c.nombreArchivoCV || 'Documento CV';
@@ -286,17 +332,16 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Subcarpetas de Búsquedas con campo específico para la Empresa
 function renderizarSubcarpetasBusquedas() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
         <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1e293b;">📂 Subcarpetas de Búsquedas y Empresas Corporativas</h3>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Registra el nombre de la empresa y su vacante. Al hacer clic en <strong>"Evaluar Postulantes"</strong>, el sistema ordenará los perfiles según la afinidad de keywords ATS.</p>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Registra el nombre de la empresa y su vacante. Haz clic en <strong>"Evaluar Postulantes"</strong> para ordenar los perfiles según afinidad.</p>
         
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <input type="text" id="nuevaEmpresa" placeholder="🏢 Nombre de la Empresa (Ej: Sura, Newsan)..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto (Ej: Operario de Logística)..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS (Ej: chofer carga registro)..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaEmpresa" placeholder="🏢 Nombre de la Empresa..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
             <button onclick="agregarSubcarpetaBusqueda()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">➕ Crear Subcarpeta</button>
         </div>
 
@@ -327,7 +372,7 @@ function agregarSubcarpetaBusqueda() {
     const keywordsInput = document.getElementById('nuevaBusquedaKeywords');
     
     if (!empresaInput.value || !tituloInput.value || !keywordsInput.value) {
-        alert('Por favor completa el nombre de la empresa, el título del puesto y las keywords.');
+        alert('Por favor completa todos los campos de la subcarpeta.');
         return;
     }
 
@@ -354,30 +399,21 @@ function evaluarSubcarpetaBusqueda(keywords) {
 
 function filtrarSubcarpetas(texto) {
     const textoBajo = texto.toLowerCase();
-    const filtrados = todosLosCandidatos.filter(c => {
+    todosLosCandidatos.filter(c => {
         const total = `${c.nombre} ${c.dni} ${c.puestoRequerido} ${c.habilidades}`.toLowerCase();
         return total.includes(textoBajo);
     });
     renderizarExploradorCarpetas();
 }
 
-// Visor del CV ATS (Utiliza el texto íntegro extraído sin filtros)
 function verCVATS(c) {
     const incluirFotoChk = document.getElementById('chkIncluirFoto');
     const mostrarFoto = incluirFotoChk ? incluirFotoChk.checked : false;
 
-    const habilidadesFinales = enriquecerHabilidadesATS(c);
+    const habilidadesFinales = c.habilidades || 'Administración • Gestión';
     const fotoSrc = c.fotoUrl;
 
-    let experienciaFinal = c.experiencia || '';
-    if (c.textoExtraidoCV && c.textoExtraidoCV.trim() !== '') {
-        experienciaFinal = c.textoExtraidoCV.trim();
-    }
-
-    let resumenFinal = c.resumen || '';
-    if (!resumenFinal && c.textoExtraidoCV) {
-        resumenFinal = c.textoExtraidoCV.substring(0, 300) + '...';
-    }
+    let experienciaFinal = c.experiencia || c.textoExtraidoCV || '';
 
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
@@ -414,7 +450,7 @@ function verCVATS(c) {
             </div>
 
             <h2>Resumen Profesional</h2>
-            <p>${resumenFinal || 'No especificado.'}</p>
+            <p>${c.resumen || 'No especificado.'}</p>
 
             <h2>Experiencia Laboral</h2>
             <p style="white-space: pre-line;">${experienciaFinal || 'No especificada.'}</p>

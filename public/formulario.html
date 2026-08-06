@@ -3,72 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Postulación y Bolsa de Empleo - Mi Trabajo TDF</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Bolsa de Empleo TDF - Envía tu Postulación</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --light: #f8f9fa;
+            --border: #cbd5e1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 40px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 24px;
+            margin-top: 0;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        h3 {
+            color: var(--secondary);
+            font-size: 16px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #1e293b;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            height: 100px;
+        }
+
+        .file-box {
+            background: #f8fafc;
+            border: 2px dashed var(--border);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn-enviar {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            transition: opacity 0.2s;
+            margin-top: 20px;
+        }
+
+        .btn-enviar:hover {
+            opacity: 0.9;
+        }
+
+        .success-box {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-box h2 {
+            color: var(--success);
+            margin-bottom: 15px;
+        }
+    </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
-    
-    <form id="formPostulacion">
-        <!-- PUESTO REQUERIDO (Opcional) -->
-        <div class="form-group" style="background: #eaf2f8; padding: 15px; border-radius: 8px; border-left: 5px solid #3498db;">
-            <label style="color: #2c3e50; font-size: 16px;">🎯 Puesto Requerido / Vacante a la que te postulás:</label>
-            <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor..." style="margin-top: 8px;">
+    <div class="container">
+        <div id="resultadoSeccion" class="success-box">
+            <h2>🎉 ¡Postulación Enviada con Éxito!</h2>
+            <p>Tus datos y archivos fueron recibidos y guardados correctamente en tu legajo del sistema ATS.</p>
+            <a href="/formulario.html" style="display:inline-block; margin-top:15px; background:var(--secondary); color:white; padding:10px 20px; text-decoration:none; border-radius:6px; font-weight:600;">Cargar otra postulación</a>
         </div>
 
-        <!-- ARCHIVOS -->
-        <div class="upload-section">
-            <label style="color: #16a085; font-size: 16px;">📂 Adjunta tu CV original (PDF o DOCX):</label>
-            <input type="file" id="cvFile" name="cvFile" accept=".pdf,.docx" style="margin-top: 10px;" required>
-            <div style="margin-top: 15px;">
-                <label>Foto de Perfil (Opcional):</label>
-                <input type="file" id="fotoPerfil" name="fotoPerfil" accept="image/*">
+        <form id="formPostulacion">
+            <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
+
+            <div class="form-group">
+                <label>🎯 Puesto Requerido / Vacante a la que te postulás <span style="color: #64748b; font-weight: normal;">(Opcional)</span>:</label>
+                <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor...">
             </div>
-        </div>
 
-        <!-- DATOS PERSONALES -->
-        <h2>Datos Personales</h2>
-        <div class="form-group"><label>Nombre Completo:</label><input type="text" id="nombreInput" name="nombre" required></div>
-        <div class="form-group"><label>DNI:</label><input type="text" id="dniInput" name="dni" required></div>
-        <div class="form-group"><label>Email:</label><input type="email" id="emailInput" name="email" required></div>
-        <div class="form-group"><label>Teléfono de Contacto:</label><input type="text" id="telefonoInput" name="telefono" required></div>
-        <div class="form-group"><label>Domicilio / Dirección:</label><input type="text" id="direccionInput" name="direccion" required></div>
-        <div class="form-group"><label>Disponibilidad Horaria:</label><input type="text" id="disponibilidadInput" name="disponibilidad" placeholder="Ej: Inmediata, Part-time..." required></div>
-
-        <!-- CAMPOS MANUALES ATS -->
-        <h2>Información Profesional</h2>
-        <div class="form-group"><label>Resumen Profesional:</label><textarea id="resumenInput" name="resumen" placeholder="Redacta o completa tu perfil profesional..." required></textarea></div>
-        <div class="form-group"><label>Experiencia Laboral:</label><textarea id="experienciaInput" name="experiencia" placeholder="Detalla tu experiencia de corrido y en líneas fluidas..." required></textarea></div>
-        <div class="form-group"><label>Estudios y Cursos:</label><textarea id="estudiosInput" name="estudios" placeholder="Detalla tu formación académica y cursos..." required></textarea></div>
-        <div class="form-group"><label>Habilidades:</label><input type="text" id="habilidadesInput" name="habilidades" placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo" required></div>
-        
-        <button type="submit" id="btnEnviar" class="btn-submit">Enviar Postulación Final</button>
-    </form>
-
-    <!-- SECCIÓN DE RESULTADO CON MENSAJE PROFESIONAL -->
-    <div id="resultadoSeccion" style="display: none; background: #fff; padding: 30px; border-radius: 8px; text-align: center;">
-        <h2 style="color: #27ae60; margin-top:0;">🎉 ¡Postulación Enviada con Éxito!</h2>
-        <p style="font-size: 16px; color: #2c3e50; line-height: 1.6;">
-            Tu postulación fue enviada con éxito.
-        </p>
-        
-        <div style="background: #eaf2f8; padding: 25px; border-radius: 8px; margin: 25px 0; text-align: left; border-left: 5px solid #2980b9;">
-            <p style="margin: 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
-                Si querés tener tu CV optimizado por si necesitás entregarlo de manera física, me enviás un mensaje al WhatsApp <strong>+54 9 2964 659057</strong> y te digo cómo hacemos.
-            </p>
-            <div style="margin-top: 20px; text-align: center;">
-                <a href="https://wa.me/5492964659057?text=Hola,%20acabo%20de%20enviar%20mi%20postulación%20y%20me%20interesa%20obtener%20más%20información%20sobre%20el%20CV%20optimizado." target="_blank" style="display: inline-block; background: #25d366; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px;">💬 Enviar mensaje por WhatsApp</a>
+            <div class="file-box">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>📂 Adjunta tu CV original (PDF o DOCX):</label>
+                    <input type="file" id="cvFile" name="cvFile" accept=".pdf,.doc,.docx" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>📷 Foto de Perfil <span style="color: #64748b; font-weight: normal;">(Opcional)</span>:</label>
+                    <input type="file" id="fotoPerfil" name="fotoPerfil" accept="image/*">
+                </div>
             </div>
-        </div>
 
-        <div style="margin-top: 30px;">
-            <a href="/formulario.html" class="btn-submit" style="display:inline-block; background:#3498db; color:white; padding:12px 25px; text-decoration:none; border-radius:6px; font-weight:bold;">Enviar otra postulación</a>
-        </div>
+            <h3>Datos Personales</h3>
+            <div class="form-group">
+                <label>Nombre Completo *:</label>
+                <input type="text" id="nombre" name="nombre" required placeholder="Ej: Juan Pérez">
+            </div>
+            <div class="form-group">
+                <label>DNI *:</label>
+                <input type="text" id="dni" name="dni" required placeholder="Ej: 35123456">
+            </div>
+            <div class="form-group">
+                <label>Email *:</label>
+                <input type="email" id="email" name="email" required placeholder="correo@ejemplo.com">
+            </div>
+            <div class="form-group">
+                <label>Teléfono de Contacto *:</label>
+                <input type="tel" id="telefono" name="telefono" required placeholder="Ej: +54 9 2964 123456">
+            </div>
+            <div class="form-group">
+                <label>Domicilio / Dirección *:</label>
+                <input type="text" id="direccion" name="direccion" required placeholder="Calle y Número, Ciudad">
+            </div>
+            <div class="form-group">
+                <label>Disponibilidad Horaria *:</label>
+                <input type="text" id="disponibilidad" name="disponibilidad" required placeholder="Ej: Inmediata, Part-time, Full-time">
+            </div>
+
+            <h3>Información Profesional</h3>
+            <div class="form-group">
+                <label>Resumen Profesional *:</label>
+                <textarea id="resumen" name="resumen" required placeholder="Redacta o completa tu perfil profesional..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Experiencia Laboral *:</label>
+                <textarea id="experiencia" name="experiencia" required placeholder="Detalla tu experiencia de corrido y en líneas fluidas..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Estudios y Cursos *:</label>
+                <textarea id="estudios" name="estudios" required placeholder="Detalla tu formación académica y cursos..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Habilidades *:</label>
+                <input type="text" id="habilidades" name="habilidades" required placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo">
+            </div>
+
+            <button type="submit" id="btnEnviar" class="btn-enviar">Enviar Postulación Final</button>
+        </form>
     </div>
-</div>
 
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

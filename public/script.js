@@ -185,9 +185,9 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
             avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
         }
 
-        // CORRECCIÓN: Se agrega el atributo 'download' para forzar la descarga del archivo en lugar de abrirlo
+        // CORRECCIÓN: Apuntamos al endpoint del servidor /api/descargar-cv/ para forzar la bajada del archivo sin errores de CORS
         const linkCvOriginal = c.cvUrl 
-            ? `<a href="${c.cvUrl}" download style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
+            ? `<a href="/api/descargar-cv/${c.id}" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
             : '<span style="color:#999; font-size:11px;">No adjunto</span>';
 
         html += `<tr>

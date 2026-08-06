@@ -90,6 +90,30 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// 🌐 Endpoint auxiliar para autocompletar el formulario al adjuntar el CV
+app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
+    try {
+        if (!req.file) return res.json({ success: false, error: 'No file' });
+        const filePath = req.file.path;
+        const buffer = fs.readFileSync(filePath);
+        let texto = '';
+
+        if (req.file.mimetype === 'application/pdf') {
+            const dataPdf = await pdfParse(buffer);
+            texto = dataPdf.text;
+        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+            const resultWord = await mammoth.extractRawText({ buffer: buffer });
+            texto = resultWord.value;
+        }
+
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+        return res.json({ success: true, texto: texto });
+    } catch (e) {
+        return res.json({ success: false, error: e.message });
+    }
+});
+
 // 🌐 Endpoint de Recepción de Postulación (Lectura íntegra del CV sin filtros)
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
@@ -113,10 +137,10 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
-                        textoExtraidoCV = dataPdf.text; // Lectura completa sin filtros
+                        textoExtraidoCV = dataPdf.text;
                     } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
                         const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        textoExtraidoCV = resultWord.value; // Lectura completa sin filtros
+                        textoExtraidoCV = resultWord.value;
                     }
                 } catch (readError) {
                     console.error('⚠️ No se pudo extraer texto completo del CV:', readError);

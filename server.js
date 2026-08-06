@@ -6,6 +6,8 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const nodemailer = require('nodemailer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -71,6 +73,7 @@ const candidatoSchema = new mongoose.Schema({
     habilidades: String,
     cvUrl: String,
     fotoUrl: String,
+    textoExtraidoCV: String, // Campo nuevo para el texto extraído del archivo subido
     fecha: String,
     pagado: { type: Boolean, default: false }
 });
@@ -86,13 +89,14 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación
+// 🌐 Endpoint de Recepción de Postulación (Actualizado con lectura de PDF/Word)
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
         let cvUrlLocal = '';
         let fotoUrlLocal = '';
+        let textoExtraidoCV = '';
 
         if (req.files && req.files.length > 0) {
             const cvFile = req.files.find(f => f.fieldname === 'cvFile') || req.files[0];
@@ -100,6 +104,22 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
             if (cvFile) {
                 cvUrlLocal = `/uploads/${path.basename(cvFile.path)}`;
+                
+                // Procesar la lectura del archivo adjunto (PDF o Word)
+                try {
+                    const filePath = cvFile.path;
+                    const buffer = fs.readFileSync(filePath);
+
+                    if (cvFile.mimetype === 'application/pdf') {
+                        const dataPdf = await pdfParse(buffer);
+                        textoExtraidoCV = dataPdf.text;
+                    } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
+                        const resultWord = await mammoth.extractRawText({ buffer: buffer });
+                        textoExtraidoCV = resultWord.value;
+                    }
+                } catch (readError) {
+                    console.error('⚠️ No se pudo extraer texto del archivo adjunto:', readError);
+                }
             }
             if (fotoPerfil) {
                 fotoUrlLocal = `/uploads/${path.basename(fotoPerfil.path)}`;
@@ -123,6 +143,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             habilidades: habilidades || '',
             cvUrl: cvUrlLocal,
             fotoUrl: fotoUrlLocal,
+            textoExtraidoCV: textoExtraidoCV || '',
             fecha: new Date().toLocaleString(),
             pagado: false
         });
@@ -141,7 +162,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 <p><strong>Email:</strong> ${email}</p>
                 <p><strong>Teléfono:</strong> ${telefono}</p>
                 <hr>
-                <p>El perfil ya se encuentra guardado en tu Panel de Gestión.</p>
+                <p>El perfil y el texto de su CV adjunto ya se encuentran guardados en tu Panel de Gestión.</p>
             `
         };
 
@@ -259,7 +280,7 @@ app.get('/api/estado-pago/:id', async (req, res) => {
     }
 });
 
-// 📥 Endpoint público para descargar el CV (Actualizado para permitir la apertura directa al retornar del pago)
+// 📥 Endpoint público para descargar el CV
 app.get('/api/descargar-cv/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -269,7 +290,6 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
-        // Marcamos como pagado automáticamente al momento de solicitar la descarga tras el retorno de pago
         if (!candidato.pagado) {
             candidato.pagado = true;
             await candidato.save();

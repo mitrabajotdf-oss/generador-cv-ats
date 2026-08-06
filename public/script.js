@@ -1,4 +1,4 @@
-// Lógica para el envío del formulario y autocompletado
+// Lógica para el envío del formulario y autocompletado inteligente
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
     const cvInputFile = document.getElementById('cvFile');
@@ -96,9 +96,12 @@ if (formPostulacion) {
     });
 }
 
+// Función de interpretación inteligente del CV y autocompletado de campos
 function procesarYAutocompletarCampos(texto) {
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const textoBajo = texto.toLowerCase();
 
+    // 1. Detección de Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) {
@@ -106,13 +109,28 @@ function procesarYAutocompletarCampos(texto) {
         if (inputEmail) inputEmail.value = matchEmail[0];
     }
 
-    const regexTel = /(\+?54\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/;
-    const matchTel = texto.match(regexTel);
-    if (matchTel) {
+    // 2. Formato estricto de Teléfono con +54 9
+    const regexTel = /(?:\+?54\s?9?\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/g;
+    const matchesTel = texto.match(regexTel);
+    if (matchesTel && matchesTel.length > 0) {
+        let numerosLimpios = matchesTel[0].replace(/\D/g, '');
+        if (numerosLimpios.startsWith('549')) {
+            numerosLimpios = numerosLimpios.substring(3);
+        } else if (numerosLimpios.startsWith('54')) {
+            numerosLimpios = numerosLimpios.substring(2);
+        }
+        if (numerosLimpios.length >= 10) {
+            const codArea = numerosLimpios.substring(0, 4);
+            const resto = numerosLimpios.substring(4);
+            const inputTel = document.getElementById('telefono');
+            if (inputTel) inputTel.value = `+54 9 ${codArea} ${resto}`;
+        }
+    } else {
         const inputTel = document.getElementById('telefono');
-        if (inputTel) inputTel.value = matchTel[0];
+        if (inputTel && !inputTel.value) inputTel.value = '+54 9 2964 ';
     }
 
+    // 3. Detección de DNI
     const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
     const matchDni = texto.match(regexDni);
     if (matchDni && matchDni[1]) {
@@ -120,22 +138,72 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
+    // 4. Nombre Completo
     if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
         const inputNombre = document.getElementById('nombre');
-        if (inputNombre && !inputNombre.value) inputNombre.value = lineas[0];
+        if (inputNombre) inputNombre.value = lineas[0];
     }
 
+    // 5. Identificación inteligente del Resumen Profesional
+    let resumenExtraido = '';
+    const idxResumen = textoBajo.indexOf('resumen profesional');
+    const idxExperiencia = textoBajo.indexOf('experiencia');
+    if (idxResumen !== -1 && idxExperiencia !== -1 && idxExperiencia > idxResumen) {
+        resumenExtraido = texto.substring(idxResumen, idxExperiencia).replace(/resumen profesional/i, '').trim();
+    } else {
+        resumenExtraido = texto.substring(0, 350).trim();
+    }
     const inputResumen = document.getElementById('resumen');
-    if (inputResumen && !inputResumen.value) inputResumen.value = texto.substring(0, 400) + '...';
+    if (inputResumen) inputResumen.value = resumenExtraido;
 
+    // 6. Identificación de la Experiencia Laboral
+    let experienciaExtraida = '';
+    if (idxExperiencia !== -1) {
+        const idxEstudios = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : texto.length;
+        experienciaExtraida = texto.substring(idxExperiencia, idxEstudios).replace(/experiencia laboral|experiencia/i, '').trim();
+    } else {
+        experienciaExtraida = texto;
+    }
     const inputExperiencia = document.getElementById('experiencia');
-    if (inputExperiencia && !inputExperiencia.value) inputExperiencia.value = texto;
+    if (inputExperiencia) inputExperiencia.value = experienciaExtraida;
 
+    // 7. Identificación de Estudios y Formación
+    let estudiosExtraidos = '';
+    const idxEstudios = textoBajo.indexOf('estudios');
+    const idxHabilidades = textoBajo.indexOf('habilidades');
+    if (idxEstudios !== -1) {
+        let finEstudios = idxHabilidades !== -1 && idxHabilidades > idxEstudios ? idxHabilidades : texto.length;
+        estudiosExtraidos = texto.substring(idxEstudios, finEstudios).replace(/estudios y formación|estudios|educación/i, '').trim();
+    }
     const inputEstudios = document.getElementById('estudios');
-    if (inputEstudios && !inputEstudios.value) inputEstudios.value = 'Extraído automáticamente del CV adjunto.';
+    if (inputEstudios) inputEstudios.value = estudiosExtraidos || 'Formación académica detallada en CV adjunto.';
+
+    // 8. Extracción y relación automática de Habilidades basadas en la experiencia
+    let habilidadesDetectadas = [];
+    const diccionarioHabilidades = [
+        { term: 'tango', label: 'Manejo de Tango Gestión' },
+        { term: 'excel', label: 'Microsoft Excel Avanzado' },
+        { term: 'administrativo', label: 'Gestión Administrativa' },
+        { term: 'notarial', label: 'Gestión Notarial y Legal' },
+        { term: 'atención', label: 'Atención al Cliente' },
+        { term: 'caja', label: 'Manejo de Caja' },
+        { term: 'logística', label: 'Logística y Depósito' },
+        { term: 'ventas', label: 'Ventas y Comercialización' },
+        { term: 'copilot', label: 'Integración de IA (Copilot)' }
+    ];
+
+    diccionarioHabilidades.forEach(h => {
+        if (textoBajo.includes(h.term)) {
+            habilidadesDetectadas.push(h.label);
+        }
+    });
 
     const inputHabilidades = document.getElementById('habilidades');
-    if (inputHabilidades && !inputHabilidades.value) inputHabilidades.value = 'Administración • Gestión • Trabajo en Equipo';
+    if (inputHabilidades) {
+        inputHabilidades.value = habilidadesDetectadas.length > 0 
+            ? habilidadesDetectadas.join(' • ') 
+            : 'Administración • Gestión • Trabajo en Equipo';
+    }
 }
 
 // Variables globales del panel

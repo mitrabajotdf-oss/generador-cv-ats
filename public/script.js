@@ -63,6 +63,20 @@ if (formPostulacion) {
             if (data.success) {
                 document.getElementById('formPostulacion').style.display = 'none';
                 document.getElementById('resultadoSeccion').style.display = 'block';
+
+                // Configurar los enlaces de WhatsApp con el mensaje automático en la pantalla de éxito
+                const nombrePostulante = document.getElementById('nombre').value || 'Postulante';
+                const telefonoWhatsApp = '5492964659057';
+
+                const mensajeConFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV con foto.`);
+                const mensajeSinFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV sin foto.`);
+
+                const btnConFoto = document.getElementById('linkCvConFoto');
+                const btnSinFoto = document.getElementById('linkCvSinFoto');
+
+                if (btnConFoto) btnConFoto.href = `https://wa.me/${telefonoWhatsApp}?text=${mensajeConFoto}`;
+                if (btnSinFoto) btnSinFoto.href = `https://wa.me/${telefonoWhatsApp}?text=${mensajeSinFoto}`;
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 alert('Hubo un error al enviar: ' + (data.error || 'Desconocido'));
@@ -221,7 +235,6 @@ function cambiarDirectorio(dir) {
     renderizarExploradorCarpetas();
 }
 
-// Subcarpetas de Postulantes con archivos adjuntos visibles y separados
 function renderizarSubcarpetasPostulantes() {
     let listaFiltrada = todosLosCandidatos;
     
@@ -389,7 +402,6 @@ function filtrarSubcarpetas(texto) {
     renderizarExploradorCarpetas();
 }
 
-// Visor del CV ATS Optimizado (Sin foto)
 function verCVATS(c) {
     const habilidadesFinales = c.habilidades || 'Administración • Gestión • Trabajo en Equipo';
     let experienciaFinal = c.experiencia || c.textoExtraidoCV || '';

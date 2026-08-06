@@ -49,9 +49,9 @@ if (formPostulacion) {
 // Variables globales para el panel estructurado por carpetas
 let todosLosCandidatos = [];
 let carpetasBusquedas = [
-    { id: 1, titulo: 'Administrativo Contable', keywords: 'excel administración tango gestión' },
-    { id: 2, titulo: 'Atención al Cliente', keywords: 'atención al cliente ventas caja' },
-    { id: 3, titulo: 'Logística y Operaciones', keywords: 'logística chofer repositor carga' }
+    { id: 1, empresa: 'Estudio Notarial Bitsh', titulo: 'Administrativo Contable', keywords: 'excel administración tango gestión' },
+    { id: 2, empresa: 'Comercial Austral', titulo: 'Atención al Cliente', keywords: 'atención al cliente ventas caja' },
+    { id: 3, empresa: 'Logística Fueguina', titulo: 'Logística y Operaciones', keywords: 'logística chofer repositor carga' }
 ];
 let directorioActual = 'postulantes'; // 'postulantes' o 'busquedas'
 let busquedaSeleccionadaFiltro = '';
@@ -174,7 +174,7 @@ function renderizarExploradorCarpetas() {
             <div style="font-size: 36px;">📂</div>
             <div>
                 <div style="font-size: 16px; font-weight: bold; color: #1e293b;">Carpeta: Búsquedas & Vacantes</div>
-                <div style="font-size: 13px; color: #64748b;">${carpetasBusquedas.length} Perfiles de búsqueda creados</div>
+                <div style="font-size: 13px; color: #64748b;">${carpetasBusquedas.length} Empresas / Perfiles creados</div>
             </div>
         </div>
 
@@ -197,7 +197,7 @@ function cambiarDirectorio(dir) {
     renderizarExploradorCarpetas();
 }
 
-// Subcarpetas de Postulantes (Cada postulante es una subcarpeta con sus archivos)
+// Subcarpetas de Postulantes
 function renderizarSubcarpetasPostulantes() {
     let listaFiltrada = todosLosCandidatos;
     
@@ -214,7 +214,7 @@ function renderizarSubcarpetasPostulantes() {
         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 250px;">
             <input type="text" id="buscadorGeneral" placeholder="🔍 Buscar subcarpeta de postulante..." oninput="filtrarSubcarpetas(this.value)" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none;">
         </div>
-        ${busquedaSeleccionadaFiltro ? `<div style="background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">Filtrando por Búsqueda: "${busquedaSeleccionadaFiltro}" <button onclick="busquedaSeleccionadaFiltro=''; renderizarExploradorCarpetas();" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; margin-left:5px;">✕</button></div>` : ''}
+        ${busquedaSeleccionadaFiltro ? `<div style="background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">Filtrando por Requisitos: "${busquedaSeleccionadaFiltro}" <button onclick="busquedaSeleccionadaFiltro=''; renderizarExploradorCarpetas();" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; margin-left:5px;">✕</button></div>` : ''}
         <label style="cursor: pointer; font-weight: 600; color: #0284c7; font-size: 13px;">
             <input type="checkbox" id="chkIncluirFoto" style="margin-right: 6px;"> Incluir Foto en CV ATS
         </label>
@@ -286,16 +286,17 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Subcarpetas de Búsquedas (Cada búsqueda es una subcarpeta de vacante)
+// Subcarpetas de Búsquedas con campo específico para la Empresa
 function renderizarSubcarpetasBusquedas() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
-        <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1e293b;">📂 Subcarpetas de Búsquedas y Vacantes Corporativas</h3>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Cada tarjeta representa una subcarpeta de búsqueda. Al hacer clic en <strong>"Evaluar Postulantes"</strong>, el sistema abrirá la carpeta de postulantes ordenados por afinidad ATS.</p>
+        <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1e293b;">📂 Subcarpetas de Búsquedas y Empresas Corporativas</h3>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Registra el nombre de la empresa y su vacante. Al hacer clic en <strong>"Evaluar Postulantes"</strong>, el sistema ordenará los perfiles según la afinidad de keywords ATS.</p>
         
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <input type="text" id="nuevaBusquedaTitulo" placeholder="Título de la Subcarpeta (Ej: Operario de Logística)..." style="flex: 1; min-width: 220px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <input type="text" id="nuevaBusquedaKeywords" placeholder="Keywords (Ej: chofer carga registro)..." style="flex: 2; min-width: 280px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaEmpresa" placeholder="🏢 Nombre de la Empresa (Ej: Sura, Newsan)..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto (Ej: Operario de Logística)..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS (Ej: chofer carga registro)..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
             <button onclick="agregarSubcarpetaBusqueda()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">➕ Crear Subcarpeta</button>
         </div>
 
@@ -305,8 +306,9 @@ function renderizarSubcarpetasBusquedas() {
         html += `
         <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-                <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 Subcarpeta: ${b.titulo}</div>
-                <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Requisitos ATS:</strong> ${b.keywords}</div>
+                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 2px;">🏢 ${b.empresa || 'Empresa General'}</div>
+                <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 Vacante: ${b.titulo}</div>
+                <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Keywords ATS:</strong> ${b.keywords}</div>
             </div>
             <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
                 <button onclick="evaluarSubcarpetaBusqueda('${b.keywords}')" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">🔍 Evaluar Postulantes</button>
@@ -320,16 +322,18 @@ function renderizarSubcarpetasBusquedas() {
 }
 
 function agregarSubcarpetaBusqueda() {
+    const empresaInput = document.getElementById('nuevaEmpresa');
     const tituloInput = document.getElementById('nuevaBusquedaTitulo');
     const keywordsInput = document.getElementById('nuevaBusquedaKeywords');
     
-    if (!tituloInput.value || !keywordsInput.value) {
-        alert('Por favor completa el título y las keywords de la subcarpeta.');
+    if (!empresaInput.value || !tituloInput.value || !keywordsInput.value) {
+        alert('Por favor completa el nombre de la empresa, el título del puesto y las keywords.');
         return;
     }
 
     carpetasBusquedas.push({
         id: Date.now(),
+        empresa: empresaInput.value,
         titulo: tituloInput.value,
         keywords: keywordsInput.value
     });

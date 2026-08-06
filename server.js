@@ -72,6 +72,7 @@ const candidatoSchema = new mongoose.Schema({
     estudios: String,
     habilidades: String,
     cvUrl: String,
+    nombreArchivoCV: String, // Guardamos el nombre real del archivo adjunto
     fotoUrl: String,
     textoExtraidoCV: String, 
     fecha: String,
@@ -95,6 +96,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
         let cvUrlLocal = '';
+        let nombreArchivoOriginal = '';
         let fotoUrlLocal = '';
         let textoExtraidoCV = '';
 
@@ -104,6 +106,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
             if (cvFile) {
                 cvUrlLocal = `/uploads/${path.basename(cvFile.path)}`;
+                nombreArchivoOriginal = cvFile.originalname;
                 try {
                     const filePath = cvFile.path;
                     const buffer = fs.readFileSync(filePath);
@@ -140,6 +143,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             estudios: estudios || '',
             habilidades: habilidades || '',
             cvUrl: cvUrlLocal,
+            nombreArchivoCV: nombreArchivoOriginal,
             fotoUrl: fotoUrlLocal,
             textoExtraidoCV: textoExtraidoCV || '',
             fecha: new Date().toLocaleString(),
@@ -186,10 +190,8 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
-        // CORRECCIÓN: Buscamos tanto en fotoUrl como en fotoPerfil para asegurarnos de que la imagen aparezca siempre
         const fotoSrc = candidato.fotoUrl || candidato.fotoPerfil || '';
 
-        // HTML limpio que incluye la foto corporativa para el cliente/empresa
         const htmlCV = `
         <!DOCTYPE html>
         <html lang="es">
@@ -372,10 +374,10 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
 
         const filePath = path.join(__dirname, candidato.cvUrl);
         if (!fs.existsSync(filePath)) {
-            return res.status(404).send('El archivo físico no se encuentra en el servidor.');
+            return res.status(404).send('⚠️ El archivo físico ya no se encuentra en el servidor (posible reinicio o candidato antiguo).');
         }
 
-        return res.download(filePath);
+        return res.download(filePath, candidato.nombreArchivoCV || 'CV_Postulante');
     } catch (error) {
         return res.status(500).send('Error al procesar la descarga.');
     }

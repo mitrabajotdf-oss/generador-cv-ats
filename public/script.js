@@ -264,7 +264,6 @@ function verCVATS(c) {
     const habilidadesFinales = enriquecerHabilidadesATS(c);
     const fotoSrc = c.fotoUrl || c.fotoPerfil;
 
-    // Fusión inteligente: Si hay texto profundo extraído del CV, se prioriza y unifica limpiamente
     let experienciaFinal = c.experiencia || '';
     if (c.textoExtraidoCV && c.textoExtraidoCV.trim() !== '') {
         experienciaFinal = c.textoExtraidoCV.trim();

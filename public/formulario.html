@@ -50,12 +50,12 @@
             background: #eff6ff;
             border: 1px solid #bfdbfe;
             color: #1e40af;
-            padding: 12px 16px;
+            padding: 14px 18px;
             border-radius: 8px;
             font-size: 13px;
             margin-bottom: 25px;
-            text-align: center;
-            font-weight: 500;
+            text-align: left;
+            line-height: 1.6;
         }
 
         h3 {
@@ -173,7 +173,7 @@
             font-size: 14px;
         }
 
-        .btn-con-foto { background: #25d366; } /* Color estilo WhatsApp */
+        .btn-con-foto { background: #25d366; }
         .btn-sin-foto { background: #25d366; }
 
         .nota-ats {
@@ -188,15 +188,15 @@
 <body>
 
     <div class="container">
-        <!-- Pantalla de Éxito con redirección automática a WhatsApp -->
+        <!-- Pantalla de Éxito -->
         <div id="resultadoSeccion" class="success-box">
             <h2>🎉 ¡Postulación Enviada con Éxito!</h2>
             <p>El formulario fue enviado con éxito y quedó registrado en nuestra base de datos para las búsquedas internas.</p>
             
             <div class="download-buttons-container">
                 <div style="font-weight: 600; font-size: 14px; color: #1e293b; margin-bottom: 5px;">Solicita tus formatos por WhatsApp:</div>
-                <a href="https://wa.me/5492964659057?text=Hola,%20quiero%20descargar%20mi%20cv%20con%20foto" target="_blank" class="btn-descarga-exito btn-con-foto">💬 Pedir CV con Foto por WhatsApp</a>
-                <a href="https://wa.me/5492964659057?text=Hola,%20quiero%20descargar%20mi%20cv%20sin%20foto" target="_blank" class="btn-descarga-exito btn-sin-foto">💬 Pedir CV sin Foto por WhatsApp</a>
+                <a href="#" id="linkCvConFoto" target="_blank" class="btn-descarga-exito btn-con-foto">💬 Pedir CV con Foto por WhatsApp</a>
+                <a href="#" id="linkCvSinFoto" target="_blank" class="btn-descarga-exito btn-sin-foto">💬 Pedir CV sin Foto por WhatsApp</a>
             </div>
 
             <div class="nota-ats">
@@ -210,8 +210,9 @@
             <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
             <div class="aviso-obligatorio">Los campos marcados con <span style="color: #ef4444; font-weight: bold;">*</span> son obligatorios.</div>
 
+            <!-- Aviso importante actualizado con la advertencia de fallas e interpretación por imágenes/gráficos -->
             <div class="aviso-autocompletado">
-                💡 <strong>Aviso importante:</strong> Al adjuntar tu CV, el sistema autocompletará los campos automáticamente. Por favor, <strong>verificá que los datos se hayan completado correctamente</strong> y modificalos de forma manual si es necesario antes de enviar.
+                💡 <strong>Aviso importante:</strong> Al adjuntar tu CV, el sistema intentará autocompletar los campos automáticamente. Sin embargo, <strong>la interfaz puede fallar y completar mal los campos obligatorios</strong> debido a los filtros ATS, imágenes, gráficos u otros elementos visuales del archivo que impiden una lectura correcta. <br><br>Por favor, <strong>verificá detalladamente que los datos se hayan completado bien</strong> y modificalos de forma manual si es necesario antes de enviar.
             </div>
 
             <div class="form-group">

@@ -153,7 +153,7 @@ function enriquecerHabilidadesATS(candidato) {
     return habilidadesManuales || 'No especificadas.';
 }
 
-// Función para renderizar la tabla con visualización de foto, descarga de archivo original y opciones de CV
+// Función para renderizar la tabla con visualización de foto, nombre del archivo y descarga segura
 function renderizarTabla(candidatos, textoBusqueda = '') {
     if (!listaCandidatosDiv) return;
 
@@ -177,7 +177,7 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
     html += '</label></div>';
 
     html += '<table border="1" style="width:100%; border-collapse: collapse; margin-top: 5px; background:white;">';
-    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>CV Original</th>';
+    html += '<tr style="background:#f2f2f2;"><th>Foto</th><th>Puesto Requerido</th><th>Nombre</th><th>Email / Teléfono</th><th>CV Original Adjunto</th>';
     if (textoBusqueda) html += '<th>Afinidad ATS</th>';
     html += '<th>Fecha</th><th>Acciones ATS / Empresa</th></tr>';
     
@@ -192,9 +192,10 @@ function renderizarTabla(candidatos, textoBusqueda = '') {
             avatarHtml = `<img src="${imgSource}" alt="Foto" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #bdc3c7;">`;
         }
 
-        // Enlace seguro al servidor para la descarga física del archivo original
+        // Mostramos el nombre real del archivo adjunto y el botón de descarga directa
+        const nombreArchivoMostrable = c.nombreArchivoCV || 'Documento CV';
         const linkCvOriginal = c.cvUrl 
-            ? `<a href="/api/descargar-cv/${c.id}" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
+            ? `<div style="margin-bottom:4px; font-size:11px; color:#2c3e50; font-weight:bold; word-break:break-all;">📎 ${nombreArchivoMostrable}</div><a href="/api/descargar-cv/${c.id}" style="background:#007bff; color:white; padding:5px 8px; text-decoration:none; border-radius:3px; font-size:11px; display:inline-block;">📥 Descargar CV</a>` 
             : '<span style="color:#999; font-size:11px;">No adjunto</span>';
 
         html += `<tr>

@@ -72,7 +72,7 @@ const candidatoSchema = new mongoose.Schema({
     estudios: String,
     habilidades: String,
     cvUrl: String,
-    nombreArchivoCV: String, // Guardamos el nombre real del archivo adjunto
+    nombreArchivoCV: String,
     fotoUrl: String,
     textoExtraidoCV: String, 
     fecha: String,
@@ -81,7 +81,7 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// 📧 Configuración del Transportador de Correos (Nodemailer)
+// 📧 Configuración de Nodemailer
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -90,7 +90,7 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación (Lectura de PDF/Word y Fotos)
+// 🌐 Endpoint de Recepción de Postulación (Lectura íntegra del CV sin filtros)
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -113,13 +113,13 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
-                        textoExtraidoCV = dataPdf.text;
+                        textoExtraidoCV = dataPdf.text; // Lectura completa sin filtros
                     } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
                         const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        textoExtraidoCV = resultWord.value;
+                        textoExtraidoCV = resultWord.value; // Lectura completa sin filtros
                     }
                 } catch (readError) {
-                    console.error('⚠️ No se pudo extraer texto del archivo adjunto:', readError);
+                    console.error('⚠️ No se pudo extraer texto completo del CV:', readError);
                 }
             }
             if (fotoPerfil) {
@@ -164,7 +164,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 <p><strong>Email:</strong> ${email}</p>
                 <p><strong>Teléfono:</strong> ${telefono}</p>
                 <hr>
-                <p>El perfil y el texto de su CV adjunto ya se encuentran guardados en tu Panel de Gestión.</p>
+                <p>El perfil y el texto íntegro de su CV adjunto ya se encuentran guardados en el panel de gestión.</p>
             `
         };
 
@@ -180,7 +180,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 🏢 Endpoint Protegido: Genera el CV con Foto para enviar a Empresas
+// 🏢 Endpoint: Genera el CV con Foto para Empresas
 app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -190,7 +190,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
-        const fotoSrc = candidato.fotoUrl || candidato.fotoPerfil || '';
+        const fotoSrc = candidato.fotoUrl || '';
 
         const htmlCV = `
         <!DOCTYPE html>
@@ -251,109 +251,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 💳 Endpoint para Crear Preferencia de Pago Dinámica
-app.post('/api/crear-preferencia/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-
-        if (!candidato) {
-            return res.status(404).json({ success: false, error: 'Candidato no encontrado.' });
-        }
-
-        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
-        if (!mpAccessToken) {
-            return res.status(500).json({ success: false, error: 'Falta configurar el Token de Mercado Pago.' });
-        }
-
-        const preferenceData = {
-            items: [
-                {
-                    title: `CV Optimizado ATS - ${candidato.nombre}`,
-                    quantity: 1,
-                    unit_price: 5000
-                }
-            ],
-            external_reference: String(candidato.id),
-            back_urls: {
-                success: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=exitoso&id=${candidato.id}`,
-                failure: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=fallido&id=${candidato.id}`,
-                pending: `https://generador-cv-ats-1.onrender.com/formulario.html?pago=pendiente&id=${candidato.id}`
-            },
-            auto_return: 'approved'
-        };
-
-        const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${mpAccessToken}`
-            },
-            body: JSON.stringify(preferenceData)
-        });
-
-        const preferenceResult = await mpResponse.json();
-
-        if (mpResponse.ok) {
-            return res.json({
-                success: true,
-                init_point: preferenceResult.init_point,
-                sandbox_init_point: preferenceResult.sandbox_init_point
-            });
-        } else {
-            return res.status(500).json({ success: false, error: preferenceResult.message || 'Error al crear preferencia en MP' });
-        }
-
-    } catch (error) {
-        console.error('❌ Error creando preferencia:', error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 💳 Webhook Mercado Pago
-app.post('/api/webhook-mercadopago', async (req, res) => {
-    try {
-        const notification = req.body;
-        if (notification.type === 'payment' || notification.action === 'payment.created' || notification.action === 'payment.updated') {
-            const paymentId = notification.data?.id || notification.id;
-            if (paymentId) {
-                const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-                    headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` }
-                });
-                if (mpResponse.ok) {
-                    const paymentData = await mpResponse.json();
-                    if (paymentData.status === 'approved') {
-                        const externalRef = paymentData.external_reference;
-                        if (externalRef) {
-                            await Candidato.updateOne({ id: Number(externalRef) }, { $set: { pagado: true } });
-                        } else {
-                            await Candidato.findOneAndUpdate({}, { $set: { pagado: true } }, { sort: { _id: -1 } });
-                        }
-                    }
-                }
-            }
-        }
-        return res.status(200).send('OK');
-    } catch (error) {
-        return res.status(500).send('Error');
-    }
-});
-
-// 🔍 Endpoint público para consultar si un candidato ya pagó
-app.get('/api/estado-pago/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) {
-            return res.json({ success: false, error: 'Candidato no encontrado' });
-        }
-        return res.json({ success: true, pagado: candidato.pagado, cvUrl: candidato.cvUrl });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 📥 Endpoint público para descargar el CV original
+// 📥 Endpoint para descargar el CV original
 app.get('/api/descargar-cv/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -363,18 +261,13 @@ app.get('/api/descargar-cv/:id', async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
-        if (!candidato.pagado) {
-            candidato.pagado = true;
-            await candidato.save();
-        }
-
         if (!candidato.cvUrl || !candidato.cvUrl.startsWith('/uploads/')) {
             return res.status(404).send('Archivo de CV no disponible.');
         }
 
         const filePath = path.join(__dirname, candidato.cvUrl);
         if (!fs.existsSync(filePath)) {
-            return res.status(404).send('⚠️ El archivo físico ya no se encuentra en el servidor (posible reinicio o candidato antiguo).');
+            return res.status(404).send('⚠️ El archivo físico ya no se encuentra en el servidor.');
         }
 
         return res.download(filePath, candidato.nombreArchivoCV || 'CV_Postulante');

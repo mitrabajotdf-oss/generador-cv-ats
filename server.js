@@ -186,6 +186,9 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
+        // CORRECCIÓN: Buscamos tanto en fotoUrl como en fotoPerfil para asegurarnos de que la imagen aparezca siempre
+        const fotoSrc = candidato.fotoUrl || candidato.fotoPerfil || '';
+
         // HTML limpio que incluye la foto corporativa para el cliente/empresa
         const htmlCV = `
         <!DOCTYPE html>
@@ -206,7 +209,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
         </head>
         <body>
             <div class="header">
-                ${candidato.fotoUrl ? `<img src="${candidato.fotoUrl}" class="foto" alt="Foto de perfil">` : ''}
+                ${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto de perfil">` : ''}
                 <div class="info">
                     <h1>${candidato.nombre}</h1>
                     <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido}</p>

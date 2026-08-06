@@ -114,7 +114,7 @@ app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación (Lectura íntegra del CV sin filtros)
+// 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -176,26 +176,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
         await nuevoCandidato.save();
 
-        const mailOptions = {
-            from: 'mitrabajotdf@gmail.com',
-            to: 'mitrabajotdf@gmail.com',
-            subject: `🚀 ¡Nueva Postulación Recibida: ${nombre}!`,
-            html: `
-                <h2>¡Nuevo postulante registrado en Mi Trabajo TDF!</h2>
-                <p><strong>Puesto Requerido:</strong> ${puestoRequerido || 'General'}</p>
-                <p><strong>Nombre:</strong> ${nombre}</p>
-                <p><strong>DNI:</strong> ${dni}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Teléfono:</strong> ${telefono}</p>
-                <hr>
-                <p>El perfil y el texto íntegro de su CV adjunto ya se encuentran guardados en el panel de gestión.</p>
-            `
-        };
-
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) console.error('❌ Error correo:', error);
-        });
-
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });
 
     } catch (error) {
@@ -221,15 +201,15 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <title>CV - ${candidato.nombre}</title>
+            <title>CV Corporativo con Foto - ${candidato.nombre}</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; }
+                body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 40px auto; }
                 .header { display: flex; align-items: center; gap: 25px; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 20px; }
                 .foto { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0056b3; }
-                .info h1 { margin: 0; color: #0056b3; }
+                .info h1 { margin: 0; color: #0056b3; font-size: 24px; text-transform: uppercase; }
                 .section { margin-bottom: 20px; }
-                .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; }
-                .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; font-size: 15px; text-transform: uppercase; }
+                .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; display: block; margin: 30px auto; }
                 @media print { .btn-print { display: none; } }
             </style>
         </head>
@@ -271,7 +251,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
 
         return res.send(htmlCV);
     } catch (error) {
-        return res.status(500).send('Error al generar el CV para la empresa.');
+        return res.status(500).send('Error al generar el CV corporativo.');
     }
 });
 
@@ -316,6 +296,10 @@ app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
         if (candidato && candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
             const filePath = path.join(__dirname, candidato.cvUrl);
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+        if (candidato && candidato.fotoUrl && candidato.fotoUrl.startsWith('/uploads/')) {
+            const fotoPath = path.join(__dirname, candidato.fotoUrl);
+            if (fs.existsSync(fotoPath)) fs.unlinkSync(fotoPath);
         }
         await Candidato.deleteOne({ id: id });
         return res.json({ success: true });

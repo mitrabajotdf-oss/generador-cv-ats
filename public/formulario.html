@@ -136,29 +136,80 @@
         .success-box {
             display: none;
             text-align: center;
-            padding: 40px 20px;
+            padding: 20px 10px;
         }
 
         .success-box h2 {
             color: var(--success);
             margin-bottom: 15px;
         }
+
+        .success-box p {
+            font-size: 15px;
+            color: #334155;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .download-buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 25px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-descarga-exito {
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            display: block;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .btn-con-foto { background: #25d366; } /* Color estilo WhatsApp */
+        .btn-sin-foto { background: #25d366; }
+
+        .nota-ats {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-top: 15px;
+            padding: 0 10px;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- Pantalla de Éxito con redirección automática a WhatsApp -->
         <div id="resultadoSeccion" class="success-box">
             <h2>🎉 ¡Postulación Enviada con Éxito!</h2>
-            <p>Tus datos y archivos fueron recibidos y guardados correctamente en tu legajo del sistema ATS.</p>
-            <a href="/formulario.html" style="display:inline-block; margin-top:15px; background:var(--secondary); color:white; padding:10px 20px; text-decoration:none; border-radius:6px; font-weight:600;">Cargar otra postulación</a>
+            <p>El formulario fue enviado con éxito y quedó registrado en nuestra base de datos para las búsquedas internas.</p>
+            
+            <div class="download-buttons-container">
+                <div style="font-weight: 600; font-size: 14px; color: #1e293b; margin-bottom: 5px;">Solicita tus formatos por WhatsApp:</div>
+                <a href="https://wa.me/5492964659057?text=Hola,%20quiero%20descargar%20mi%20cv%20con%20foto" target="_blank" class="btn-descarga-exito btn-con-foto">💬 Pedir CV con Foto por WhatsApp</a>
+                <a href="https://wa.me/5492964659057?text=Hola,%20quiero%20descargar%20mi%20cv%20sin%20foto" target="_blank" class="btn-descarga-exito btn-sin-foto">💬 Pedir CV sin Foto por WhatsApp</a>
+            </div>
+
+            <div class="nota-ats">
+                * Nota importante: Los filtros automáticos (ATS) que utilizan las empresas habitualmente descartan los CVs con fotos, gráficos o elementos de diseño complejos. Te recomendamos utilizar y conservar el formato ATS optimizado (sin foto) para tus postulaciones corporativas.
+            </div>
+
+            <a href="/formulario.html" style="display:inline-block; margin-top:25px; background:var(--secondary); color:white; padding:10px 20px; text-decoration:none; border-radius:6px; font-weight:600;">Cargar otra postulación</a>
         </div>
 
         <form id="formPostulacion">
             <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
             <div class="aviso-obligatorio">Los campos marcados con <span style="color: #ef4444; font-weight: bold;">*</span> son obligatorios.</div>
 
-            <!-- Leyenda explicativa de autocompletado y corrección manual -->
             <div class="aviso-autocompletado">
                 💡 <strong>Aviso importante:</strong> Al adjuntar tu CV, el sistema autocompletará los campos automáticamente. Por favor, <strong>verificá que los datos se hayan completado correctamente</strong> y modificalos de forma manual si es necesario antes de enviar.
             </div>

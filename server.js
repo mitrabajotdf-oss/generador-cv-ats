@@ -5,7 +5,6 @@ const path = require('path');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
-const nodemailer = require('nodemailer');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 
@@ -175,7 +174,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 🌐 Endpoint para actualizar / subir archivos faltantes directamente desde el Panel de Gestión
+// 🌐 Endpoint robusto para actualizar / subir archivos desde el Panel de Gestión
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -186,8 +185,8 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
         }
 
         if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile' || f.fieldname.startsWith('panelCv'));
-            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil' || f.fieldname.startsWith('panelFoto'));
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile' || f.fieldname.includes('Cv'));
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil' || f.fieldname.includes('Foto'));
 
             if (cvFile) {
                 candidato.cvUrl = `/uploads/${path.basename(cvFile.path)}`;
@@ -214,7 +213,7 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             return res.json({ success: true, message: 'Archivos actualizados con éxito' });
         }
 
-        return res.json({ success: false, error: 'No se detectaron archivos' });
+        return res.json({ success: false, error: 'No se detectaron archivos en la solicitud' });
     } catch (error) {
         console.error("Error en actualización desde panel:", error);
         return res.status(500).json({ success: false, error: error.message });

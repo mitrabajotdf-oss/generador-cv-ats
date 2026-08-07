@@ -174,7 +174,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 🌐 Endpoint robusto para actualizar / subir archivos desde el Panel de Gestión
+// 🌐 Endpoint para actualizar / subir archivos faltantes directamente desde el Panel de Gestión
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
         const id = Number(req.params.id);

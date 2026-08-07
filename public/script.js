@@ -380,7 +380,7 @@ function renderizarSubcarpetasPostulantes() {
                     ${linkCvOriginal}
                     ${linkFotoPerfil}
                     
-                    <!-- Opción para subir o reponer archivos directamente desde el panel -->
+                    <!-- Opción para subir o reponer archivos directamente desde el panel con recarga limpia -->
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
                         <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;">
@@ -403,7 +403,7 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Función original limpia para subir archivos desde el panel
+// Función auxiliar con recarga limpia location.reload()
 async function subirArchivosDesdePanel(idCandidato) {
     const inputCv = document.getElementById(`panelCv_${idCandidato}`);
     const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);
@@ -412,8 +412,8 @@ async function subirArchivosDesdePanel(idCandidato) {
     if (inputCv && inputCv.files[0]) formData.append('cvFile', inputCv.files[0]);
     if (inputFoto && inputFoto.files[0]) formData.append('fotoPerfil', inputFoto.files[0]);
 
-    if (!inputCv.files[0] && !inputFoto.files[0]) {
-        alert('Por favor selecciona al menos un archivo para subir.');
+    if ((!inputCv || !inputCv.files[0]) && (!inputFoto || !inputFoto.files[0])) {
+        alert('Por favor selecciona al menos un archivo (CV o Foto) para subir.');
         return;
     }
 
@@ -425,11 +425,12 @@ async function subirArchivosDesdePanel(idCandidato) {
         const data = await res.json();
         if (data.success) {
             alert('¡Archivos actualizados correctamente en el legajo!');
-            cargarCandidatos();
+            location.reload();
         } else {
             alert('Error al actualizar: ' + (data.error || 'Desconocido'));
         }
     } catch (e) {
+        console.error(e);
         alert('Error de conexión con el servidor.');
     }
 }

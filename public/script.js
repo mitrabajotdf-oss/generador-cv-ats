@@ -334,22 +334,22 @@ function renderizarSubcarpetasPostulantes() {
         else if (c.porcentaje >= 40) badgeColor = '#f39c12';
 
         let avatarHtml = '<div style="width: 50px; height: 50px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid #cbd5e1;">Sin foto</div>';
-        if (c.fotoUrl) {
-            avatarHtml = `<img src="${c.fotoUrl}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
+        if (c.fotoData) {
+            avatarHtml = `<img src="/api/foto/${c.id}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
 
         const nombreArchivoCV = c.nombreArchivoCV || 'Documento CV';
-        const linkCvOriginal = c.cvUrl 
+        const linkCvOriginal = c.cvData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
                    <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${nombreArchivoCV}">📄 ${nombreArchivoCV}</span>
                    <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar CV</a>
                </div>` 
             : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">📂 Sin archivo de CV</div>';
 
-        const linkFotoPerfil = c.fotoUrl 
+        const linkFotoPerfil = c.fotoData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
                    <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📷 Foto de Perfil</span>
-                   <a href="${c.fotoUrl}" target="_blank" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">👁️ Ver Foto</a>
+                   <a href="/api/foto/${c.id}" target="_blank" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">👁️ Ver Foto</a>
                </div>` 
             : '';
 
@@ -380,7 +380,7 @@ function renderizarSubcarpetasPostulantes() {
                     ${linkCvOriginal}
                     ${linkFotoPerfil}
                     
-                    <!-- Opción para subir o reponer archivos directamente desde el panel con recarga limpia -->
+                    <!-- Opción para subir o reponer archivos directamente desde el panel -->
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
                         <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;">
@@ -403,7 +403,7 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Función auxiliar con recarga limpia location.reload()
+// Función auxiliar para subir archivos desde el panel con recarga limpia
 async function subirArchivosDesdePanel(idCandidato) {
     const inputCv = document.getElementById(`panelCv_${idCandidato}`);
     const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);

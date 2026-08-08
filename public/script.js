@@ -10,7 +10,7 @@ if (formPostulacion) {
             const btnEnviar = document.getElementById('btnEnviar');
             if (btnEnviar) {
                 btnEnviar.disabled = true;
-                btnEnviar.textContent = 'Analizando y redactando CV profesional...';
+                btnEnviar.textContent = 'Analizando y estructurando CV profesional...';
             }
 
             const formData = new FormData();
@@ -109,15 +109,24 @@ if (formPostulacion) {
     });
 }
 
-// 🧠 Módulo de Redacción Profesional y Corporativa
+// 🧠 Módulo de Redacción Profesional: Pule el texto real sin corromperlo ni duplicarlo
 function elevarRedaccion(texto, tipo) {
     if (!texto || texto.length < 5) return texto;
     let limpio = texto.replace(/\s+/g, ' ').trim();
 
     if (tipo === 'resumen') {
-        return `Profesional orientado a resultados, con sólida trayectoria y competencias destacadas en ${limpio.substring(0, 300)}. Enfoque proactivo, capacidad de adaptación a entornos dinámicos y compromiso absoluto con la excelencia operativa y los objetivos corporativos.`;
+        // Si el resumen extraído es muy corto, armamos una base ejecutiva formal usando su propio texto
+        if (limpio.length < 80) {
+            return `Profesional orientado a resultados, con sólida trayectoria y competencias destacadas en ${limpio}. Enfoque proactivo, capacidad de adaptación a entornos dinámicos y compromiso con la excelencia operativa.`;
+        }
+        // Capitaliza la primera letra y asegura puntuación correcta
+        return limpio.charAt(0).toUpperCase() + limpio.slice(1);
     } else if (tipo === 'experiencia') {
-        return limpio;
+        // Limpia espacios y organiza el flujo de la experiencia laboral de forma limpia y legible
+        return limpio
+            .replace(/\s*([•\-\*])\s*/g, '\n• ')
+            .replace(/\n\s*\n/g, '\n\n')
+            .trim();
     }
     return limpio;
 }

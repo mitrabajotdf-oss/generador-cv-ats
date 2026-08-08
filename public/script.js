@@ -1,4 +1,4 @@
-// Lógica para el envío del formulario y autocompletado inteligente
+// Lógica para el envío del formulario, autocompletado y mejora de redacción profesional
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
     const cvInputFile = document.getElementById('cvFile');
@@ -10,7 +10,7 @@ if (formPostulacion) {
             const btnEnviar = document.getElementById('btnEnviar');
             if (btnEnviar) {
                 btnEnviar.disabled = true;
-                btnEnviar.textContent = 'Analizando CV y autocompletando formulario...';
+                btnEnviar.textContent = 'Analizando y redactando CV profesional...';
             }
 
             const formData = new FormData();
@@ -47,10 +47,13 @@ if (formPostulacion) {
             return;
         }
 
+        // Optimizar redacción corporativa justo antes de enviar
+        optimizarRedaccionCampos();
+
         const btn = document.getElementById('btnEnviar');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Enviando postulación...';
+            btn.textContent = 'Enviando postulación optimizada...';
         }
 
         const formData = new FormData(this);
@@ -106,9 +109,33 @@ if (formPostulacion) {
     });
 }
 
+// 🧠 Módulo de Redacción Profesional y Corporativa
+function elevarRedaccion(texto, tipo) {
+    if (!texto || texto.length < 5) return texto;
+    let limpio = texto.replace(/\s+/g, ' ').trim();
+
+    if (tipo === 'resumen') {
+        return `Profesional orientado a resultados, con sólida trayectoria y competencias destacadas en ${limpio.substring(0, 300)}. Enfoque proactivo, capacidad de adaptación a entornos dinámicos y compromiso absoluto con la excelencia operativa y los objetivos corporativos.`;
+    } else if (tipo === 'experiencia') {
+        return limpio;
+    }
+    return limpio;
+}
+
+function optimizarRedaccionCampos() {
+    const inputResumen = document.getElementById('resumen');
+    const inputExperiencia = document.getElementById('experiencia');
+
+    if (inputResumen && inputResumen.value) {
+        inputResumen.value = elevarRedaccion(inputResumen.value, 'resumen');
+    }
+    if (inputExperiencia && inputExperiencia.value) {
+        inputExperiencia.value = elevarRedaccion(inputExperiencia.value, 'experiencia');
+    }
+}
+
 // Función de interpretación inteligente del CV y autocompletado
 function procesarYAutocompletarCampos(texto) {
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const textoBajo = texto.toLowerCase();
 
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
@@ -145,51 +172,55 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
+    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
         const inputNombre = document.getElementById('nombre');
         if (inputNombre) inputNombre.value = lineas[0];
     }
 
     let resumenExtraido = '';
-    const idxResumen = textoBajo.indexOf('resumen profesional');
-    const idxExperiencia = textoBajo.indexOf('experiencia');
-    if (idxResumen !== -1 && idxExperiencia !== -1 && idxExperiencia > idxResumen) {
-        resumenExtraido = texto.substring(idxResumen, idxExperiencia).replace(/resumen profesional/i, '').trim();
+    const idxResumen = textoBajo.indexOf('resumen');
+    const idxExperienciaKey = textoBajo.indexOf('experiencia');
+    if (idxResumen !== -1 && idxExperienciaKey !== -1 && idxExperienciaKey > idxResumen) {
+        resumenExtraido = texto.substring(idxResumen, idxExperienciaKey).replace(/resumen profesional|resumen/i, '').trim();
     } else {
-        resumenExtraido = texto.substring(0, 350).trim();
+        resumenExtraido = texto.substring(0, 400).trim();
     }
     const inputResumen = document.getElementById('resumen');
-    if (inputResumen) inputResumen.value = resumenExtraido;
+    if (inputResumen) inputResumen.value = elevarRedaccion(resumenExtraido, 'resumen');
 
     let experienciaExtraida = '';
-    if (idxExperiencia !== -1) {
-        const idxEstudios = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : texto.length;
-        experienciaExtraida = texto.substring(idxExperiencia, idxEstudios).replace(/experiencia laboral|experiencia/i, '').trim();
+    if (idxExperienciaKey !== -1) {
+        const idxEstudiosKey = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : (textoBajo.indexOf('educación') !== -1 ? textoBajo.indexOf('educación') : texto.length);
+        experienciaExtraida = texto.substring(idxExperienciaKey, idxEstudiosKey).replace(/experiencia laboral|experiencia/i, '').trim();
     } else {
         experienciaExtraida = texto;
     }
     const inputExperiencia = document.getElementById('experiencia');
-    if (inputExperiencia) inputExperiencia.value = experienciaExtraida;
+    if (inputExperiencia) inputExperiencia.value = elevarRedaccion(experienciaExtraida, 'experiencia');
 
     let estudiosExtraidos = '';
-    const idxEstudios = textoBajo.indexOf('estudios');
-    const idxHabilidades = textoBajo.indexOf('habilidades');
-    if (idxEstudios !== -1) {
-        let finEstudios = idxHabilidades !== -1 && idxHabilidades > idxEstudios ? idxHabilidades : texto.length;
-        estudiosExtraidos = texto.substring(idxEstudios, finEstudios).replace(/estudios y formación|estudios|educación/i, '').trim();
+    const idxEstudiosKey = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : textoBajo.indexOf('educación');
+    const idxHabilidadesKey = textoBajo.indexOf('habilidades');
+    if (idxEstudiosKey !== -1) {
+        let finEstudios = idxHabilidadesKey !== -1 && idxHabilidadesKey > idxEstudiosKey ? idxHabilidadesKey : texto.length;
+        estudiosExtraidos = texto.substring(idxEstudiosKey, finEstudios).replace(/estudios y formación|estudios|educación/i, '').trim();
     }
     const inputEstudios = document.getElementById('estudios');
     if (inputEstudios) inputEstudios.value = estudiosExtraidos || 'Formación académica detallada en CV adjunto.';
 
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
+        { term: 'logística', label: 'Logística y Depósito' },
+        { term: 'depósito', label: 'Gestión de Depósito y Stock' },
+        { term: 'fiscal', label: 'Operaciones de Depósito Fiscal' },
+        { term: 'supervisor', label: 'Supervisión de Equipos' },
+        { term: 'administrativo', label: 'Gestión Administrativa' },
+        { term: 'comercio exterior', label: 'Comercio Exterior y Aduanas' },
+        { term: 'seguridad', label: 'Seguridad y Control de Accesos' },
         { term: 'tango', label: 'Manejo de Tango Gestión' },
         { term: 'excel', label: 'Microsoft Excel Avanzado' },
-        { term: 'administrativo', label: 'Gestión Administrativa' },
-        { term: 'notarial', label: 'Gestión Notarial y Legal' },
         { term: 'atención', label: 'Atención al Cliente' },
-        { term: 'caja', label: 'Manejo de Caja' },
-        { term: 'logística', label: 'Logística y Depósito' },
         { term: 'ventas', label: 'Ventas y Comercialización' },
         { term: 'copilot', label: 'Integración de IA (Copilot)' }
     ];
@@ -204,7 +235,7 @@ function procesarYAutocompletarCampos(texto) {
     if (inputHabilidades) {
         inputHabilidades.value = habilidadesDetectadas.length > 0 
             ? habilidadesDetectadas.join(' • ') 
-            : 'Administración • Gestión • Trabajo en Equipo';
+            : 'Administración • Logística • Trabajo en Equipo';
     }
 }
 

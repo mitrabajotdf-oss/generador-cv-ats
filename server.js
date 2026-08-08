@@ -67,6 +67,33 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
+// 🧠 Función inteligente para limpiar textos e incorporar correcciones ortográficas automáticas
+function limpiarYCorregirTexto(texto) {
+    if (!texto) return '';
+    let limpio = texto
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+
+    // Correcciones ortográficas automáticas comunes en lectura de CVs
+    const correcciones = [
+        { error: /\bexperiencia\b/gi, bien: 'Experiencia' },
+        { error: /\beducacion\b/gi, bien: 'Educación' },
+        { error: /\bestudios\b/gi, bien: 'Estudios' },
+        { error: /\bhabilidades\b/gi, bien: 'Habilidades' },
+        { error: /\badminstrativo\b/gi, bien: 'administrativo' },
+        { error: /\bcompuacion\b/gi, bien: 'computación' },
+        { error: /\bgeston\b/gi, bien: 'gestión' }
+    ];
+
+    correcciones.forEach(c => {
+        limpio = limpio.replace(c.error, c.bien);
+    });
+
+    return limpio;
+}
+
 // 🌐 Endpoint auxiliar para autocompletar el formulario al adjuntar el CV
 app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     try {
@@ -82,7 +109,8 @@ app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
             texto = resultWord.value;
         }
 
-        return res.json({ success: true, texto: texto });
+        const textoLimpio = limpiarYCorregirTexto(texto);
+        return res.json({ success: true, texto: textoLimpio });
     } catch (e) {
         return res.json({ success: false, error: e.message });
     }
@@ -91,8 +119,15 @@ app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
 // 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
-        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
+        // Aplicar limpieza y corrección ortográfica automática antes de guardar
+        nombre = limpiarYCorregirTexto(nombre);
+        resumen = limpiarYCorregirTexto(resumen);
+        experiencia = limpiarYCorregirTexto(experiencia);
+        estudios = limpiarYCorregirTexto(estudios);
+        habilidades = limpiarYCorregirTexto(habilidades);
+
         let cvData = '';
         let cvContentType = '';
         let nombreArchivoOriginal = '';
@@ -112,10 +147,10 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                     const buffer = cvFile.buffer;
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
-                        textoExtraidoCV = dataPdf.text;
+                        textoExtraidoCV = limpiarYCorregirTexto(dataPdf.text);
                     } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
                         const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        textoExtraidoCV = resultWord.value;
+                        textoExtraidoCV = limpiarYCorregirTexto(resultWord.value);
                     }
                 } catch (readError) {
                     console.error('⚠️ No se pudo extraer texto completo del CV:', readError);
@@ -184,10 +219,10 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
                     const buffer = cvFile.buffer;
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
-                        candidato.textoExtraidoCV = dataPdf.text;
+                        candidato.textoExtraidoCV = limpiarYCorregirTexto(dataPdf.text);
                     } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
                         const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        candidato.textoExtraidoCV = resultWord.value;
+                        candidato.textoExtraidoCV = limpiarYCorregirTexto(resultWord.value);
                     }
                 } catch (e) {
                     console.error('Error leyendo nuevo CV:', e);

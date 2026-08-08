@@ -31,24 +31,9 @@ app.get('/formulario.html', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 📂 Gestión de Archivos Locales
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage: storage });
+// 📂 Almacenamiento en memoria para procesar y guardar directamente en MongoDB
+const upload = multer({ storage: multer.memoryStorage() });
 
 // 🚀 Conexión a MongoDB
 const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
@@ -70,9 +55,11 @@ const candidatoSchema = new mongoose.Schema({
     experiencia: String,
     estudios: String,
     habilidades: String,
-    cvUrl: String,
+    cvData: String,           // Archivo binario guardado de forma persistente en Base64
+    cvContentType: String,
     nombreArchivoCV: String,
-    fotoUrl: String,
+    fotoData: String,         // Imagen guardada de forma persistente en Base64
+    fotoContentType: String,
     textoExtraidoCV: String, 
     fecha: String,
     pagado: { type: Boolean, default: false }
@@ -84,8 +71,7 @@ const Candidato = mongoose.model('Candidato', candidatoSchema);
 app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     try {
         if (!req.file) return res.json({ success: false, error: 'No file' });
-        const filePath = req.file.path;
-        const buffer = fs.readFileSync(filePath);
+        const buffer = req.file.buffer;
         let texto = '';
 
         if (req.file.mimetype === 'application/pdf') {
@@ -95,8 +81,6 @@ app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
             const resultWord = await mammoth.extractRawText({ buffer: buffer });
             texto = resultWord.value;
         }
-
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
         return res.json({ success: true, texto: texto });
     } catch (e) {
@@ -109,9 +93,11 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
-        let cvUrlLocal = '';
+        let cvData = '';
+        let cvContentType = '';
         let nombreArchivoOriginal = '';
-        let fotoUrlLocal = '';
+        let fotoData = '';
+        let fotoContentType = '';
         let textoExtraidoCV = '';
 
         if (req.files && req.files.length > 0) {
@@ -119,12 +105,11 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
 
             if (cvFile) {
-                cvUrlLocal = `/uploads/${path.basename(cvFile.path)}`;
+                cvData = cvFile.buffer.toString('base64');
+                cvContentType = cvFile.mimetype;
                 nombreArchivoOriginal = cvFile.originalname;
                 try {
-                    const filePath = cvFile.path;
-                    const buffer = fs.readFileSync(filePath);
-
+                    const buffer = cvFile.buffer;
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
                         textoExtraidoCV = dataPdf.text;
@@ -137,7 +122,8 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 }
             }
             if (fotoPerfil) {
-                fotoUrlLocal = `/uploads/${path.basename(fotoPerfil.path)}`;
+                fotoData = fotoPerfil.buffer.toString('base64');
+                fotoContentType = fotoPerfil.mimetype;
             }
         }
 
@@ -156,9 +142,11 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             experiencia: experiencia || '',
             estudios: estudios || '',
             habilidades: habilidades || '',
-            cvUrl: cvUrlLocal,
+            cvData: cvData,
+            cvContentType: cvContentType,
             nombreArchivoCV: nombreArchivoOriginal,
-            fotoUrl: fotoUrlLocal,
+            fotoData: fotoData,
+            fotoContentType: fotoContentType,
             textoExtraidoCV: textoExtraidoCV || '',
             fecha: new Date().toLocaleString(),
             pagado: false
@@ -189,10 +177,11 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil' || f.fieldname.includes('Foto'));
 
             if (cvFile) {
-                candidato.cvUrl = `/uploads/${path.basename(cvFile.path)}`;
+                candidato.cvData = cvFile.buffer.toString('base64');
+                candidato.cvContentType = cvFile.mimetype;
                 candidato.nombreArchivoCV = cvFile.originalname;
                 try {
-                    const buffer = fs.readFileSync(cvFile.path);
+                    const buffer = cvFile.buffer;
                     if (cvFile.mimetype === 'application/pdf') {
                         const dataPdf = await pdfParse(buffer);
                         candidato.textoExtraidoCV = dataPdf.text;
@@ -206,7 +195,8 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             }
 
             if (fotoPerfil) {
-                candidato.fotoUrl = `/uploads/${path.basename(fotoPerfil.path)}`;
+                candidato.fotoData = fotoPerfil.buffer.toString('base64');
+                candidato.fotoContentType = fotoPerfil.mimetype;
             }
 
             await candidato.save();
@@ -220,6 +210,21 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
     }
 });
 
+// 👁️ Endpoint dinámico para servir la foto de perfil directamente desde MongoDB
+app.get('/api/foto/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto no encontrada');
+
+        const imgBuffer = Buffer.from(candidato.fotoData, 'base64');
+        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
+        return res.send(imgBuffer);
+    } catch (e) {
+        return res.status(500).send('Error al cargar la foto');
+    }
+});
+
 // 🏢 Endpoint: Genera el CV con Foto para Empresas
 app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     try {
@@ -230,7 +235,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
             return res.status(404).send('Candidato no encontrado.');
         }
 
-        const fotoSrc = candidato.fotoUrl || '';
+        const fotoSrc = candidato.fotoData ? `/api/foto/${candidato.id}` : '';
 
         const htmlCV = `
         <!DOCTYPE html>
@@ -291,26 +296,20 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📥 Endpoint para descargar el CV original
+// 📥 Endpoint para descargar el CV original guardado en MongoDB
 app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });
         
-        if (!candidato) {
-            return res.status(404).send('Candidato no encontrado.');
-        }
-
-        if (!candidato.cvUrl || !candidato.cvUrl.startsWith('/uploads/')) {
+        if (!candidato || !candidato.cvData) {
             return res.status(404).send('Archivo de CV no disponible.');
         }
 
-        const filePath = path.join(__dirname, candidato.cvUrl);
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).send('⚠️ El archivo físico ya no se encuentra en el servidor.');
-        }
-
-        return res.download(filePath, candidato.nombreArchivoCV || 'CV_Postulante');
+        const cvBuffer = Buffer.from(candidato.cvData, 'base64');
+        res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${candidato.nombreArchivoCV || 'CV_Postulante.pdf'}"`);
+        return res.send(cvBuffer);
     } catch (error) {
         return res.status(500).send('Error al procesar la descarga.');
     }
@@ -328,15 +327,6 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
 app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (candidato && candidato.cvUrl && candidato.cvUrl.startsWith('/uploads/')) {
-            const filePath = path.join(__dirname, candidato.cvUrl);
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
-        if (candidato && candidato.fotoUrl && candidato.fotoUrl.startsWith('/uploads/')) {
-            const fotoPath = path.join(__dirname, candidato.fotoUrl);
-            if (fs.existsSync(fotoPath)) fs.unlinkSync(fotoPath);
-        }
         await Candidato.deleteOne({ id: id });
         return res.json({ success: true });
     } catch (error) {

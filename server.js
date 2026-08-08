@@ -32,7 +32,7 @@ app.get('/formulario.html', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 📂 Almacenamiento en memoria para procesar y guardar directamente en MongoDB
+// 📂 Almacenamiento en memoria para convertir archivos directamente a Base64
 const upload = multer({ storage: multer.memoryStorage() });
 
 // 🚀 Conexión a MongoDB
@@ -55,10 +55,10 @@ const candidatoSchema = new mongoose.Schema({
     experiencia: String,
     estudios: String,
     habilidades: String,
-    cvData: String,           // Archivo binario guardado de forma persistente en Base64
+    cvData: String,           // Archivo binario guardado de forma permanente en MongoDB
     cvContentType: String,
     nombreArchivoCV: String,
-    fotoData: String,         // Imagen guardada de forma persistente en Base64
+    fotoData: String,         // Imagen guardada de forma permanente en MongoDB
     fotoContentType: String,
     textoExtraidoCV: String, 
     fecha: String,
@@ -162,7 +162,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 🌐 Endpoint para actualizar / subir archivos faltantes directamente desde el Panel de Gestión
+// 🌐 Endpoint para actualizar / subir archivos desde el Panel de Gestión
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -296,7 +296,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📥 Endpoint para descargar el CV original guardado en MongoDB
+// 📥 Endpoint para descargar el CV original desde MongoDB
 app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);

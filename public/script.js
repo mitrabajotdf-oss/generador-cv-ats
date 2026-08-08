@@ -75,14 +75,17 @@ if (formPostulacion) {
                 const nombrePostulante = document.getElementById('nombre').value || 'Postulante';
                 const telefonoWhatsApp = '5492964659057';
 
-                const mensajeConFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV con foto.`);
-                const mensajeSinFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV sin foto.`);
+                const mensajeConFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV con foto ($6.000).`);
+                const mensajeSinFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV sin foto ($5.000).`);
+                const mensajeAmbos = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar ambos formatos de mi CV con y sin foto ($6.500).`);
 
                 const btnConFoto = document.getElementById('linkCvConFoto');
                 const btnSinFoto = document.getElementById('linkCvSinFoto');
+                const btnAmbos = document.getElementById('linkCvAmbos');
 
                 if (btnConFoto) btnConFoto.href = `https://wa.me/${telefonoWhatsApp}?text=${mensajeConFoto}`;
                 if (btnSinFoto) btnSinFoto.href = `https://wa.me/${telefonoWhatsApp}?text=${mensajeSinFoto}`;
+                if (btnAmbos) btnAmbos.href = `https://wa.me/${telefonoWhatsApp}?text=${mensajeAmbos}`;
 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {

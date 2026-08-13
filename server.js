@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const nodemailer = require('nodemailer'); // ✉️ Librería para envío de correos
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -55,10 +56,10 @@ const candidatoSchema = new mongoose.Schema({
     experiencia: String,
     estudios: String,
     habilidades: String,
-    cvData: String,           // Archivo binario guardado de forma permanente en MongoDB
+    cvData: String,           
     cvContentType: String,
     nombreArchivoCV: String,
-    fotoData: String,         // Imagen guardada de forma permanente en MongoDB
+    fotoData: String,         
     fotoContentType: String,
     textoExtraidoCV: String, 
     fecha: String,
@@ -66,6 +67,48 @@ const candidatoSchema = new mongoose.Schema({
 });
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
+
+// ✉️ Configuración del Transportador de Correo (Nodemailer)
+// Puedes configurar variables de entorno en Render o poner tus datos directamente aquí abajo:
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER || 'mitrabajotdf@gmail.com',
+        pass: process.env.EMAIL_PASS || 'AQUI_PEGA_TU_CONTRASENA_DE_APLICACION_DE_16_LETRAS'
+    }
+});
+
+// Función auxiliar para enviar la alerta por email
+async function enviarAlertaEmail(candidato) {
+    try {
+        const mailOptions = {
+            from: '"Mi Trabajo TDF" <mitrabajotdf@gmail.com>',
+            to: 'mitrabajotdf@gmail.com',
+            subject: `🔔 ¡Nuevo CV Cargado: ${candidato.nombre} (${candidato.puestoRequerido})!`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px;">
+                    <h2 style="color: #0284c7; margin-top: 0;">¡Nuevo Postulante Registrado! 🚀</h2>
+                    <p>Se ha recibido una nueva postulación en la plataforma:</p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+                    <p><strong>👤 Nombre:</strong> ${candidato.nombre}</p>
+                    <p><strong>💼 Puesto / Subcarpeta:</strong> ${candidato.puestoRequerido}</p>
+                    <p><strong>📄 DNI:</strong> ${candidato.dni || 'No especificado'}</p>
+                    <p><strong>📧 Email:</strong> ${candidato.email || 'No especificado'}</p>
+                    <p><strong>📞 Teléfono:</strong> ${candidato.telefono || 'No especificado'}</p>
+                    <p><strong>📅 Fecha:</strong> ${candidato.fecha}</p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+                    <p style="text-align: center; margin-top: 20px;">
+                        <a href="https://generador-cv-ats-1.onrender.com" style="background: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ingresar al Panel de Gestión</a>
+                    </p>
+                </div>
+            `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log('✅ Alerta por email enviada con éxito a mitrabajotdf@gmail.com');
+    } catch (error) {
+        console.error('⚠️ Error al enviar el correo de alerta:', error);
+    }
+}
 
 // 🧠 Función inteligente para limpiar textos e incorporar correcciones ortográficas automáticas
 function limpiarYCorregirTexto(texto) {
@@ -76,7 +119,6 @@ function limpiarYCorregirTexto(texto) {
         .replace(/\n\s*\n/g, '\n\n')
         .trim();
 
-    // Correcciones ortográficas automáticas comunes en lectura de CVs
     const correcciones = [
         { error: /\bexperiencia\b/gi, bien: 'Experiencia' },
         { error: /\beducacion\b/gi, bien: 'Educación' },
@@ -121,7 +163,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
-        // Aplicar limpieza y corrección ortográfica automática antes de guardar
         nombre = limpiarYCorregirTexto(nombre);
         resumen = limpiarYCorregirTexto(resumen);
         experiencia = limpiarYCorregirTexto(experiencia);
@@ -188,6 +229,9 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         });
 
         await nuevoCandidato.save();
+
+        // ✉️ Enviar correo de notificación de forma asíncrona
+        enviarAlertaEmail(nuevoCandidato);
 
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });
 

@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const nodemailer = require('nodemailer'); // ✉️ Librería para envío de correos
+const { Resend } = require('resend'); // ✉️ Importamos Resend
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,22 +68,15 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// ✉️ Configuración del Transportador de Correo (Nodemailer)
-// Puedes configurar variables de entorno en Render o poner tus datos directamente aquí abajo:
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER || 'mitrabajotdf@gmail.com',
-        pass: process.env.EMAIL_PASS || 'AQUI_PEGA_TU_CONTRASENA_DE_APLICACION_DE_16_LETRAS'
-    }
-});
+// ✉️ Inicializar Resend con tu clave de Render
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Función auxiliar para enviar la alerta por email
+// Función auxiliar para enviar la alerta por email usando Resend
 async function enviarAlertaEmail(candidato) {
     try {
-        const mailOptions = {
-            from: '"Mi Trabajo TDF" <mitrabajotdf@gmail.com>',
-            to: 'mitrabajotdf@gmail.com',
+        await resend.emails.send({
+            from: 'Mi Trabajo TDF <onboarding@resend.dev>', // O tu dominio verificado si lo tienes
+            to: ['mitrabajotdf@gmail.com'],
             subject: `🔔 ¡Nuevo CV Cargado: ${candidato.nombre} (${candidato.puestoRequerido})!`,
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px;">
@@ -102,9 +95,8 @@ async function enviarAlertaEmail(candidato) {
                     </p>
                 </div>
             `
-        };
-        await transporter.sendMail(mailOptions);
-        console.log('✅ Alerta por email enviada con éxito a mitrabajotdf@gmail.com');
+        });
+        console.log('✅ Alerta por email enviada con éxito vía Resend a mitrabajotdf@gmail.com');
     } catch (error) {
         console.error('⚠️ Error al enviar el correo de alerta:', error);
     }
@@ -230,7 +222,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
         await nuevoCandidato.save();
 
-        // ✉️ Enviar correo de notificación de forma asíncrona
+        // ✉️ Enviar correo de notificación por Resend de forma asíncrona
         enviarAlertaEmail(nuevoCandidato);
 
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });

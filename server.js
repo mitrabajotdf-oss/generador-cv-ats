@@ -197,6 +197,38 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
+// ✏️ Endpoint para editar los datos de un candidato desde el Panel de Gestión
+app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) {
+            return res.json({ success: false, error: 'Candidato no encontrado' });
+        }
+
+        if (puestoRequerido !== undefined) candidato.puestoRequerido = puestoRequerido;
+        if (nombre !== undefined) candidato.nombre = nombre;
+        if (dni !== undefined) candidato.dni = dni;
+        if (email !== undefined) candidato.email = email;
+        if (telefono !== undefined) candidato.telefono = telefono;
+        if (direccion !== undefined) candidato.direccion = direccion;
+        if (disponibilidad !== undefined) candidato.disponibilidad = disponibilidad;
+        if (resumen !== undefined) candidato.resumen = resumen;
+        if (experiencia !== undefined) candidato.experiencia = experiencia;
+        if (estudios !== undefined) candidato.estudios = estudios;
+        if (habilidades !== undefined) candidato.habilidades = habilidades;
+
+        await candidato.save();
+        return res.json({ success: true, message: 'Legajo editado y actualizado correctamente.' });
+
+    } catch (error) {
+        console.error("Error al editar candidato:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 🌐 Endpoint para actualizar / subir archivos desde el Panel de Gestión
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {

@@ -115,14 +115,11 @@ function elevarRedaccion(texto, tipo) {
     let limpio = texto.replace(/\s+/g, ' ').trim();
 
     if (tipo === 'resumen') {
-        // Si el resumen extraído es muy corto, armamos una base ejecutiva formal usando su propio texto
         if (limpio.length < 80) {
             return `Profesional orientado a resultados, con sólida trayectoria y competencias destacadas en ${limpio}. Enfoque proactivo, capacidad de adaptación a entornos dinámicos y compromiso con la excelencia operativa.`;
         }
-        // Capitaliza la primera letra y asegura puntuación correcta
         return limpio.charAt(0).toUpperCase() + limpio.slice(1);
     } else if (tipo === 'experiencia') {
-        // Limpia espacios y organiza el flujo de la experiencia laboral de forma limpia y legible
         return limpio
             .replace(/\s*([•\-\*])\s*/g, '\n• ')
             .replace(/\n\s*\n/g, '\n\n')
@@ -423,6 +420,9 @@ function renderizarSubcarpetasPostulantes() {
                     ${linkCvOriginal}
                     ${linkFotoPerfil}
                     
+                    <!-- Botón para Editar Legajo Manualmente -->
+                    <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;">✏️ Editar Datos / CV del Candidato</button>
+                    
                     <!-- Opción para subir o reponer archivos directamente desde el panel -->
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
@@ -444,6 +444,107 @@ function renderizarSubcarpetasPostulantes() {
 
     html += '</div>';
     return html;
+}
+
+// Función para abrir un modal flotante y editar los datos del candidato
+function abrirModalEdicion(c) {
+    let modalExistente = document.getElementById('modalEdicionCandidato');
+    if (modalExistente) modalExistente.remove();
+
+    const modalHtml = `
+    <div id="modalEdicionCandidato" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
+        <div style="background: white; width: 100%; max-width: 650px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h2 style="margin-top:0; color:#1e293b; font-size: 20px;">✏️ Editar Legajo de ${c.nombre}</h2>
+            <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Modifica los campos que el sistema no haya leído correctamente o completa la información faltante.</p>
+            
+            <form id="formEditarCandidato" onsubmit="guardarEdicionCandidato(event, ${c.id})">
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido / Subcarpeta:</label>
+                    <input type="text" id="editPuesto" value="${c.puestoRequerido || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Nombre Completo:</label>
+                        <input type="text" id="editNombre" value="${c.nombre || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">DNI:</label>
+                        <input type="text" id="editDni" value="${c.dni || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Email:</label>
+                        <input type="email" id="editEmail" value="${c.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Teléfono:</label>
+                        <input type="text" id="editTelefono" value="${c.telefono || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Resumen Profesional:</label>
+                    <textarea id="editResumen" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.resumen || ''}</textarea>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Experiencia Laboral:</label>
+                    <textarea id="editExperiencia" rows="5" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.experiencia || c.textoExtraidoCV || ''}</textarea>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Estudios y Formación:</label>
+                    <textarea id="editEstudios" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.estudios || ''}</textarea>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Habilidades y Competencias:</label>
+                    <input type="text" id="editHabilidades" value="${c.habilidades || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" onclick="document.getElementById('modalEdicionCandidato').remove()" style="background: #cbd5e1; color: #334155; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">Cancelar</button>
+                    <button type="submit" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">💾 Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Función para enviar la edición al servidor
+async function guardarEdicionCandidato(event, idCandidato) {
+    event.preventDefault();
+
+    const datosEditados = {
+        puestoRequerido: document.getElementById('editPuesto').value,
+        nombre: document.getElementById('editNombre').value,
+        dni: document.getElementById('editDni').value,
+        email: document.getElementById('editEmail').value,
+        telefono: document.getElementById('editTelefono').value,
+        resumen: document.getElementById('editResumen').value,
+        experiencia: document.getElementById('editExperiencia').value,
+        estudios: document.getElementById('editEstudios').value,
+        habilidades: document.getElementById('editHabilidades').value
+    };
+
+    try {
+        const res = await fetch(`/api/candidatos/editar/${idCandidato}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datosEditados)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            alert('¡Legajo actualizado con éxito!');
+            document.getElementById('modalEdicionCandidato').remove();
+            location.reload();
+        } else {
+            alert('Error al actualizar: ' + (data.error || 'Desconocido'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión con el servidor.');
+    }
 }
 
 // Función auxiliar para subir archivos desde el panel con recarga limpia

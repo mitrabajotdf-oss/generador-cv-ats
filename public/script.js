@@ -1,42 +1,6 @@
-// Lógica para el envío del formulario, autocompletado y mejora de redacción profesional
+// Lógica para el envío del formulario de postulación limpio
 const formPostulacion = document.getElementById('formPostulacion');
 if (formPostulacion) {
-    const cvInputFile = document.getElementById('cvFile');
-    if (cvInputFile) {
-        cvInputFile.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const btnEnviar = document.getElementById('btnEnviar');
-            if (btnEnviar) {
-                btnEnviar.disabled = true;
-                btnEnviar.textContent = 'Analizando y estructurando CV profesional...';
-            }
-
-            const formData = new FormData();
-            formData.append('cvFile', file);
-
-            try {
-                const res = await fetch('/api/extraer-cv', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-
-                if (data.success && data.texto) {
-                    procesarYAutocompletarCampos(data.texto);
-                }
-            } catch (err) {
-                console.error('Error al autocompletar:', err);
-            } finally {
-                if (btnEnviar) {
-                    btnEnviar.disabled = false;
-                    btnEnviar.textContent = 'Enviar Postulación Final';
-                }
-            }
-        });
-    }
-
     formPostulacion.addEventListener('submit', async function(e) {
         e.preventDefault();
 
@@ -47,12 +11,10 @@ if (formPostulacion) {
             return;
         }
 
-        optimizarRedaccionCampos();
-
         const btn = document.getElementById('btnEnviar');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Enviando postulación optimizada...';
+            btn.textContent = 'Enviando postulación...';
         }
 
         const formData = new FormData(this);
@@ -61,6 +23,11 @@ if (formPostulacion) {
         const fotoPerfil = document.getElementById('fotoPerfil').files[0];
         if (fotoPerfil) {
             formData.append('fotoPerfil', fotoPerfil);
+        }
+
+        const cartaFile = document.getElementById('cartaRecomendacion').files[0];
+        if (cartaFile) {
+            formData.append('cartaRecomendacion', cartaFile);
         }
 
         try {
@@ -106,176 +73,6 @@ if (formPostulacion) {
             }
         }
     });
-}
-
-function elevarRedaccion(texto, tipo) {
-    if (!texto || texto.length < 5) return texto;
-    let limpio = texto.replace(/\s+/g, ' ').trim();
-
-    if (tipo === 'resumen') {
-        if (limpio.length < 80) {
-            return `Profesional orientado a resultados, con sólida trayectoria y competencias destacadas en ${limpio}. Enfoque proactivo, capacidad de adaptación a entornos dinámicos y compromiso con la excelencia operativa.`;
-        }
-        return limpio.charAt(0).toUpperCase() + limpio.slice(1);
-    } else if (tipo === 'experiencia') {
-        return limpio
-            .replace(/\s*([•\-\*])\s*/g, '\n• ')
-            .replace(/\n\s*\n/g, '\n\n')
-            .trim();
-    }
-    return limpio;
-}
-
-function optimizarRedaccionCampos() {
-    const inputResumen = document.getElementById('resumen');
-    const inputExperiencia = document.getElementById('experiencia');
-
-    if (inputResumen && inputResumen.value) {
-        inputResumen.value = elevarRedaccion(inputResumen.value, 'resumen');
-    }
-    if (inputExperiencia && inputExperiencia.value) {
-        inputExperiencia.value = elevarRedaccion(inputExperiencia.value, 'experiencia');
-    }
-}
-
-// 🧠 Motor de lectura inteligente con separación exacta de Experiencia y Educación
-function procesarYAutocompletarCampos(texto) {
-    const textoBajo = texto.toLowerCase();
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-    // 1. Detección de Email
-    const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
-    const matchEmail = texto.match(regexEmail);
-    if (matchEmail) {
-        const inputEmail = document.getElementById('email');
-        if (inputEmail) inputEmail.value = matchEmail[0];
-    }
-
-    // 2. Detección de Teléfono
-    const regexTel = /(?:\+?54\s?9?\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/g;
-    const matchesTel = texto.match(regexTel);
-    if (matchesTel && matchesTel.length > 0) {
-        let numerosLimpios = matchesTel[0].replace(/\D/g, '');
-        if (numerosLimpios.startsWith('549')) numerosLimpios = numerosLimpios.substring(3);
-        else if (numerosLimpios.startsWith('54')) numerosLimpios = numerosLimpios.substring(2);
-        
-        if (numerosLimpios.length >= 10) {
-            const codArea = numerosLimpios.substring(0, 4);
-            const resto = numerosLimpios.substring(4);
-            const inputTel = document.getElementById('telefono');
-            if (inputTel) inputTel.value = `+54 9 ${codArea} ${resto}`;
-        }
-    } else {
-        const inputTel = document.getElementById('telefono');
-        if (inputTel && !inputTel.value) inputTel.value = '+54 9 2964 ';
-    }
-
-    // 3. Detección de DNI
-    const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
-    const matchDni = texto.match(regexDni);
-    if (matchDni && matchDni[1]) {
-        const inputDni = document.getElementById('dni');
-        if (inputDni) inputDni.value = matchDni[1];
-    }
-
-    // 4. Detección del Nombre
-    let nombreDetectado = '';
-    for (let i = 0; i < Math.min(lineas.length, 5); i++) {
-        let l = lineas[i];
-        let lBajo = l.toLowerCase();
-        if (l.length > 2 && l.length < 40 && !l.includes('@') && !/\d{4}/.test(l) && !lBajo.includes('cocinero') && !lBajo.includes('pastelero') && !lBajo.includes('tehuelches')) {
-            nombreDetectado = l;
-            break;
-        }
-    }
-    if (!nombreDetectado && lineas.length > 0) nombreDetectado = lineas[0];
-    
-    const inputNombre = document.getElementById('nombre');
-    if (inputNombre) inputNombre.value = nombreDetectado;
-
-    // 5. Delimitación estricta de Secciones (Búsqueda de índices exactos)
-    let idxExp = textoBajo.indexOf('experiencia laboral');
-    if (idxExp === -1) idxExp = textoBajo.indexOf('experiencia');
-
-    let idxEdu = textoBajo.indexOf('educación');
-    if (idxEdu === -1) idxEdu = textoBajo.indexOf('estudios');
-
-    let idxCur = textoBajo.indexOf('cursos');
-
-    // A. Extraer Experiencia Laboral (Texto exclusivo entre Experiencia y Educación)
-    let textoExperiencia = '';
-    if (idxExp !== -1) {
-        let inicioExp = idxExp;
-        let finExp = texto.length;
-        if (idxEdu !== -1 && idxEdu > idxExp) finExp = idxEdu;
-        else if (idxCur !== -1 && idxCur > idxExp && (idxEdu === -1 || idxCur < idxEdu)) finExp = idxCur;
-
-        textoExperiencia = texto.substring(inicioExp, finExp)
-            .replace(/experiencia laboral|experiencia/gi, '')
-            .trim();
-    }
-    const inputExperiencia = document.getElementById('experiencia');
-    if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
-
-    // B. Extraer Estudios y Cursos (Texto exclusivo desde Educación/Cursos en adelante)
-    let textoEstudios = '';
-    let inicioEdu = -1;
-    if (idxEdu !== -1 && idxCur !== -1) {
-        inicioEdu = Math.min(idxEdu, idxCur);
-    } else {
-        inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
-    }
-
-    if (inicioEdu !== -1) {
-        textoEstudios = texto.substring(inicioEdu)
-            .replace(/educación|estudios y formación|estudios|cursos/gi, '')
-            .trim();
-    }
-    const inputEstudios = document.getElementById('estudios');
-    if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación académica detallada en CV adjunto.';
-
-    // C. Generar Resumen Profesional limpio
-    let textoResumen = '';
-    if (idxExp !== -1 && idxExp > 30) {
-        textoResumen = texto.substring(0, idxExp)
-            .replace(nombreDetectado, '')
-            .replace(matchEmail ? matchEmail[0] : '', '')
-            .replace(/cocinero|pastelero|tehuelches|ushuaia|disponibilidad/gi, '')
-            .trim();
-    } else {
-        textoResumen = 'Profesional con sólida formación y experiencia operativa, orientado al cumplimiento de objetivos y estándares de calidad.';
-    }
-    const inputResumen = document.getElementById('resumen');
-    if (inputResumen) inputResumen.value = elevarRedaccion(textoResumen, 'resumen');
-
-    // D. Extracción automática de Habilidades
-    let habilidadesDetectadas = [];
-    const diccionarioHabilidades = [
-        { term: 'logística', label: 'Logística y Depósito' },
-        { term: 'depósito', label: 'Gestión de Depósito y Stock' },
-        { term: 'supervisor', label: 'Supervisión de Equipos' },
-        { term: 'administrativo', label: 'Gestión Administrativa' },
-        { term: 'cocina', label: 'Cocina y Producción' },
-        { term: 'pastelería', label: 'Pastelería y Repostería' },
-        { term: 'bromatología', label: 'Higiene y Bromatología' },
-        { term: 'atención', label: 'Atención al Cliente' },
-        { term: 'ventas', label: 'Ventas y Comercialización' },
-        { term: 'excel', label: 'Microsoft Excel' },
-        { term: '5s', label: 'Metodología 5S' },
-        { term: 'inocuidad', label: 'Inocuidad Alimentaria' },
-        { term: 'alérgenos', label: 'Control de Alérgenos' }
-    ];
-
-    diccionarioHabilidades.forEach(h => {
-        if (textoBajo.includes(h.term)) {
-            habilidadesDetectadas.push(h.label);
-        }
-    });
-
-    const inputHabilidades = document.getElementById('habilidades');
-    if (inputHabilidades && habilidadesDetectadas.length > 0) {
-        inputHabilidades.value = habilidadesDetectadas.join(' • ');
-    }
 }
 
 // Variables globales del panel (Carga persistente desde localStorage)
@@ -412,14 +209,14 @@ function renderizarSubcarpetasPostulantes() {
         const linkCvOriginal = c.cvData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
                    <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${nombreArchivoCV}">📄 ${nombreArchivoCV}</span>
-                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar CV</a>
+                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>` 
             : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">📂 Sin archivo de CV</div>';
 
-        const linkFotoPerfil = c.fotoData 
+        const linkCarta = c.cartaData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📷 Foto de Perfil</span>
-                   <a href="/api/foto/${c.id}" target="_blank" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">👁️ Ver Foto</a>
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${c.nombreArchivoCarta}">📜 Carta de Recomendación</span>
+                   <a href="/api/descargar-carta/${c.id}" style="background:#10b981; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>` 
             : '';
 
@@ -448,14 +245,15 @@ function renderizarSubcarpetasPostulantes() {
                 <div style="margin-top: 10px;">
                     <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">Archivos en Subcarpeta:</div>
                     ${linkCvOriginal}
-                    ${linkFotoPerfil}
+                    ${linkCarta}
                     
-                    <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;">✏️ Editar Datos / CV del Candidato</button>
+                    <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;">✏️ Editar Datos del Candidato</button>
                     
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
-                        <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;">
-                        <input type="file" id="panelFoto_${c.id}" accept="image/*" style="font-size: 11px; margin-bottom: 6px; display:block;">
+                        <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;" title="CV">
+                        <input type="file" id="panelFoto_${c.id}" accept="image/*" style="font-size: 11px; margin-bottom: 4px; display:block;" title="Foto">
+                        <input type="file" id="panelCarta_${c.id}" accept=".pdf,.doc,.docx,image/*" style="font-size: 11px; margin-bottom: 6px; display:block;" title="Carta">
                         <button onclick="subirArchivosDesdePanel(${c.id})" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: 100%;">Guardar Archivos Nuevos</button>
                     </div>
                 </div>
@@ -463,8 +261,8 @@ function renderizarSubcarpetasPostulantes() {
             <div style="background: #f8fafc; padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
                 <button onclick='verCVATS(${JSON.stringify(c)})' style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 CV ATS Optimizado (Sin Foto)</button>
                 <div style="display: flex; gap: 6px;">
-                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Corporativo (Con Foto)</a>
-                    <button onclick="eliminarCandidato(${c.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️ Eliminar</button>
+                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Corporativo</a>
+                    <button onclick="eliminarCandidato(${c.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️</button>
                 </div>
             </div>
         </div>`;
@@ -482,11 +280,9 @@ function abrirModalEdicion(c) {
     <div id="modalEdicionCandidato" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
         <div style="background: white; width: 100%; max-width: 650px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
             <h2 style="margin-top:0; color:#1e293b; font-size: 20px;">✏️ Editar Legajo de ${c.nombre}</h2>
-            <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Modifica los campos que el sistema no haya leído correctamente o completa la información faltante.</p>
-            
             <form id="formEditarCandidato" onsubmit="guardarEdicionCandidato(event, ${c.id})">
                 <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido / Subcarpeta:</label>
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido:</label>
                     <input type="text" id="editPuesto" value="${c.puestoRequerido || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
@@ -515,14 +311,14 @@ function abrirModalEdicion(c) {
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Experiencia Laboral:</label>
-                    <textarea id="editExperiencia" rows="5" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.experiencia || c.textoExtraidoCV || ''}</textarea>
+                    <textarea id="editExperiencia" rows="5" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.experiencia || ''}</textarea>
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Estudios y Formación:</label>
                     <textarea id="editEstudios" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.estudios || ''}</textarea>
                 </div>
                 <div style="margin-bottom: 20px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Habilidades y Competencias:</label>
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Habilidades:</label>
                     <input type="text" id="editHabilidades" value="${c.habilidades || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
                 </div>
                 
@@ -539,7 +335,6 @@ function abrirModalEdicion(c) {
 
 async function guardarEdicionCandidato(event, idCandidato) {
     event.preventDefault();
-
     const datosEditados = {
         puestoRequerido: document.getElementById('editPuesto').value,
         nombre: document.getElementById('editNombre').value,
@@ -560,30 +355,30 @@ async function guardarEdicionCandidato(event, idCandidato) {
             credentials: 'include'
         });
         const data = await res.json();
-
         if (data.success) {
             alert('¡Legajo actualizado con éxito!');
             document.getElementById('modalEdicionCandidato').remove();
             location.reload();
         } else {
-            alert('Error al actualizar: ' + (data.error || 'Desconocido'));
+            alert('Error al actualizar.');
         }
     } catch (e) {
-        console.error(e);
-        alert('Error de conexión con el servidor.');
+        alert('Error de conexión.');
     }
 }
 
 async function subirArchivosDesdePanel(idCandidato) {
     const inputCv = document.getElementById(`panelCv_${idCandidato}`);
     const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);
+    const inputCarta = document.getElementById(`panelCarta_${idCandidato}`);
     
     const formData = new FormData();
     if (inputCv && inputCv.files[0]) formData.append('cvFile', inputCv.files[0]);
     if (inputFoto && inputFoto.files[0]) formData.append('fotoPerfil', inputFoto.files[0]);
+    if (inputCarta && inputCarta.files[0]) formData.append('cartaRecomendacion', inputCarta.files[0]);
 
-    if ((!inputCv || !inputCv.files[0]) && (!inputFoto || !inputFoto.files[0])) {
-        alert('Por favor selecciona al menos un archivo (CV o Foto) para subir.');
+    if ((!inputCv || !inputCv.files[0]) && (!inputFoto || !inputFoto.files[0]) && (!inputCarta || !inputCarta.files[0])) {
+        alert('Selecciona al menos un archivo para subir.');
         return;
     }
 
@@ -595,14 +390,13 @@ async function subirArchivosDesdePanel(idCandidato) {
         });
         const data = await res.json();
         if (data.success) {
-            alert('¡Archivos actualizados correctamente en el legajo!');
+            alert('¡Archivos actualizados con éxito!');
             location.reload();
         } else {
-            alert('Error al actualizar: ' + (data.error || 'Desconocido'));
+            alert('Error al actualizar.');
         }
     } catch (e) {
-        console.error(e);
-        alert('Error de conexión con el servidor.');
+        alert('Error de conexión.');
     }
 }
 
@@ -610,28 +404,25 @@ function renderizarSubcarpetasBusquedas() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
         <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1e293b;">📂 Subcarpetas de Búsquedas y Empresas Corporativas</h3>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Registra el nombre de la empresa y su vacante. Haz clic en <strong>"Evaluar Postulantes"</strong> para ordenar los perfiles según afinidad.</p>
-        
         <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <input type="text" id="nuevaEmpresa" placeholder="🏢 Nombre de la Empresa..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaEmpresa" placeholder="🏢 Empresa..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
             <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
             <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <button onclick="agregarSubcarpetaBusqueda()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">➕ Crear Subcarpeta</button>
+            <button onclick="agregarSubcarpetaBusqueda()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">➕ Crear Subcarpeta</button>
         </div>
-
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px;">`;
 
     carpetasBusquedas.forEach(b => {
         html += `
-        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px 20px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 2px;">🏢 ${b.empresa || 'Empresa General'}</div>
-                <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 Vacante: ${b.titulo}</div>
-                <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Keywords ATS:</strong> ${b.keywords}</div>
+                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">🏢 ${b.empresa || 'Empresa'}</div>
+                <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 ${b.titulo}</div>
+                <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Keywords:</strong> ${b.keywords}</div>
             </div>
             <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
-                <button onclick="evaluarSubcarpetaBusqueda('${b.keywords}')" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">🔍 Evaluar Postulantes</button>
-                <button onclick="eliminarSubcarpetaBusqueda(${b.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">🗑️</button>
+                <button onclick="evaluarSubcarpetaBusqueda('${b.keywords}')" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">🔍 Evaluar</button>
+                <button onclick="eliminarSubcarpetaBusqueda(${b.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer;">🗑️</button>
             </div>
         </div>`;
     });
@@ -644,25 +435,10 @@ function agregarSubcarpetaBusqueda() {
     const empresaInput = document.getElementById('nuevaEmpresa');
     const tituloInput = document.getElementById('nuevaBusquedaTitulo');
     const keywordsInput = document.getElementById('nuevaBusquedaKeywords');
-    
-    if (!empresaInput.value || !tituloInput.value || !keywordsInput.value) {
-        alert('Por favor completa todos los campos de la subcarpeta.');
-        return;
-    }
+    if (!empresaInput.value || !tituloInput.value || !keywordsInput.value) return alert('Completa todos los campos.');
 
-    carpetasBusquedas.push({
-        id: Date.now(),
-        empresa: empresaInput.value,
-        titulo: tituloInput.value,
-        keywords: keywordsInput.value
-    });
-
+    carpetasBusquedas.push({ id: Date.now(), empresa: empresaInput.value, titulo: tituloInput.value, keywords: keywordsInput.value });
     localStorage.setItem('carpetasBusquedas_tdf', JSON.stringify(carpetasBusquedas));
-
-    empresaInput.value = '';
-    tituloInput.value = '';
-    keywordsInput.value = '';
-
     renderizarExploradorCarpetas();
 }
 
@@ -679,17 +455,12 @@ function evaluarSubcarpetaBusqueda(keywords) {
 }
 
 function filtrarSubcarpetas(texto) {
-    const textoBajo = texto.toLowerCase();
-    todosLosCandidatos.filter(c => {
-        const total = `${c.nombre} ${c.dni} ${c.puestoRequerido} ${c.habilidades}`.toLowerCase();
-        return total.includes(textoBajo);
-    });
     renderizarExploradorCarpetas();
 }
 
 function verCVATS(c) {
     const habilidadesFinales = c.habilidades || 'Administración • Gestión • Trabajo en Equipo';
-    let experienciaFinal = c.experiencia || c.textoExtraidoCV || '';
+    let experienciaFinal = c.experiencia || '';
 
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
@@ -699,12 +470,11 @@ function verCVATS(c) {
             <meta charset="UTF-8">
             <title>CV ATS Optimizado - ${c.nombre}</title>
             <style>
-                body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #000; max-width: 800px; margin: 40px auto; padding: 20px; }
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #000; max-width: 800px; margin: 40px auto; padding: 20px; }
                 h1 { font-size: 22px; text-transform: uppercase; margin: 0; text-align: center; }
                 .contacto { text-align: center; font-size: 14px; margin-bottom: 25px; color: #333; }
                 h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin-top: 25px; margin-bottom: 8px; }
                 p { font-size: 14px; text-align: justify; margin: 0 0 10px 0; }
-                .habilidades-lista { font-size: 14px; font-weight: bold; }
                 .btn-imprimir { background: #3498db; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; display: block; margin: 30px auto; border-radius: 4px; }
                 @media print { .btn-imprimir { display: none; } }
             </style>
@@ -716,19 +486,14 @@ function verCVATS(c) {
                 ${c.puestoRequerido ? `<br><strong>Objetivo / Puesto:</strong> ${c.puestoRequerido}` : ''}
                 <br><strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
             </div>
-
             <h2>Resumen Profesional</h2>
             <p>${c.resumen || 'No especificado.'}</p>
-
             <h2>Experiencia Laboral</h2>
             <p style="white-space: pre-line;">${experienciaFinal || 'No especificada.'}</p>
-
             <h2>Estudios y Formación</h2>
             <p style="white-space: pre-line;">${c.estudios || 'No especificados'}</p>
-
             <h2>Habilidades y Competencias Clave</h2>
-            <p class="habilidades-lista">${habilidadesFinales}</p>
-
+            <p style="font-weight: bold;">${habilidadesFinales}</p>
             <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar como PDF ATS</button>
         </body>
         </html>
@@ -739,16 +504,10 @@ function verCVATS(c) {
 async function eliminarCandidato(id) {
     if (!confirm('¿Estás seguro de eliminar este legajo?')) return;
     try {
-        const res = await fetch(`/api/candidatos/${id}`, { 
-            method: 'DELETE',
-            credentials: 'include'
-        });
+        const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE', credentials: 'include' });
         const data = await res.json();
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('No se pudo eliminar.');
-        }
+        if (data.success) location.reload();
+        else alert('No se pudo eliminar.');
     } catch (e) {
         alert('Error de conexión.');
     }

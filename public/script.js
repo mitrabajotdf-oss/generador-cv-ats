@@ -138,7 +138,7 @@ function optimizarRedaccionCampos() {
     }
 }
 
-// 🧠 Motor de lectura inteligente y separación por bloques de alta precisión
+// 🧠 Motor de lectura inteligente con separación exacta de Experiencia y Educación
 function procesarYAutocompletarCampos(texto) {
     const textoBajo = texto.toLowerCase();
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -178,7 +178,7 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Detección del Nombre (Primera línea válida que no sea puesto, email o teléfono)
+    // 4. Detección del Nombre
     let nombreDetectado = '';
     for (let i = 0; i < Math.min(lineas.length, 5); i++) {
         let l = lineas[i];
@@ -193,7 +193,7 @@ function procesarYAutocompletarCampos(texto) {
     const inputNombre = document.getElementById('nombre');
     if (inputNombre) inputNombre.value = nombreDetectado;
 
-    // 5. Delimitación estricta de Secciones (Búsqueda de índices de palabras clave)
+    // 5. Delimitación estricta de Secciones (Búsqueda de índices exactos)
     let idxExp = textoBajo.indexOf('experiencia laboral');
     if (idxExp === -1) idxExp = textoBajo.indexOf('experiencia');
 
@@ -202,11 +202,10 @@ function procesarYAutocompletarCampos(texto) {
 
     let idxCur = textoBajo.indexOf('cursos');
 
-    // A. Extraer Experiencia Laboral con precisión milimétrica
+    // A. Extraer Experiencia Laboral (Texto exclusivo entre Experiencia y Educación)
     let textoExperiencia = '';
     if (idxExp !== -1) {
         let inicioExp = idxExp;
-        // El fin de la experiencia es donde arranca educación o cursos
         let finExp = texto.length;
         if (idxEdu !== -1 && idxEdu > idxExp) finExp = idxEdu;
         else if (idxCur !== -1 && idxCur > idxExp && (idxEdu === -1 || idxCur < idxEdu)) finExp = idxCur;
@@ -218,10 +217,16 @@ function procesarYAutocompletarCampos(texto) {
     const inputExperiencia = document.getElementById('experiencia');
     if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
 
-    // B. Extraer Estudios y Cursos por separado o en su bloque correspondiente
+    // B. Extraer Estudios y Cursos (Texto exclusivo desde Educación/Cursos en adelante)
     let textoEstudios = '';
-    if (idxEdu !== -1 || idxCur !== -1) {
-        let inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
+    let inicioEdu = -1;
+    if (idxEdu !== -1 && idxCur !== -1) {
+        inicioEdu = Math.min(idxEdu, idxCur);
+    } else {
+        inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
+    }
+
+    if (inicioEdu !== -1) {
         textoEstudios = texto.substring(inicioEdu)
             .replace(/educación|estudios y formación|estudios|cursos/gi, '')
             .trim();
@@ -243,7 +248,7 @@ function procesarYAutocompletarCampos(texto) {
     const inputResumen = document.getElementById('resumen');
     if (inputResumen) inputResumen.value = elevarRedaccion(textoResumen, 'resumen');
 
-    // D. Extracción automática de Habilidades (Keywords corporativas)
+    // D. Extracción automática de Habilidades
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
         { term: 'logística', label: 'Logística y Depósito' },

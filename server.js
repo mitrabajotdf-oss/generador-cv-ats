@@ -36,8 +36,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 📂 Almacenamiento en memoria para convertir archivos directamente a Base64
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 🚀 Conexión a MongoDB
-const mongoURI = process.env.MONGODB_URI || "mongodb+srv://mitrabajotdf_db_user:SSnitYQtSzK9LwvG@mitrabajotdf.ph3zsu1.mongodb.net/?appName=MiTrabajoTDF";
+// 🚀 Conexión a MongoDB (⚠️ MODIFICACIÓN DE SEGURIDAD: Contraseña oculta)
+const mongoURI = process.env.MONGODB_URI;
 
 mongoose.connect(mongoURI)
     .then(() => console.log('✅ Base de datos MongoDB conectada con éxito.'))

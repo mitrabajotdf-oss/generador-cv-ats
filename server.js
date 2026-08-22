@@ -27,17 +27,14 @@ app.get('/', authMiddleware, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ✅ FORMULARIO OPERATIVO (Mantenimiento desactivado)
 app.get('/formulario.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 📂 Almacenamiento en memoria para convertir archivos directamente a Base64
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 🚀 Conexión a MongoDB (SEGURIDAD APLICADA: Contraseña oculta en variables de entorno)
 const mongoURI = process.env.MONGODB_URI;
 
 mongoose.connect(mongoURI)
@@ -62,6 +59,9 @@ const candidatoSchema = new mongoose.Schema({
     nombreArchivoCV: String,
     fotoData: String,         
     fotoContentType: String,
+    cartaData: String,        // 📄 Nuevo campo para Carta de Recomendación
+    cartaContentType: String,
+    nombreArchivoCarta: String,
     textoExtraidoCV: String, 
     fecha: String,
     pagado: { type: Boolean, default: false }
@@ -69,7 +69,6 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// ✉️ Configuración de Nodemailer usando las variables de Render
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -78,7 +77,6 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Función auxiliar para enviar la alerta por email
 async function enviarAlertaEmail(candidato) {
     try {
         const mailOptions = {
@@ -104,62 +102,18 @@ async function enviarAlertaEmail(candidato) {
             `
         };
         await transporter.sendMail(mailOptions);
-        console.log('✅ Alerta por email enviada con éxito a mitrabajotdf@gmail.com');
+        console.log('✅ Alerta por email enviada con éxito');
     } catch (error) {
-        console.error('⚠️ Error al enviar el correo de alerta:', error);
+        console.error('⚠️ Error al enviar alerta:', error);
     }
 }
 
-// 🧠 Motor avanzado de limpieza y corrección ortográfica / tipográfica para ATS
 function limpiarYCorregirTexto(texto) {
     if (!texto) return '';
-    let limpio = texto
-        .replace(/\r\n/g, '\n')
-        .replace(/[ \t]+/g, ' ')
-        .replace(/\n\s*\n/g, '\n\n')
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Elimina caracteres invisibles o corruptos de PDFs
-        .trim();
-
-    const correcciones = [
-        { error: /\bexperiencia\b/gi, bien: 'Experiencia' },
-        { error: /\beducacion\b/gi, bien: 'Educación' },
-        { error: /\bestudios\b/gi, bien: 'Estudios' },
-        { error: /\bhabilidades\b/gi, bien: 'Habilidades' },
-        { error: /\badminstrativo\b/gi, bien: 'administrativo' },
-        { error: /\bcompuacion\b/gi, bien: 'computación' },
-        { error: /\bgeston\b/gi, bien: 'gestión' }
-    ];
-
-    correcciones.forEach(c => {
-        limpio = limpio.replace(c.error, c.bien);
-    });
-
-    return limpio;
+    return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// 🌐 Endpoint auxiliar optimizado para extraer y limpiar texto al adjuntar el CV
-app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
-    try {
-        if (!req.file) return res.json({ success: false, error: 'No file' });
-        const buffer = req.file.buffer;
-        let texto = '';
-
-        if (req.file.mimetype === 'application/pdf') {
-            const dataPdf = await pdfParse(buffer);
-            texto = dataPdf.text;
-        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
-            const resultWord = await mammoth.extractRawText({ buffer: buffer });
-            texto = resultWord.value;
-        }
-
-        const textoLimpio = limpiarYCorregirTexto(texto);
-        return res.json({ success: true, texto: textoLimpio });
-    } catch (e) {
-        return res.json({ success: false, error: e.message });
-    }
-});
-
-// 🌐 Endpoint de Recepción de Postulación con procesamiento de lectura robusto
+// 🌐 Endpoint de Recepción de Postulación con manejo de Carta de Recomendación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
@@ -181,32 +135,28 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         let nombreArchivoOriginal = '';
         let fotoData = '';
         let fotoContentType = '';
-        let textoExtraidoCV = '';
+        let cartaData = '';
+        let cartaContentType = '';
+        let nombreArchivoCarta = '';
 
         if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile') || req.files[0];
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
             const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
 
             if (cvFile) {
                 cvData = cvFile.buffer.toString('base64');
                 cvContentType = cvFile.mimetype;
                 nombreArchivoOriginal = cvFile.originalname;
-                try {
-                    const buffer = cvFile.buffer;
-                    if (cvFile.mimetype === 'application/pdf') {
-                        const dataPdf = await pdfParse(buffer);
-                        textoExtraidoCV = limpiarYCorregirTexto(dataPdf.text);
-                    } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
-                        const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        textoExtraidoCV = limpiarYCorregirTexto(resultWord.value);
-                    }
-                } catch (readError) {
-                    console.error('⚠️ No se pudo extraer texto completo del CV:', readError);
-                }
             }
             if (fotoPerfil) {
                 fotoData = fotoPerfil.buffer.toString('base64');
                 fotoContentType = fotoPerfil.mimetype;
+            }
+            if (cartaFile) {
+                cartaData = cartaFile.buffer.toString('base64');
+                cartaContentType = cartaFile.mimetype;
+                nombreArchivoCarta = cartaFile.originalname;
             }
         }
 
@@ -230,7 +180,10 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             nombreArchivoCV: nombreArchivoOriginal,
             fotoData: fotoData,
             fotoContentType: fotoContentType,
-            textoExtraidoCV: textoExtraidoCV || '',
+            cartaData: cartaData,
+            cartaContentType: cartaContentType,
+            nombreArchivoCarta: nombreArchivoCarta,
+            textoExtraidoCV: experiencia || '',
             fecha: new Date().toLocaleString(),
             pagado: false
         });
@@ -246,7 +199,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// ✏️ Endpoint para editar los datos de un candidato desde el Panel de Gestión
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -268,15 +220,12 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
         if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
 
         await candidato.save();
-        return res.json({ success: true, message: 'Legajo editado y actualizado correctamente.' });
-
+        return res.json({ success: true, message: 'Legajo editado correctamente.' });
     } catch (error) {
-        console.error("Error al editar candidato:", error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 🌐 Endpoint para actualizar / subir archivos desde el Panel de Gestión
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -285,18 +234,23 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
 
         if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile' || f.fieldname.includes('Cv'));
-            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil' || f.fieldname.includes('Foto'));
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
 
             if (cvFile) {
                 candidato.cvData = cvFile.buffer.toString('base64');
                 candidato.cvContentType = cvFile.mimetype;
                 candidato.nombreArchivoCV = cvFile.originalname;
             }
-
             if (fotoPerfil) {
                 candidato.fotoData = fotoPerfil.buffer.toString('base64');
                 candidato.fotoContentType = fotoPerfil.mimetype;
+            }
+            if (cartaFile) {
+                candidato.cartaData = cartaFile.buffer.toString('base64');
+                candidato.cartaContentType = cartaFile.mimetype;
+                candidato.nombreArchivoCarta = cartaFile.originalname;
             }
 
             await candidato.save();
@@ -304,12 +258,10 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
         }
         return res.json({ success: false, error: 'No se detectaron archivos' });
     } catch (error) {
-        console.error("Error en actualización desde panel:", error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 👁️ Endpoint dinámico para servir la foto de perfil
 app.get('/api/foto/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -324,7 +276,23 @@ app.get('/api/foto/:id', async (req, res) => {
     }
 });
 
-// 🏢 Endpoint: Genera el CV con Foto para Empresas
+// 📄 Endpoint para descargar la Carta de Recomendación
+app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        
+        if (!candidato || !candidato.cartaData) return res.status(404).send('Carta de recomendación no disponible.');
+
+        const cartaBuffer = Buffer.from(candidato.cartaData, 'base64');
+        res.setHeader('Content-Type', candidato.cartaContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${candidato.nombreArchivoCarta || 'Carta_Recomendacion.pdf'}"`);
+        return res.send(cartaBuffer);
+    } catch (error) {
+        return res.status(500).send('Error al procesar la descarga.');
+    }
+});
+
 app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -362,7 +330,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
                 </div>
             </div>
             <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
-            <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || candidato.textoExtraidoCV || 'No especificada'}</p></div>
+            <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || 'No especificada'}</p></div>
             <div class="section"><h3>Estudios y Formación</h3><p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p></div>
             <div class="section"><h3>Habilidades</h3><p>${candidato.habilidades || 'No especificadas'}</p></div>
             <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
@@ -374,7 +342,6 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📥 Endpoint para descargar el CV original
 app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -391,20 +358,19 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 🚀 EL ARREGLO MÁGICO DE MEMORIA: Enviar la lista de candidatos sin incluir los pesados PDFs
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        const listaCandidatos = await Candidato.find().select('-cvData -fotoData').sort({ id: -1 }).lean();
+        const listaCandidatos = await Candidato.find().select('-cvData -fotoData -cartaData').sort({ id: -1 }).lean();
         
         const listaOptimizada = listaCandidatos.map(c => ({
             ...c,
             cvData: c.nombreArchivoCV ? 'true' : '',
-            fotoData: c.fotoContentType ? 'true' : ''
+            fotoData: c.fotoContentType ? 'true' : '',
+            cartaData: c.nombreArchivoCarta ? 'true' : ''
         }));
 
         return res.json({ success: true, candidatos: listaOptimizada });
     } catch (error) {
-        console.error("🚨 Error al obtener lista de candidatos:", error);
         return res.json({ success: false, error: error.message });
     }
 });

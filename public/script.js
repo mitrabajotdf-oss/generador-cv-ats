@@ -138,9 +138,10 @@ function optimizarRedaccionCampos() {
     }
 }
 
-// 🧠 Autocompletado inteligente perfeccionado para separar secciones del CV
+// 🧠 Autocompletado inteligente de alta precisión corregido
 function procesarYAutocompletarCampos(texto) {
     const textoBajo = texto.toLowerCase();
+    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
     // 1. Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
@@ -177,49 +178,59 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Nombre
-    const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
-        const inputNombre = document.getElementById('nombre');
-        if (inputNombre) inputNombre.value = lineas[0];
+    // 4. Nombre (Busca la primera línea válida que no sea teléfono, email o dirección)
+    let nombreDetectado = '';
+    for (let i = 0; i < Math.min(lineas.length, 5); i++) {
+        let l = lineas[i];
+        if (l.length > 2 && l.length < 40 && !l.includes('@') && !/\d{4}/.test(l) && !l.toLowerCase().includes('cocinero') && !l.toLowerCase().includes('pastelero')) {
+            nombreDetectado = l;
+            break;
+        }
     }
+    if (!nombreDetectado && lineas.length > 0) nombreDetectado = lineas[0];
+    
+    const inputNombre = document.getElementById('nombre');
+    if (inputNombre) inputNombre.value = nombreDetectado;
 
-    // 5. Separación precisa de Secciones (Experiencia, Estudios, Habilidades)
-    let idxExp = textoBajo.indexOf('experiencia');
-    let idxEdu = textoBajo.indexOf('educación') !== -1 ? textoBajo.indexOf('educación') : textoBajo.indexOf('estudios');
+    // 5. Separación precisa de Secciones por índices de texto
+    let idxExp = textoBajo.indexOf('experiencia laboral');
+    if (idxExp === -1) idxExp = textoBajo.indexOf('experiencia');
+
+    let idxEdu = textoBajo.indexOf('educación');
+    if (idxEdu === -1) idxEdu = textoBajo.indexOf('estudios');
+
     let idxCur = textoBajo.indexOf('cursos');
 
-    // Asignar Experiencia Laboral
+    // Extraer Experiencia
     let textoExperiencia = '';
     if (idxExp !== -1) {
-        let finExp = idxEdu !== -1 && idxEdu > idxExp ? idxEdu : (idxCur !== -1 && idxCur > idxExp ? idxCur : texto.length);
-        textoExperiencia = texto.substring(idxExp, finExp).replace(/experiencia laboral|experiencia/gi, '').trim();
-    } else {
-        textoExperiencia = texto;
+        let inicioExp = idxExp;
+        let finExp = (idxEdu !== -1 && idxEdu > idxExp) ? idxEdu : ((idxCur !== -1 && idxCur > idxExp) ? idxCur : texto.length);
+        textoExperiencia = texto.substring(inicioExp, finExp).replace(/experiencia laboral|experiencia/gi, '').trim();
     }
     const inputExperiencia = document.getElementById('experiencia');
     if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
 
-    // Asignar Estudios y Cursos
+    // Extraer Estudios y Cursos
     let textoEstudios = '';
     if (idxEdu !== -1 || idxCur !== -1) {
         let inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
         textoEstudios = texto.substring(inicioEdu).replace(/educación|estudios y formación|estudios|cursos/gi, '').trim();
     }
     const inputEstudios = document.getElementById('estudios');
-    if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación detallada en CV adjunto.';
+    if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación académica detallada en CV adjunto.';
 
-    // Asignar Resumen Profesional
+    // Extraer Resumen Profesional
     let textoResumen = '';
-    if (idxExp !== -1 && idxExp > 50) {
-        textoResumen = texto.substring(0, idxExp).trim();
+    if (idxExp !== -1 && idxExp > 30) {
+        textoResumen = texto.substring(0, idxExp).replace(nombreDetectado, '').trim();
     } else {
-        textoResumen = lineas.slice(1, 4).join(' ');
+        textoResumen = 'Profesional con sólida formación y experiencia operativa, orientado al cumplimiento de objetivos y estándares de calidad.';
     }
     const inputResumen = document.getElementById('resumen');
     if (inputResumen) inputResumen.value = elevarRedaccion(textoResumen, 'resumen');
 
-    // Habilidades automáticas según palabras clave
+    // Habilidades automáticas
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
         { term: 'logística', label: 'Logística y Depósito' },
@@ -231,7 +242,9 @@ function procesarYAutocompletarCampos(texto) {
         { term: 'bromatología', label: 'Higiene y Bromatología' },
         { term: 'atención', label: 'Atención al Cliente' },
         { term: 'ventas', label: 'Ventas y Comercialización' },
-        { term: 'excel', label: 'Microsoft Excel' }
+        { term: 'excel', label: 'Microsoft Excel' },
+        { term: '5s', label: 'Metodología 5S' },
+        { term: 'inocuidad', label: 'Inocuidad Alimentaria' }
     ];
 
     diccionarioHabilidades.forEach(h => {

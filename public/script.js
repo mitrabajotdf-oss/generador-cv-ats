@@ -138,7 +138,7 @@ function optimizarRedaccionCampos() {
     }
 }
 
-// 🧠 Motor de lectura inteligente y separación por bloques (Lógica ATS idéntica)
+// 🧠 Motor de lectura inteligente y separación por bloques de alta precisión
 function procesarYAutocompletarCampos(texto) {
     const textoBajo = texto.toLowerCase();
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -178,11 +178,12 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Detección del Nombre (Primera línea limpia sin emails ni teléfonos)
+    // 4. Detección del Nombre (Primera línea válida que no sea puesto, email o teléfono)
     let nombreDetectado = '';
     for (let i = 0; i < Math.min(lineas.length, 5); i++) {
         let l = lineas[i];
-        if (l.length > 2 && l.length < 40 && !l.includes('@') && !/\d{4}/.test(l) && !l.toLowerCase().includes('cocinero') && !l.toLowerCase().includes('pastelero')) {
+        let lBajo = l.toLowerCase();
+        if (l.length > 2 && l.length < 40 && !l.includes('@') && !/\d{4}/.test(l) && !lBajo.includes('cocinero') && !lBajo.includes('pastelero') && !lBajo.includes('tehuelches')) {
             nombreDetectado = l;
             break;
         }
@@ -192,7 +193,7 @@ function procesarYAutocompletarCampos(texto) {
     const inputNombre = document.getElementById('nombre');
     if (inputNombre) inputNombre.value = nombreDetectado;
 
-    // 5. Delimitación exacta de bloques (Experiencia vs Educación vs Cursos)
+    // 5. Delimitación estricta de Secciones (Búsqueda de índices de palabras clave)
     let idxExp = textoBajo.indexOf('experiencia laboral');
     if (idxExp === -1) idxExp = textoBajo.indexOf('experiencia');
 
@@ -201,21 +202,29 @@ function procesarYAutocompletarCampos(texto) {
 
     let idxCur = textoBajo.indexOf('cursos');
 
-    // A. Extraer Experiencia Laboral en su bloque exclusivo
+    // A. Extraer Experiencia Laboral con precisión milimétrica
     let textoExperiencia = '';
     if (idxExp !== -1) {
         let inicioExp = idxExp;
-        let finExp = (idxEdu !== -1 && idxEdu > idxExp) ? idxEdu : ((idxCur !== -1 && idxCur > idxExp) ? idxCur : texto.length);
-        textoExperiencia = texto.substring(inicioExp, finExp).replace(/experiencia laboral|experiencia/gi, '').trim();
+        // El fin de la experiencia es donde arranca educación o cursos
+        let finExp = texto.length;
+        if (idxEdu !== -1 && idxEdu > idxExp) finExp = idxEdu;
+        else if (idxCur !== -1 && idxCur > idxExp && (idxEdu === -1 || idxCur < idxEdu)) finExp = idxCur;
+
+        textoExperiencia = texto.substring(inicioExp, finExp)
+            .replace(/experiencia laboral|experiencia/gi, '')
+            .trim();
     }
     const inputExperiencia = document.getElementById('experiencia');
     if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
 
-    // B. Extraer Estudios y Cursos en su bloque exclusivo
+    // B. Extraer Estudios y Cursos por separado o en su bloque correspondiente
     let textoEstudios = '';
     if (idxEdu !== -1 || idxCur !== -1) {
         let inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
-        textoEstudios = texto.substring(inicioEdu).replace(/educación|estudios y formación|estudios|cursos/gi, '').trim();
+        textoEstudios = texto.substring(inicioEdu)
+            .replace(/educación|estudios y formación|estudios|cursos/gi, '')
+            .trim();
     }
     const inputEstudios = document.getElementById('estudios');
     if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación académica detallada en CV adjunto.';
@@ -223,7 +232,11 @@ function procesarYAutocompletarCampos(texto) {
     // C. Generar Resumen Profesional limpio
     let textoResumen = '';
     if (idxExp !== -1 && idxExp > 30) {
-        textoResumen = texto.substring(0, idxExp).replace(nombreDetectado, '').replace(matchEmail ? matchEmail[0] : '', '').trim();
+        textoResumen = texto.substring(0, idxExp)
+            .replace(nombreDetectado, '')
+            .replace(matchEmail ? matchEmail[0] : '', '')
+            .replace(/cocinero|pastelero|tehuelches|ushuaia|disponibilidad/gi, '')
+            .trim();
     } else {
         textoResumen = 'Profesional con sólida formación y experiencia operativa, orientado al cumplimiento de objetivos y estándares de calidad.';
     }

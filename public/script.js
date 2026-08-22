@@ -138,12 +138,12 @@ function optimizarRedaccionCampos() {
     }
 }
 
-// 🧠 Autocompletado inteligente de alta precisión corregido
+// 🧠 Motor de lectura inteligente y separación por bloques (Lógica ATS idéntica)
 function procesarYAutocompletarCampos(texto) {
     const textoBajo = texto.toLowerCase();
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    // 1. Email
+    // 1. Detección de Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) {
@@ -151,7 +151,7 @@ function procesarYAutocompletarCampos(texto) {
         if (inputEmail) inputEmail.value = matchEmail[0];
     }
 
-    // 2. Teléfono
+    // 2. Detección de Teléfono
     const regexTel = /(?:\+?54\s?9?\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/g;
     const matchesTel = texto.match(regexTel);
     if (matchesTel && matchesTel.length > 0) {
@@ -170,7 +170,7 @@ function procesarYAutocompletarCampos(texto) {
         if (inputTel && !inputTel.value) inputTel.value = '+54 9 2964 ';
     }
 
-    // 3. DNI
+    // 3. Detección de DNI
     const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
     const matchDni = texto.match(regexDni);
     if (matchDni && matchDni[1]) {
@@ -178,7 +178,7 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
-    // 4. Nombre (Busca la primera línea válida que no sea teléfono, email o dirección)
+    // 4. Detección del Nombre (Primera línea limpia sin emails ni teléfonos)
     let nombreDetectado = '';
     for (let i = 0; i < Math.min(lineas.length, 5); i++) {
         let l = lineas[i];
@@ -192,7 +192,7 @@ function procesarYAutocompletarCampos(texto) {
     const inputNombre = document.getElementById('nombre');
     if (inputNombre) inputNombre.value = nombreDetectado;
 
-    // 5. Separación precisa de Secciones por índices de texto
+    // 5. Delimitación exacta de bloques (Experiencia vs Educación vs Cursos)
     let idxExp = textoBajo.indexOf('experiencia laboral');
     if (idxExp === -1) idxExp = textoBajo.indexOf('experiencia');
 
@@ -201,7 +201,7 @@ function procesarYAutocompletarCampos(texto) {
 
     let idxCur = textoBajo.indexOf('cursos');
 
-    // Extraer Experiencia
+    // A. Extraer Experiencia Laboral en su bloque exclusivo
     let textoExperiencia = '';
     if (idxExp !== -1) {
         let inicioExp = idxExp;
@@ -211,7 +211,7 @@ function procesarYAutocompletarCampos(texto) {
     const inputExperiencia = document.getElementById('experiencia');
     if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
 
-    // Extraer Estudios y Cursos
+    // B. Extraer Estudios y Cursos en su bloque exclusivo
     let textoEstudios = '';
     if (idxEdu !== -1 || idxCur !== -1) {
         let inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
@@ -220,17 +220,17 @@ function procesarYAutocompletarCampos(texto) {
     const inputEstudios = document.getElementById('estudios');
     if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación académica detallada en CV adjunto.';
 
-    // Extraer Resumen Profesional
+    // C. Generar Resumen Profesional limpio
     let textoResumen = '';
     if (idxExp !== -1 && idxExp > 30) {
-        textoResumen = texto.substring(0, idxExp).replace(nombreDetectado, '').trim();
+        textoResumen = texto.substring(0, idxExp).replace(nombreDetectado, '').replace(matchEmail ? matchEmail[0] : '', '').trim();
     } else {
         textoResumen = 'Profesional con sólida formación y experiencia operativa, orientado al cumplimiento de objetivos y estándares de calidad.';
     }
     const inputResumen = document.getElementById('resumen');
     if (inputResumen) inputResumen.value = elevarRedaccion(textoResumen, 'resumen');
 
-    // Habilidades automáticas
+    // D. Extracción automática de Habilidades (Keywords corporativas)
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
         { term: 'logística', label: 'Logística y Depósito' },
@@ -244,7 +244,8 @@ function procesarYAutocompletarCampos(texto) {
         { term: 'ventas', label: 'Ventas y Comercialización' },
         { term: 'excel', label: 'Microsoft Excel' },
         { term: '5s', label: 'Metodología 5S' },
-        { term: 'inocuidad', label: 'Inocuidad Alimentaria' }
+        { term: 'inocuidad', label: 'Inocuidad Alimentaria' },
+        { term: 'alérgenos', label: 'Control de Alérgenos' }
     ];
 
     diccionarioHabilidades.forEach(h => {

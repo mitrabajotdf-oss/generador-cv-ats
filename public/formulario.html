@@ -120,7 +120,6 @@
             border: 2px dashed var(--border);
             padding: 20px;
             border-radius: 8px;
-            text-align: center;
             margin-bottom: 20px;
         }
 
@@ -212,7 +211,7 @@
             </div>
 
             <div class="nota-ats">
-                * Nota importante: Los CVs sin foto se filtran únicamente cuando los envías por email o a través de alguna plataforma digital, ya que los sistemas automáticos (ATS) suelen descartar los archivos con fotos o diseños complejos. Sin embargo, si los entregan en mano o los reciben de forma presencial, resulta mucho mejor si tienen foto.
+                * Nota importante: Los CVs sin foto se filtran únicamente cuando los envías por email o a través de alguna plataforma digital, ya que los sistemas automáticos (ATS) suelen descartar los archivos con fotos o diseños complejos.
             </div>
 
             <a href="/formulario.html" style="display:inline-block; margin-top:25px; background:var(--secondary); color:white; padding:10px 20px; text-decoration:none; border-radius:6px; font-weight:600;">Cargar otra postulación</a>
@@ -223,7 +222,7 @@
             <div class="aviso-obligatorio">Los campos marcados con <span style="color: #ef4444; font-weight: bold;">*</span> son obligatorios.</div>
 
             <div class="aviso-autocompletado">
-                💡 <strong>Instrucción importante:</strong> Para que tu perfil sea evaluado correctamente por nuestros filtros inteligentes, completá los siguientes campos siguiendo los <strong>ejemplos detallados</strong> debajo de cada casilla. Evitá dejar información incompleta.
+                💡 <strong>Instrucción importante:</strong> Para que tus datos queden perfectamente registrados, por favor <strong>copiá y pegá en cada campo la información exacta que figura en tu archivo PDF adjunto</strong>, siguiendo los ejemplos indicados.
             </div>
 
             <div class="form-group">
@@ -236,9 +235,13 @@
                     <label>📂 Adjunta tu CV original (PDF o DOCX) <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
                     <input type="file" id="cvFile" name="cvFile" accept=".pdf,.doc,.docx" required>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="margin-bottom: 15px;">
                     <label>📷 Foto de Perfil <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
                     <input type="file" id="fotoPerfil" name="fotoPerfil" accept="image/*" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>📜 Carta de Recomendación / Referencias <span style="color: #64748b; font-weight: normal;">(Opcional)</span>:</label>
+                    <input type="file" id="cartaRecomendacion" name="cartaRecomendacion" accept=".pdf,.doc,.docx,image/*">
                 </div>
             </div>
 
@@ -268,29 +271,29 @@
                 <input type="text" id="disponibilidad" name="disponibilidad" required placeholder="Ej: Inmediata, Part-time, Full-time">
             </div>
 
-            <h3>Información Profesional (Guiada con Ejemplos)</h3>
+            <h3>Información Profesional (Copia y pega desde tu CV)</h3>
             
             <div class="form-group">
                 <label>Resumen Profesional <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="resumen" name="resumen" required placeholder="Describí brevemente tu perfil, años de experiencia y objetivo laboral..."></textarea>
+                <textarea id="resumen" name="resumen" required placeholder="Copia aquí el resumen de tu perfil profesional..."></textarea>
                 <div class="ejemplo-ayuda">
-                    💡 <strong>Ejemplo correcto:</strong> Profesional gastronómico con más de 5 años de experiencia en liderazgo de brigadas, control de stock y desarrollo de cartas. Enfoque orientado a la calidad y eficiencia operativa.
+                    💡 <strong>Ejemplo correcto:</strong> Profesional gastronómico con más de 5 años de experiencia en liderazgo de brigadas, control de stock y desarrollo de cartas.
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Experiencia Laboral <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="experiencia" name="experiencia" required placeholder="Detallá tus trabajos anteriores indicando puestos, empresas y tareas clave..."></textarea>
+                <textarea id="experiencia" name="experiencia" required placeholder="Copia aquí tus trabajos anteriores indicando puestos, empresas y tareas clave..."></textarea>
                 <div class="ejemplo-ayuda">
                     💡 <strong>Ejemplo correcto:</strong><br>
-                    • 2022 - 2024: Jefe de Cocina en Restaurante El Fuego. Funciones: Coordinación de equipo de 8 personas, control de costos, pedidos a proveedores y estandarización de recetas.<br>
-                    • 2019 - 2021: Cocinero en Hotel Austral. Funciones: Preparación de platos calientes y fríos, cumplimiento de normas bromatológicas.
+                    • 2022 - 2024: Jefe de Cocina en Restaurante El Fuego. Funciones: Coordinación de equipo, control de costos y pedidos a proveedores.<br>
+                    • 2019 - 2021: Cocinero en Hotel Austral. Funciones: Preparación de platos y control bromatológico.
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Estudios y Cursos <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="estudios" name="estudios" required placeholder="Detallá tu formación académica, títulos y capacitaciones relevantes..."></textarea>
+                <textarea id="estudios" name="estudios" required placeholder="Copia aquí tus títulos, formaciones y cursos realizados..."></textarea>
                 <div class="ejemplo-ayuda">
                     💡 <strong>Ejemplo correcto:</strong><br>
                     • 2018: Tecnicatura en Gastronomía - Instituto Gato Dumas.<br>
@@ -302,7 +305,7 @@
                 <label>Habilidades (Separadas por puntos o guiones) <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
                 <input type="text" id="habilidades" name="habilidades" required placeholder="Ej: Cocina al vacío • Control de stock • Manejo de brigada • Higiene y Bromatología">
                 <div class="ejemplo-ayuda">
-                    💡 <strong>Ejemplo correcto:</strong> Cocina al vacío • Control de stock • Manejo de brigada • Higiene y Bromatología • Trabajo en equipo
+                    💡 <strong>Ejemplo correcto:</strong> Cocina al vacío • Control de stock • Manejo de brigada • Higiene y Bromatología
                 </div>
             </div>
 

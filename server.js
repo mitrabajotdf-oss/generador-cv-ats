@@ -27,29 +27,9 @@ app.get('/', authMiddleware, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 🛠️ MODO MANTENIMIENTO ACTIVADO TEMPORALMENTE PARA EL FORMULARIO
+// ✅ FORMULARIO OPERATIVO (Mantenimiento desactivado)
 app.get('/formulario.html', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <title>Portal en Mantenimiento - Mi Trabajo TDF</title>
-            <style>
-                body { font-family: Arial, sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #334155; text-align: center; }
-                .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); max-width: 500px; }
-                h1 { color: #0284c7; margin-bottom: 15px; }
-                p { line-height: 1.6; color: #64748b; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h1>🛠️ Portal en Mantenimiento</h1>
-                <p>Estamos actualizando nuestro sistema de postulaciones y optimizando los formularios para brindarte un mejor servicio. Estaremos operando nuevamente en breve. ¡Muchas gracias por tu paciencia!</p>
-            </div>
-        </body>
-        </html>
-    `);
+    res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));

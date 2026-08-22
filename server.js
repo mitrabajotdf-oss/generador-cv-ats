@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const nodemailer = require('nodemailer'); // ✉️ Volvemos a Nodemailer
+const nodemailer = require('nodemailer'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -228,8 +228,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         });
 
         await nuevoCandidato.save();
-
-        // ✉️ Enviar correo de notificación de forma asíncrona
         enviarAlertaEmail(nuevoCandidato);
 
         return res.json({ success: true, candidatoId: candidatoId, message: '¡Postulación guardada con éxito!' });
@@ -247,9 +245,7 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
         const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
 
         const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) {
-            return res.json({ success: false, error: 'Candidato no encontrado' });
-        }
+        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
 
         if (puestoRequerido !== undefined) candidato.puestoRequerido = puestoRequerido;
         if (nombre !== undefined) candidato.nombre = nombre;
@@ -278,9 +274,7 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });
         
-        if (!candidato) {
-            return res.json({ success: false, error: 'Candidato no encontrado' });
-        }
+        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
 
         if (req.files && req.files.length > 0) {
             const cvFile = req.files.find(f => f.fieldname === 'cvFile' || f.fieldname.includes('Cv'));
@@ -290,18 +284,6 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
                 candidato.cvData = cvFile.buffer.toString('base64');
                 candidato.cvContentType = cvFile.mimetype;
                 candidato.nombreArchivoCV = cvFile.originalname;
-                try {
-                    const buffer = cvFile.buffer;
-                    if (cvFile.mimetype === 'application/pdf') {
-                        const dataPdf = await pdfParse(buffer);
-                        candidato.textoExtraidoCV = limpiarYCorregirTexto(dataPdf.text);
-                    } else if (cvFile.mimetype.includes('wordprocessingml') || cvFile.originalname.endsWith('.docx')) {
-                        const resultWord = await mammoth.extractRawText({ buffer: buffer });
-                        candidato.textoExtraidoCV = limpiarYCorregirTexto(resultWord.value);
-                    }
-                } catch (e) {
-                    console.error('Error leyendo nuevo CV:', e);
-                }
             }
 
             if (fotoPerfil) {
@@ -312,15 +294,14 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             await candidato.save();
             return res.json({ success: true, message: 'Archivos actualizados con éxito' });
         }
-
-        return res.json({ success: false, error: 'No se detectaron archivos en la solicitud' });
+        return res.json({ success: false, error: 'No se detectaron archivos' });
     } catch (error) {
         console.error("Error en actualización desde panel:", error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// 👁️ Endpoint dinámico para servir la foto de perfil directamente desde MongoDB
+// 👁️ Endpoint dinámico para servir la foto de perfil
 app.get('/api/foto/:id', async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -341,9 +322,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });
 
-        if (!candidato) {
-            return res.status(404).send('Candidato no encontrado.');
-        }
+        if (!candidato) return res.status(404).send('Candidato no encontrado.');
 
         const fotoSrc = candidato.fotoData ? `/api/foto/${candidato.id}` : '';
 
@@ -374,47 +353,26 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
                     <p><strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
                 </div>
             </div>
-
-            <div class="section">
-                <h3>Resumen Profesional</h3>
-                <p>${candidato.resumen || 'No especificado'}</p>
-            </div>
-
-            <div class="section">
-                <h3>Experiencia Laboral</h3>
-                <p style="white-space: pre-line;">${candidato.experiencia || candidato.textoExtraidoCV || 'No especificada'}</p>
-            </div>
-
-            <div class="section">
-                <h3>Estudios y Formación</h3>
-                <p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p>
-            </div>
-
-            <div class="section">
-                <h3>Habilidades</h3>
-                <p>${candidato.habilidades || 'No especificadas'}</p>
-            </div>
-
+            <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
+            <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || candidato.textoExtraidoCV || 'No especificada'}</p></div>
+            <div class="section"><h3>Estudios y Formación</h3><p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p></div>
+            <div class="section"><h3>Habilidades</h3><p>${candidato.habilidades || 'No especificadas'}</p></div>
             <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
         </body>
-        </html>
-        `;
-
+        </html>`;
         return res.send(htmlCV);
     } catch (error) {
         return res.status(500).send('Error al generar el CV corporativo.');
     }
 });
 
-// 📥 Endpoint para descargar el CV original desde MongoDB
+// 📥 Endpoint para descargar el CV original
 app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const candidato = await Candidato.findOne({ id: id });
         
-        if (!candidato || !candidato.cvData) {
-            return res.status(404).send('Archivo de CV no disponible.');
-        }
+        if (!candidato || !candidato.cvData) return res.status(404).send('Archivo de CV no disponible.');
 
         const cvBuffer = Buffer.from(candidato.cvData, 'base64');
         res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
@@ -425,12 +383,23 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// 🚀 EL ARREGLO MÁGICO DE MEMORIA: Enviar la lista de candidatos sin incluir los pesados PDFs
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        const listaCandidatos = await Candidato.find().sort({ id: -1 });
-        return res.json({ success: true, candidatos: listaCandidatos });
+        // Obtenemos los candidatos pero .select('-cvData -fotoData') excluye los archivos gigantes
+        const listaCandidatos = await Candidato.find().select('-cvData -fotoData').sort({ id: -1 }).lean();
+        
+        // Le mandamos al panel una señal de que el archivo existe (para que muestre el botón de descargar)
+        const listaOptimizada = listaCandidatos.map(c => ({
+            ...c,
+            cvData: c.nombreArchivoCV ? 'true' : '',
+            fotoData: c.fotoContentType ? 'true' : ''
+        }));
+
+        return res.json({ success: true, candidatos: listaOptimizada });
     } catch (error) {
-        return res.json({ success: false });
+        console.error("🚨 Error al obtener lista de candidatos:", error);
+        return res.json({ success: false, error: error.message });
     }
 });
 

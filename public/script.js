@@ -47,7 +47,6 @@ if (formPostulacion) {
             return;
         }
 
-        // Optimizar redacción corporativa justo antes de enviar
         optimizarRedaccionCampos();
 
         const btn = document.getElementById('btnEnviar');
@@ -109,7 +108,6 @@ if (formPostulacion) {
     });
 }
 
-// 🧠 Módulo de Redacción Profesional: Pule el texto real sin corromperlo ni duplicarlo
 function elevarRedaccion(texto, tipo) {
     if (!texto || texto.length < 5) return texto;
     let limpio = texto.replace(/\s+/g, ' ').trim();
@@ -140,10 +138,11 @@ function optimizarRedaccionCampos() {
     }
 }
 
-// Función de interpretación inteligente del CV y autocompletado
+// 🧠 Autocompletado inteligente perfeccionado para separar secciones del CV
 function procesarYAutocompletarCampos(texto) {
     const textoBajo = texto.toLowerCase();
 
+    // 1. Email
     const regexEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     const matchEmail = texto.match(regexEmail);
     if (matchEmail) {
@@ -151,15 +150,14 @@ function procesarYAutocompletarCampos(texto) {
         if (inputEmail) inputEmail.value = matchEmail[0];
     }
 
+    // 2. Teléfono
     const regexTel = /(?:\+?54\s?9?\s?)?(\(?\d{2,4}\)?\s?)?\d{3,4}[-\s]?\d{4}/g;
     const matchesTel = texto.match(regexTel);
     if (matchesTel && matchesTel.length > 0) {
         let numerosLimpios = matchesTel[0].replace(/\D/g, '');
-        if (numerosLimpios.startsWith('549')) {
-            numerosLimpios = numerosLimpios.substring(3);
-        } else if (numerosLimpios.startsWith('54')) {
-            numerosLimpios = numerosLimpios.substring(2);
-        }
+        if (numerosLimpios.startsWith('549')) numerosLimpios = numerosLimpios.substring(3);
+        else if (numerosLimpios.startsWith('54')) numerosLimpios = numerosLimpios.substring(2);
+        
         if (numerosLimpios.length >= 10) {
             const codArea = numerosLimpios.substring(0, 4);
             const resto = numerosLimpios.substring(4);
@@ -171,6 +169,7 @@ function procesarYAutocompletarCampos(texto) {
         if (inputTel && !inputTel.value) inputTel.value = '+54 9 2964 ';
     }
 
+    // 3. DNI
     const regexDni = /(?:dni|d\.n\.i\.?|c[u|i][l|t])\D*(\d{1,2}\.?\d{3}\.?\d{3})/i;
     const matchDni = texto.match(regexDni);
     if (matchDni && matchDni[1]) {
@@ -178,57 +177,61 @@ function procesarYAutocompletarCampos(texto) {
         if (inputDni) inputDni.value = matchDni[1];
     }
 
+    // 4. Nombre
     const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lineas.length > 0 && lineas[0].length < 40 && !lineas[0].includes('@')) {
         const inputNombre = document.getElementById('nombre');
         if (inputNombre) inputNombre.value = lineas[0];
     }
 
-    let resumenExtraido = '';
-    const idxResumen = textoBajo.indexOf('resumen');
-    const idxExperienciaKey = textoBajo.indexOf('experiencia');
-    if (idxResumen !== -1 && idxExperienciaKey !== -1 && idxExperienciaKey > idxResumen) {
-        resumenExtraido = texto.substring(idxResumen, idxExperienciaKey).replace(/resumen profesional|resumen/i, '').trim();
-    } else {
-        resumenExtraido = texto.substring(0, 400).trim();
-    }
-    const inputResumen = document.getElementById('resumen');
-    if (inputResumen) inputResumen.value = elevarRedaccion(resumenExtraido, 'resumen');
+    // 5. Separación precisa de Secciones (Experiencia, Estudios, Habilidades)
+    let idxExp = textoBajo.indexOf('experiencia');
+    let idxEdu = textoBajo.indexOf('educación') !== -1 ? textoBajo.indexOf('educación') : textoBajo.indexOf('estudios');
+    let idxCur = textoBajo.indexOf('cursos');
 
-    let experienciaExtraida = '';
-    if (idxExperienciaKey !== -1) {
-        const idxEstudiosKey = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : (textoBajo.indexOf('educación') !== -1 ? textoBajo.indexOf('educación') : texto.length);
-        experienciaExtraida = texto.substring(idxExperienciaKey, idxEstudiosKey).replace(/experiencia laboral|experiencia/i, '').trim();
+    // Asignar Experiencia Laboral
+    let textoExperiencia = '';
+    if (idxExp !== -1) {
+        let finExp = idxEdu !== -1 && idxEdu > idxExp ? idxEdu : (idxCur !== -1 && idxCur > idxExp ? idxCur : texto.length);
+        textoExperiencia = texto.substring(idxExp, finExp).replace(/experiencia laboral|experiencia/gi, '').trim();
     } else {
-        experienciaExtraida = texto;
+        textoExperiencia = texto;
     }
     const inputExperiencia = document.getElementById('experiencia');
-    if (inputExperiencia) inputExperiencia.value = elevarRedaccion(experienciaExtraida, 'experiencia');
+    if (inputExperiencia) inputExperiencia.value = elevarRedaccion(textoExperiencia, 'experiencia');
 
-    let estudiosExtraidos = '';
-    const idxEstudiosKey = textoBajo.indexOf('estudios') !== -1 ? textoBajo.indexOf('estudios') : textoBajo.indexOf('educación');
-    const idxHabilidadesKey = textoBajo.indexOf('habilidades');
-    if (idxEstudiosKey !== -1) {
-        let finEstudios = idxHabilidadesKey !== -1 && idxHabilidadesKey > idxEstudiosKey ? idxHabilidadesKey : texto.length;
-        estudiosExtraidos = texto.substring(idxEstudiosKey, finEstudios).replace(/estudios y formación|estudios|educación/i, '').trim();
+    // Asignar Estudios y Cursos
+    let textoEstudios = '';
+    if (idxEdu !== -1 || idxCur !== -1) {
+        let inicioEdu = idxEdu !== -1 ? idxEdu : idxCur;
+        textoEstudios = texto.substring(inicioEdu).replace(/educación|estudios y formación|estudios|cursos/gi, '').trim();
     }
     const inputEstudios = document.getElementById('estudios');
-    if (inputEstudios) inputEstudios.value = estudiosExtraidos || 'Formación académica detallada en CV adjunto.';
+    if (inputEstudios) inputEstudios.value = textoEstudios || 'Formación detallada en CV adjunto.';
 
+    // Asignar Resumen Profesional
+    let textoResumen = '';
+    if (idxExp !== -1 && idxExp > 50) {
+        textoResumen = texto.substring(0, idxExp).trim();
+    } else {
+        textoResumen = lineas.slice(1, 4).join(' ');
+    }
+    const inputResumen = document.getElementById('resumen');
+    if (inputResumen) inputResumen.value = elevarRedaccion(textoResumen, 'resumen');
+
+    // Habilidades automáticas según palabras clave
     let habilidadesDetectadas = [];
     const diccionarioHabilidades = [
         { term: 'logística', label: 'Logística y Depósito' },
         { term: 'depósito', label: 'Gestión de Depósito y Stock' },
-        { term: 'fiscal', label: 'Operaciones de Depósito Fiscal' },
         { term: 'supervisor', label: 'Supervisión de Equipos' },
         { term: 'administrativo', label: 'Gestión Administrativa' },
-        { term: 'comercio exterior', label: 'Comercio Exterior y Aduanas' },
-        { term: 'seguridad', label: 'Seguridad y Control de Accesos' },
-        { term: 'tango', label: 'Manejo de Tango Gestión' },
-        { term: 'excel', label: 'Microsoft Excel Avanzado' },
+        { term: 'cocina', label: 'Cocina y Producción' },
+        { term: 'pastelería', label: 'Pastelería y Repostería' },
+        { term: 'bromatología', label: 'Higiene y Bromatología' },
         { term: 'atención', label: 'Atención al Cliente' },
         { term: 'ventas', label: 'Ventas y Comercialización' },
-        { term: 'copilot', label: 'Integración de IA (Copilot)' }
+        { term: 'excel', label: 'Microsoft Excel' }
     ];
 
     diccionarioHabilidades.forEach(h => {
@@ -238,10 +241,8 @@ function procesarYAutocompletarCampos(texto) {
     });
 
     const inputHabilidades = document.getElementById('habilidades');
-    if (inputHabilidades) {
-        inputHabilidades.value = habilidadesDetectadas.length > 0 
-            ? habilidadesDetectadas.join(' • ') 
-            : 'Administración • Logística • Trabajo en Equipo';
+    if (inputHabilidades && habilidadesDetectadas.length > 0) {
+        inputHabilidades.value = habilidadesDetectadas.join(' • ');
     }
 }
 
@@ -635,9 +636,7 @@ function agregarSubcarpetaBusqueda() {
 
 function eliminarSubcarpetaBusqueda(id) {
     carpetasBusquedas = carpetasBusquedas.filter(b => b.id !== id);
-    
     localStorage.setItem('carpetasBusquedas_tdf', JSON.stringify(carpetasBusquedas));
-
     renderizarExploradorCarpetas();
 }
 
@@ -693,7 +692,7 @@ function verCVATS(c) {
             <p style="white-space: pre-line;">${experienciaFinal || 'No especificada.'}</p>
 
             <h2>Estudios y Formación</h2>
-            <p style="white-space: pre-line;">${c.estudios || 'No especificados.'}</p>
+            <p style="white-space: pre-line;">${c.estudios || 'No especificados'}</p>
 
             <h2>Habilidades y Competencias Clave</h2>
             <p class="habilidades-lista">${habilidadesFinales}</p>

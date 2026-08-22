@@ -110,13 +110,14 @@ async function enviarAlertaEmail(candidato) {
     }
 }
 
-// 🧠 Función inteligente para limpiar textos e incorporar correcciones ortográficas automáticas
+// 🧠 Motor avanzado de limpieza y corrección ortográfica / tipográfica para ATS
 function limpiarYCorregirTexto(texto) {
     if (!texto) return '';
     let limpio = texto
         .replace(/\r\n/g, '\n')
         .replace(/[ \t]+/g, ' ')
         .replace(/\n\s*\n/g, '\n\n')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Elimina caracteres invisibles o corruptos de PDFs
         .trim();
 
     const correcciones = [
@@ -136,7 +137,7 @@ function limpiarYCorregirTexto(texto) {
     return limpio;
 }
 
-// 🌐 Endpoint auxiliar para autocompletar el formulario al adjuntar el CV
+// 🌐 Endpoint auxiliar optimizado para extraer y limpiar texto al adjuntar el CV
 app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     try {
         if (!req.file) return res.json({ success: false, error: 'No file' });
@@ -158,12 +159,18 @@ app.post('/api/extraer-cv', upload.single('cvFile'), async (req, res) => {
     }
 });
 
-// 🌐 Endpoint de Recepción de Postulación
+// 🌐 Endpoint de Recepción de Postulación con procesamiento de lectura robusto
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
+        puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
         nombre = limpiarYCorregirTexto(nombre);
+        dni = limpiarYCorregirTexto(dni);
+        email = limpiarYCorregirTexto(email);
+        telefono = limpiarYCorregirTexto(telefono);
+        direccion = limpiarYCorregirTexto(direccion);
+        disponibilidad = limpiarYCorregirTexto(disponibilidad);
         resumen = limpiarYCorregirTexto(resumen);
         experiencia = limpiarYCorregirTexto(experiencia);
         estudios = limpiarYCorregirTexto(estudios);
@@ -248,17 +255,17 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
 
-        if (puestoRequerido !== undefined) candidato.puestoRequerido = puestoRequerido;
-        if (nombre !== undefined) candidato.nombre = nombre;
-        if (dni !== undefined) candidato.dni = dni;
-        if (email !== undefined) candidato.email = email;
-        if (telefono !== undefined) candidato.telefono = telefono;
-        if (direccion !== undefined) candidato.direccion = direccion;
-        if (disponibilidad !== undefined) candidato.disponibilidad = disponibilidad;
-        if (resumen !== undefined) candidato.resumen = resumen;
-        if (experiencia !== undefined) candidato.experiencia = experiencia;
-        if (estudios !== undefined) candidato.estudios = estudios;
-        if (habilidades !== undefined) candidato.habilidades = habilidades;
+        if (puestoRequerido !== undefined) candidato.puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
+        if (nombre !== undefined) candidato.nombre = limpiarYCorregirTexto(nombre);
+        if (dni !== undefined) candidato.dni = limpiarYCorregirTexto(dni);
+        if (email !== undefined) candidato.email = limpiarYCorregirTexto(email);
+        if (telefono !== undefined) candidato.telefono = limpiarYCorregirTexto(telefono);
+        if (direccion !== undefined) candidato.direccion = limpiarYCorregirTexto(direccion);
+        if (disponibilidad !== undefined) candidato.disponibilidad = limpiarYCorregirTexto(disponibilidad);
+        if (resumen !== undefined) candidato.resumen = limpiarYCorregirTexto(resumen);
+        if (experiencia !== undefined) candidato.experiencia = limpiarYCorregirTexto(experiencia);
+        if (estudios !== undefined) candidato.estudios = limpiarYCorregirTexto(estudios);
+        if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
 
         await candidato.save();
         return res.json({ success: true, message: 'Legajo editado y actualizado correctamente.' });

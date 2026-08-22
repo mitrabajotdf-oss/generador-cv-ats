@@ -245,13 +245,9 @@ function procesarYAutocompletarCampos(texto) {
     }
 }
 
-// Variables globales del panel
+// Variables globales del panel (Carga persistente desde localStorage)
 let todosLosCandidatos = [];
-let carpetasBusquedas = [
-    { id: 1, empresa: 'Estudio Notarial Bitsh', titulo: 'Administrativo Contable', keywords: 'excel administración tango gestión' },
-    { id: 2, empresa: 'Comercial Austral', titulo: 'Atención al Cliente', keywords: 'atención al cliente ventas caja' },
-    { id: 3, empresa: 'Logística Fueguina', titulo: 'Logística y Operaciones', keywords: 'logística chofer repositor carga' }
-];
+let carpetasBusquedas = JSON.parse(localStorage.getItem('carpetasBusquedas_tdf')) || [];
 let directorioActual = 'postulantes';
 let busquedaSeleccionadaFiltro = '';
 
@@ -262,7 +258,6 @@ if (listaCandidatosDiv) {
         try {
             listaCandidatosDiv.innerHTML = '<p style="text-align:center; padding: 20px; color:#64748b;">Cargando directorios del servidor...</p>';
             
-            // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
             const res = await fetch('/api/candidatos', { credentials: 'include' });
             
             if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
@@ -422,10 +417,8 @@ function renderizarSubcarpetasPostulantes() {
                     ${linkCvOriginal}
                     ${linkFotoPerfil}
                     
-                    <!-- Botón para Editar Legajo Manualmente -->
                     <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;">✏️ Editar Datos / CV del Candidato</button>
                     
-                    <!-- Opción para subir o reponer archivos directamente desde el panel -->
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
                         <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;">
@@ -448,7 +441,6 @@ function renderizarSubcarpetasPostulantes() {
     return html;
 }
 
-// Función para abrir un modal flotante y editar los datos del candidato
 function abrirModalEdicion(c) {
     let modalExistente = document.getElementById('modalEdicionCandidato');
     if (modalExistente) modalExistente.remove();
@@ -512,7 +504,6 @@ function abrirModalEdicion(c) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-// Función para enviar la edición al servidor
 async function guardarEdicionCandidato(event, idCandidato) {
     event.preventDefault();
 
@@ -529,7 +520,6 @@ async function guardarEdicionCandidato(event, idCandidato) {
     };
 
     try {
-        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
         const res = await fetch(`/api/candidatos/editar/${idCandidato}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -551,7 +541,6 @@ async function guardarEdicionCandidato(event, idCandidato) {
     }
 }
 
-// Función auxiliar para subir archivos desde el panel con recarga limpia
 async function subirArchivosDesdePanel(idCandidato) {
     const inputCv = document.getElementById(`panelCv_${idCandidato}`);
     const inputFoto = document.getElementById(`panelFoto_${idCandidato}`);
@@ -566,7 +555,6 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 
     try {
-        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
         const res = await fetch(`/api/candidatos/actualizar-archivos/${idCandidato}`, {
             method: 'POST',
             body: formData,
@@ -636,11 +624,20 @@ function agregarSubcarpetaBusqueda() {
         keywords: keywordsInput.value
     });
 
+    localStorage.setItem('carpetasBusquedas_tdf', JSON.stringify(carpetasBusquedas));
+
+    empresaInput.value = '';
+    tituloInput.value = '';
+    keywordsInput.value = '';
+
     renderizarExploradorCarpetas();
 }
 
 function eliminarSubcarpetaBusqueda(id) {
     carpetasBusquedas = carpetasBusquedas.filter(b => b.id !== id);
+    
+    localStorage.setItem('carpetasBusquedas_tdf', JSON.stringify(carpetasBusquedas));
+
     renderizarExploradorCarpetas();
 }
 
@@ -711,7 +708,6 @@ function verCVATS(c) {
 async function eliminarCandidato(id) {
     if (!confirm('¿Estás seguro de eliminar este legajo?')) return;
     try {
-        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
         const res = await fetch(`/api/candidatos/${id}`, { 
             method: 'DELETE',
             credentials: 'include'

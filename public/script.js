@@ -261,7 +261,9 @@ if (listaCandidatosDiv) {
     async function cargarCandidatos() {
         try {
             listaCandidatosDiv.innerHTML = '<p style="text-align:center; padding: 20px; color:#64748b;">Cargando directorios del servidor...</p>';
-            const res = await fetch('/api/candidatos');
+            
+            // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
+            const res = await fetch('/api/candidatos', { credentials: 'include' });
             
             if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
 
@@ -527,10 +529,12 @@ async function guardarEdicionCandidato(event, idCandidato) {
     };
 
     try {
+        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
         const res = await fetch(`/api/candidatos/editar/${idCandidato}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(datosEditados)
+            body: JSON.stringify(datosEditados),
+            credentials: 'include'
         });
         const data = await res.json();
 
@@ -562,9 +566,11 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 
     try {
+        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
         const res = await fetch(`/api/candidatos/actualizar-archivos/${idCandidato}`, {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'include'
         });
         const data = await res.json();
         if (data.success) {
@@ -705,7 +711,11 @@ function verCVATS(c) {
 async function eliminarCandidato(id) {
     if (!confirm('¿Estás seguro de eliminar este legajo?')) return;
     try {
-        const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE' });
+        // 🔒 MODIFICACIÓN: Agregamos credentials: 'include'
+        const res = await fetch(`/api/candidatos/${id}`, { 
+            method: 'DELETE',
+            credentials: 'include'
+        });
         const data = await res.json();
         if (data.success) {
             location.reload();

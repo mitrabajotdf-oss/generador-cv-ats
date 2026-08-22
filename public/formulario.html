@@ -80,6 +80,16 @@
             color: #1e293b;
         }
 
+        .ejemplo-ayuda {
+            background: #f8fafc;
+            border-left: 3px solid #3498db;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #475569;
+            margin-top: 6px;
+            border-radius: 0 6px 6px 0;
+        }
+
         input[type="text"],
         input[type="email"],
         input[type="tel"],
@@ -102,7 +112,7 @@
 
         textarea {
             resize: vertical;
-            height: 100px;
+            height: 110px;
         }
 
         .file-box {
@@ -212,14 +222,13 @@
             <h1>Bolsa de Empleo TDF - Envía tu Postulación</h1>
             <div class="aviso-obligatorio">Los campos marcados con <span style="color: #ef4444; font-weight: bold;">*</span> son obligatorios.</div>
 
-            <!-- Aviso importante actualizado con la advertencia de fallas e interpretación por imágenes/gráficos -->
             <div class="aviso-autocompletado">
-                💡 <strong>Aviso importante:</strong> Al adjuntar tu CV, el sistema intentará autocompletar los campos automáticamente. Sin embargo, <strong>la interfaz puede fallar y completar mal los campos obligatorios</strong> debido a los filtros ATS, imágenes, gráficos u otros elementos visuales del archivo que impiden una lectura correcta. <br><br>Por favor, <strong>verificá detalladamente que los datos se hayan completado bien</strong> y modificalos de forma manual si es necesario antes de enviar.
+                💡 <strong>Instrucción importante:</strong> Para que tu perfil sea evaluado correctamente por nuestros filtros inteligentes, completá los siguientes campos siguiendo los <strong>ejemplos detallados</strong> debajo de cada casilla. Evitá dejar información incompleta.
             </div>
 
             <div class="form-group">
                 <label>🎯 Puesto Requerido / Vacante a la que te postulás <span style="color: #64748b; font-weight: normal;">(Opcional)</span>:</label>
-                <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Administrativo Contable, Atención al Cliente, Vendedor...">
+                <input type="text" id="puestoRequerido" name="puestoRequerido" placeholder="Ej: Jefe de Cocina, Pastelero/a, Administrativo Contable...">
             </div>
 
             <div class="file-box">
@@ -259,22 +268,42 @@
                 <input type="text" id="disponibilidad" name="disponibilidad" required placeholder="Ej: Inmediata, Part-time, Full-time">
             </div>
 
-            <h3>Información Profesional</h3>
+            <h3>Información Profesional (Guiada con Ejemplos)</h3>
+            
             <div class="form-group">
                 <label>Resumen Profesional <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="resumen" name="resumen" required placeholder="Redacta o completa tu perfil profesional..."></textarea>
+                <textarea id="resumen" name="resumen" required placeholder="Describí brevemente tu perfil, años de experiencia y objetivo laboral..."></textarea>
+                <div class="ejemplo-ayuda">
+                    💡 <strong>Ejemplo correcto:</strong> Profesional gastronómico con más de 5 años de experiencia en liderazgo de brigadas, control de stock y desarrollo de cartas. Enfoque orientado a la calidad y eficiencia operativa.
+                </div>
             </div>
+
             <div class="form-group">
                 <label>Experiencia Laboral <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="experiencia" name="experiencia" required placeholder="Detalla tu experiencia de corrido y en líneas fluidas..."></textarea>
+                <textarea id="experiencia" name="experiencia" required placeholder="Detallá tus trabajos anteriores indicando puestos, empresas y tareas clave..."></textarea>
+                <div class="ejemplo-ayuda">
+                    💡 <strong>Ejemplo correcto:</strong><br>
+                    • 2022 - 2024: Jefe de Cocina en Restaurante El Fuego. Funciones: Coordinación de equipo de 8 personas, control de costos, pedidos a proveedores y estandarización de recetas.<br>
+                    • 2019 - 2021: Cocinero en Hotel Austral. Funciones: Preparación de platos calientes y fríos, cumplimiento de normas bromatológicas.
+                </div>
             </div>
+
             <div class="form-group">
                 <label>Estudios y Cursos <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <textarea id="estudios" name="estudios" required placeholder="Detalla tu formación académica y cursos..."></textarea>
+                <textarea id="estudios" name="estudios" required placeholder="Detallá tu formación académica, títulos y capacitaciones relevantes..."></textarea>
+                <div class="ejemplo-ayuda">
+                    💡 <strong>Ejemplo correcto:</strong><br>
+                    • 2018: Tecnicatura en Gastronomía - Instituto Gato Dumas.<br>
+                    • 2021: Curso de Manipulación Segura de Alimentos (Carnet Sanitario al día).
+                </div>
             </div>
+
             <div class="form-group">
-                <label>Habilidades <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
-                <input type="text" id="habilidades" name="habilidades" required placeholder="Ej: Atención al Cliente • Microsoft Excel • Trabajo en Equipo">
+                <label>Habilidades (Separadas por puntos o guiones) <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
+                <input type="text" id="habilidades" name="habilidades" required placeholder="Ej: Cocina al vacío • Control de stock • Manejo de brigada • Higiene y Bromatología">
+                <div class="ejemplo-ayuda">
+                    💡 <strong>Ejemplo correcto:</strong> Cocina al vacío • Control de stock • Manejo de brigada • Higiene y Bromatología • Trabajo en equipo
+                </div>
             </div>
 
             <button type="submit" id="btnEnviar" class="btn-enviar">Enviar Postulación Final</button>

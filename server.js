@@ -27,8 +27,29 @@ app.get('/', authMiddleware, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 🛠️ MODO MANTENIMIENTO ACTIVADO TEMPORALMENTE PARA EL FORMULARIO
 app.get('/formulario.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Portal en Mantenimiento - Mi Trabajo TDF</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #334155; text-align: center; }
+                .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); max-width: 500px; }
+                h1 { color: #0284c7; margin-bottom: 15px; }
+                p { line-height: 1.6; color: #64748b; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>🛠️ Portal en Mantenimiento</h1>
+                <p>Estamos actualizando nuestro sistema de postulaciones y optimizando los formularios para brindarte un mejor servicio. Estaremos operando nuevamente en breve. ¡Muchas gracias por tu paciencia!</p>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -386,10 +407,8 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
 // 🚀 EL ARREGLO MÁGICO DE MEMORIA: Enviar la lista de candidatos sin incluir los pesados PDFs
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        // Obtenemos los candidatos pero .select('-cvData -fotoData') excluye los archivos gigantes
         const listaCandidatos = await Candidato.find().select('-cvData -fotoData').sort({ id: -1 }).lean();
         
-        // Le mandamos al panel una señal de que el archivo existe (para que muestre el botón de descargar)
         const listaOptimizada = listaCandidatos.map(c => ({
             ...c,
             cvData: c.nombreArchivoCV ? 'true' : '',

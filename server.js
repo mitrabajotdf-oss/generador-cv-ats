@@ -52,9 +52,9 @@ const candidatoSchema = new mongoose.Schema({
     resumen: String,
     experiencia: String,
     estudios: String,
-    habilidades: String,          // Campo general de compatibilidad
-    habilidadesDuras: String,     // 🛠️ Habilidades Técnicas / Duras
-    habilidadesBlandas: String,   // 💡 Habilidades Blandas / Competencias
+    habilidades: String,          
+    habilidadesDuras: String,     // 🛠️ Habilidades Técnicas (Duras)
+    habilidadesBlandas: String,   // 💡 Habilidades y Competencias (Blandas)
     cvData: String,           
     cvContentType: String,
     nombreArchivoCV: String,

@@ -276,6 +276,24 @@ app.get('/api/foto/:id', async (req, res) => {
     }
 });
 
+// 🖼️ Endpoint para descargar la Foto de Perfil como archivo adjunto
+app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        
+        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto de perfil no disponible.');
+
+        const fotoBuffer = Buffer.from(candidato.fotoData, 'base64');
+        const ext = candidato.fotoContentType ? candidato.fotoContentType.split('/')[1] || 'jpg' : 'jpg';
+        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
+        res.setHeader('Content-Disposition', `attachment; filename="Foto_${candidato.nombre.replace(/\s+/g, '_')}.${ext}"`);
+        return res.send(fotoBuffer);
+    } catch (error) {
+        return res.status(500).send('Error al procesar la descarga de la foto.');
+    }
+});
+
 // 📄 Endpoint para descargar la Carta de Recomendación
 app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
     try {

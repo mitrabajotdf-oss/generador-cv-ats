@@ -52,13 +52,15 @@ const candidatoSchema = new mongoose.Schema({
     resumen: String,
     experiencia: String,
     estudios: String,
-    habilidades: String,
+    habilidades: String,          // Campo general de compatibilidad
+    habilidadesDuras: String,     // 🛠️ Habilidades Técnicas / Duras
+    habilidadesBlandas: String,   // 💡 Habilidades Blandas / Competencias
     cvData: String,           
     cvContentType: String,
     nombreArchivoCV: String,
     fotoData: String,         
     fotoContentType: String,
-    cartaData: String,        // 📄 Nuevo campo para Carta de Recomendación
+    cartaData: String,        
     cartaContentType: String,
     nombreArchivoCarta: String,
     textoExtraidoCV: String, 
@@ -116,10 +118,10 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// 🌐 Endpoint de Recepción de Postulación con parseo y extracción avanzada
+// 🌐 Endpoint de Recepción de Postulación con parseo y separación de Habilidades
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
-        let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
         
         let cvData = '';
         let cvContentType = '';
@@ -180,6 +182,8 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         experiencia = limpiarYCorregirTexto(experiencia);
         estudios = limpiarYCorregirTexto(estudios);
         habilidades = limpiarYCorregirTexto(habilidades);
+        habilidadesDuras = limpiarYCorregirTexto(habilidadesDuras);
+        habilidadesBlandas = limpiarYCorregirTexto(habilidadesBlandas);
 
         const candidatoId = Date.now();
 
@@ -196,6 +200,8 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             experiencia: experiencia || '',
             estudios: estudios || '',
             habilidades: habilidades || '',
+            habilidadesDuras: habilidadesDuras || '',
+            habilidadesBlandas: habilidadesBlandas || '',
             cvData: cvData,
             cvContentType: cvContentType,
             nombreArchivoCV: nombreArchivoOriginal,
@@ -223,7 +229,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
+        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
 
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
@@ -239,6 +245,8 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
         if (experiencia !== undefined) candidato.experiencia = limpiarYCorregirTexto(experiencia);
         if (estudios !== undefined) candidato.estudios = limpiarYCorregirTexto(estudios);
         if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
+        if (habilidadesDuras !== undefined) candidato.habilidadesDuras = limpiarYCorregirTexto(habilidadesDuras);
+        if (habilidadesBlandas !== undefined) candidato.habilidadesBlandas = limpiarYCorregirTexto(habilidadesBlandas);
 
         await candidato.save();
         return res.json({ success: true, message: 'Legajo editado correctamente.' });
@@ -369,7 +377,8 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
             <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
             <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || 'No especificada'}</p></div>
             <div class="section"><h3>Estudios y Formación</h3><p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p></div>
-            <div class="section"><h3>Habilidades</h3><p>${candidato.habilidades || 'No especificadas'}</p></div>
+            <div class="section"><h3>Habilidades Técnicas (Duras)</h3><p>${candidato.habilidadesDuras || candidato.habilidades || 'No especificadas'}</p></div>
+            <div class="section"><h3>Habilidades y Competencias (Blandas)</h3><p>${candidato.habilidadesBlandas || 'No especificadas'}</p></div>
             <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
         </body>
         </html>`;

@@ -116,11 +116,59 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// 🌐 Endpoint de Recepción de Postulación con manejo de Carta de Recomendación
+// 🌐 Endpoint de Recepción de Postulación con parseo y extracción avanzada
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades } = req.body;
         
+        let cvData = '';
+        let cvContentType = '';
+        let nombreArchivoOriginal = '';
+        let fotoData = '';
+        let fotoContentType = '';
+        let cartaData = '';
+        let cartaContentType = '';
+        let nombreArchivoCarta = '';
+        let textoPlanoExtraido = '';
+
+        if (req.files && req.files.length > 0) {
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
+
+            if (cvFile) {
+                cvData = cvFile.buffer.toString('base64');
+                cvContentType = cvFile.mimetype;
+                nombreArchivoOriginal = cvFile.originalname;
+
+                try {
+                    if (cvContentType === 'application/pdf') {
+                        const pdfDataParsed = await pdfParse(cvFile.buffer);
+                        textoPlanoExtraido = pdfDataParsed.text;
+                    } else if (cvContentType.includes('wordprocessingml') || nombreArchivoOriginal.endsWith('.docx')) {
+                        const wordResult = await mammoth.extractRawText({ buffer: cvFile.buffer });
+                        textoPlanoExtraido = wordResult.value;
+                    }
+                } catch (err) {
+                    console.error('Error al parsear el documento adjunto:', err);
+                }
+            }
+
+            if (fotoPerfil) {
+                fotoData = fotoPerfil.buffer.toString('base64');
+                fotoContentType = fotoPerfil.mimetype;
+            }
+            if (cartaFile) {
+                cartaData = cartaFile.buffer.toString('base64');
+                cartaContentType = cartaFile.mimetype;
+                nombreArchivoCarta = cartaFile.originalname;
+            }
+        }
+
+        if (textoPlanoExtraido && (!experiencia || experiencia.length < 10)) {
+            experiencia = limpiarYCorregirTexto(textoPlanoExtraido);
+        }
+
         puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
         nombre = limpiarYCorregirTexto(nombre);
         dni = limpiarYCorregirTexto(dni);
@@ -132,36 +180,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         experiencia = limpiarYCorregirTexto(experiencia);
         estudios = limpiarYCorregirTexto(estudios);
         habilidades = limpiarYCorregirTexto(habilidades);
-
-        let cvData = '';
-        let cvContentType = '';
-        let nombreArchivoOriginal = '';
-        let fotoData = '';
-        let fotoContentType = '';
-        let cartaData = '';
-        let cartaContentType = '';
-        let nombreArchivoCarta = '';
-
-        if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
-            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
-            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
-
-            if (cvFile) {
-                cvData = cvFile.buffer.toString('base64');
-                cvContentType = cvFile.mimetype;
-                nombreArchivoOriginal = cvFile.originalname;
-            }
-            if (fotoPerfil) {
-                fotoData = fotoPerfil.buffer.toString('base64');
-                fotoContentType = fotoPerfil.mimetype;
-            }
-            if (cartaFile) {
-                cartaData = cartaFile.buffer.toString('base64');
-                cartaContentType = cartaFile.mimetype;
-                nombreArchivoCarta = cartaFile.originalname;
-            }
-        }
 
         const candidatoId = Date.now();
 
@@ -186,7 +204,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             cartaData: cartaData,
             cartaContentType: cartaContentType,
             nombreArchivoCarta: nombreArchivoCarta,
-            textoExtraidoCV: experiencia || '',
+            textoExtraidoCV: textoPlanoExtraido || experiencia || '',
             fecha: new Date().toLocaleString(),
             pagado: false
         });
@@ -279,7 +297,6 @@ app.get('/api/foto/:id', async (req, res) => {
     }
 });
 
-// 🖼️ Endpoint para descargar la Foto de Perfil como archivo adjunto
 app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -297,7 +314,6 @@ app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📄 Endpoint para descargar la Carta de Recomendación
 app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);

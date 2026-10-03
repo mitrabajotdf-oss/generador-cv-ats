@@ -95,7 +95,7 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// 🧠 Análisis inteligente de CVs con Google Gemini (API REST directa y estable)
+// 🧠 Análisis inteligente de CVs con Google Gemini (Estable y seguro mediante fetch)
 async function analizarCVConGemini(textoCrudo) {
     if (!process.env.GEMINI_API_KEY || !textoCrudo || textoCrudo.length < 20) return null;
     try {
@@ -117,6 +117,8 @@ async function analizarCVConGemini(textoCrudo) {
                 contents: [{ parts: [{ text: prompt }] }]
             })
         });
+
+        if (!response.ok) return null;
 
         const data = await response.json();
         if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {

@@ -7,7 +7,6 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,9 +14,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Inicializar Google GenAI con la clave de entorno
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // 🔒 Protección del Panel de Gestión
 const authMiddleware = basicAuth({
@@ -76,7 +72,7 @@ const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 async function enviarAlertaEmail(candidato) {
     try {
-        const response = await fetch('https://api.resend.com/emails', {
+        await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
@@ -86,33 +82,11 @@ async function enviarAlertaEmail(candidato) {
                 from: 'Mi Trabajo TDF <onboarding@resend.dev>',
                 to: ['mitrabajotdf@gmail.com'],
                 subject: `🔔 ¡Nuevo CV Cargado: ${candidato.nombre} (${candidato.puestoRequerido})!`,
-                html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px;">
-                    <h2 style="color: #0284c7; margin-top: 0;">¡Nuevo Postulante Registrado! 🚀</h2>
-                    <p>Se ha recibido una nueva postulación en la plataforma:</p>
-                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-                    <p><strong>👤 Nombre:</strong> ${candidato.nombre}</p>
-                    <p><strong>💼 Puesto / Subcarpeta:</strong> ${candidato.puestoRequerido}</p>
-                    <p><strong>📄 DNI:</strong> ${candidato.dni || 'No especificado'}</p>
-                    <p><strong>📧 Email:</strong> ${candidato.email || 'No especificado'}</p>
-                    <p><strong>📞 Teléfono:</strong> ${candidato.telefono || 'No especificado'}</p>
-                    <p><strong>📅 Fecha:</strong> ${candidato.fecha}</p>
-                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-                    <p style="text-align: center; margin-top: 20px;">
-                        <a href="https://generador-cv-ats-1.onrender.com" style="background: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ingresar al Panel de Gestión</a>
-                    </p>
-                </div>
-                `
+                html: `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>¡Nuevo Postulante Registrado! 🚀</h2><p><strong>👤 Nombre:</strong> ${candidato.nombre}</p><p><strong>💼 Puesto:</strong> ${candidato.puestoRequerido}</p></div>`
             })
         });
-        const data = await response.json();
-        if (response.ok) {
-            console.log('✅ Alerta por email enviada con éxito via Resend:', data);
-        } else {
-            console.error('⚠️ Error al enviar alerta via Resend:', data);
-        }
     } catch (error) {
-        console.error('⚠️ Error crítico al enviar alerta:', error);
+        console.error('Error al enviar alerta email:', error);
     }
 }
 
@@ -121,11 +95,11 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// Función inteligente de análisis ATS con Google Gemini
+// 🧠 Análisis inteligente de CVs con Google Gemini (API REST directa y estable)
 async function analizarCVConGemini(textoCrudo) {
     if (!process.env.GEMINI_API_KEY || !textoCrudo || textoCrudo.length < 20) return null;
     try {
-        const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro (sin bloques de código markdown como \`\`\`json, solo el objeto JSON):
+        const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro (sin bloques de código markdown, solo el objeto JSON):
         {
           "resumen": "Resumen profesional o perfil redactado.",
           "experiencia": "Experiencia laboral detallada.",
@@ -136,11 +110,145 @@ async function analizarCVConGemini(textoCrudo) {
         Texto del CV:
         ${textoCrudo}`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
         });
 
-        let textResponse = response.text.trim();
-        if (textResponse.startsWith('```json')) {
-            textResponse = textResponse
+        const data = await response.json();
+        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+            let textResponse = data.candidates[0].content.parts[0].text.trim();
+            if (textResponse.startsWith('```json')) {
+                textResponse = textResponse.replace(/^```json/, '').replace(/```$/, '').trim();
+            } else if (textResponse.startsWith('```')) {
+                textResponse = textResponse.replace(/^```/, '').replace(/```$/, '').trim();
+            }
+            return JSON.parse(textResponse);
+        }
+        return null;
+    } catch (error) {
+        console.error("Error al procesar con la IA de Gemini:", error);
+        return null;
+    }
+}
+
+// 🌐 Endpoint de Recepción de Postulación con procesamiento ATS por IA
+app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
+    try {
+        let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
+        
+        let cvData = '', cvContentType = '', nombreArchivoOriginal = '';
+        let fotoData = '', fotoContentType = '';
+        let cartaData = '', cartaContentType = '', nombreArchivoCarta = '';
+        let textoPlanoExtraido = '';
+
+        if (req.files && req.files.length > 0) {
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
+
+            if (cvFile) {
+                cvData = cvFile.buffer.toString('base64');
+                cvContentType = cvFile.mimetype;
+                nombreArchivoOriginal = cvFile.originalname;
+
+                try {
+                    if (cvContentType === 'application/pdf') {
+                        const pdfDataParsed = await pdfParse(cvFile.buffer);
+                        textoPlanoExtraido = pdfDataParsed.text;
+                    } else if (cvContentType.includes('wordprocessingml') || nombreArchivoOriginal.endsWith('.docx')) {
+                        const wordResult = await mammoth.extractRawText({ buffer: cvFile.buffer });
+                        textoPlanoExtraido = wordResult.value;
+                    }
+                } catch (err) {
+                    console.error('Error al extraer texto del documento:', err);
+                }
+            }
+
+            if (fotoPerfil) {
+                fotoData = fotoPerfil.buffer.toString('base64');
+                fotoContentType = fotoPerfil.mimetype;
+            }
+            if (cartaFile) {
+                cartaData = cartaFile.buffer.toString('base64');
+                cartaContentType = cartaFile.mimetype;
+                nombreArchivoCarta = cartaFile.originalname;
+            }
+        }
+
+        // Ejecutar IA para estructurar el perfil ATS si se extrajo texto del archivo
+        if (textoPlanoExtraido) {
+            const resultadoGemini = await analizarCVConGemini(textoPlanoExtraido);
+            if (resultadoGemini) {
+                if (!resumen) resumen = resultadoGemini.resumen;
+                if (!experiencia) experiencia = resultadoGemini.experiencia;
+                if (!estudios) estudios = resultadoGemini.estudios;
+                if (!habilidadesDuras) habilidadesDuras = resultadoGemini.habilidadesDuras;
+                if (!habilidadesBlandas) habilidadesBlandas = resultadoGemini.habilidadesBlandas;
+            } else {
+                experiencia = experiencia || textoPlanoExtraido;
+            }
+        }
+
+        const candidatoId = Date.now();
+        const nuevoCandidato = new Candidato({
+            id: candidatoId,
+            puestoRequerido: limpiarYCorregirTexto(puestoRequerido) || 'General',
+            nombre: limpiarYCorregirTexto(nombre) || 'Postulante',
+            dni: limpiarYCorregirTexto(dni),
+            email: limpiarYCorregirTexto(email),
+            telefono: limpiarYCorregirTexto(telefono),
+            direccion: limpiarYCorregirTexto(direccion),
+            disponibilidad: limpiarYCorregirTexto(disponibilidad) || 'Inmediata',
+            resumen: limpiarYCorregirTexto(resumen),
+            experiencia: limpiarYCorregirTexto(experiencia),
+            estudios: limpiarYCorregirTexto(estudios),
+            habilidades: limpiarYCorregirTexto(habilidades),
+            habilidadesDuras: limpiarYCorregirTexto(habilidadesDuras),
+            habilidadesBlandas: limpiarYCorregirTexto(habilidadesBlandas),
+            cvData, cvContentType, nombreArchivoCV: nombreArchivoOriginal,
+            fotoData, fotoContentType,
+            cartaData, cartaContentType, nombreArchivoCarta,
+            textoExtraidoCV: textoPlanoExtraido || experiencia || '',
+            fecha: new Date().toLocaleString(),
+            pagado: false
+        });
+
+        await nuevoCandidato.save();
+        enviarAlertaEmail(nuevoCandidato);
+
+        return res.json({ success: true, candidatoId, message: '¡Postulación procesada y estructurada con IA!' });
+    } catch (error) {
+        console.error("Error crítico en postulación:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/candidatos', authMiddleware, async (req, res) => {
+    try {
+        const lista = await Candidato.find().select('-cvData -fotoData -cartaData').sort({ id: -1 }).lean();
+        return res.json({ success: true, candidatos: lista });
+    } catch (error) {
+        return res.json({ success: false, error: error.message });
+    }
+});
+
+app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
+    try {
+        await Candidato.deleteOne({ id: Number(req.params.id) });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.json({ success: false });
+    }
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor de Mi Trabajo TDF corriendo en puerto ${PORT}`);
+});

@@ -71,7 +71,7 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 }, { strict: false });
 
-// 📌 APUNTANDO A LA COLECCIÓN INTERNA 'test'
+// 📌 APUNTANDO A LA COLECCIÓN 'test' DONDE ESTÁN TUS 36 LEGAJOS
 const Candidato = mongoose.model('Candidato', candidatoSchema, 'test');
 
 async function enviarAlertaEmail(candidato) {

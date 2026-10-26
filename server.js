@@ -13,7 +13,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-// Ampliamos el límite por si suben PDFs pesados
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -34,12 +33,13 @@ app.get('/formulario.html', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }); // Límite de 15MB
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 const mongoURI = process.env.MONGODB_URI;
 
-mongoose.connect(mongoURI)
-    .then(() => console.log('✅ Base de datos MongoDB conectada con éxito.'))
+// 🔗 CONEXIÓN FORZADA A LA BASE DE DATOS 'test' (DONDE ESTÁN TUS 36 CVs)
+mongoose.connect(mongoURI, { dbName: 'test' })
+    .then(() => console.log('✅ Base de datos MongoDB conectada con éxito a la colección test.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
 
 const candidatoSchema = new mongoose.Schema({
@@ -98,7 +98,6 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
-// 🧠 INICIALIZAR LA IA OFICIAL DE GOOGLE GEMINI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function analizarCVConGemini(textoCrudo) {
@@ -106,7 +105,7 @@ async function analizarCVConGemini(textoCrudo) {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
-        const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro (sin bloques de código markdown, solo el objeto JSON):
+        const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro:
         {
           "resumen": "Resumen profesional o perfil redactado.",
           "experiencia": "Experiencia laboral detallada.",
@@ -134,7 +133,6 @@ async function analizarCVConGemini(textoCrudo) {
     }
 }
 
-// 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
@@ -225,8 +223,6 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         return res.status(500).json({ success: false, error: error.message });
     }
 });
-
-// 🛠️ RUTAS PARA VER, EDITAR Y DESCARGAR ARCHIVOS
 
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
@@ -392,7 +388,6 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 🤖 NUEVO ENDPOINT: Extraer requisitos de empresas con IA
 app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
     try {
         if (!req.file) return res.json({ success: false, error: 'No se subió ningún archivo' });
@@ -412,7 +407,7 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
         const prompt = `Analiza la siguiente descripción de puesto o requisitos enviados por una empresa. Extrae el título sugerido del puesto y las palabras clave más importantes (habilidades duras, herramientas, certificaciones y competencias clave) separadas por un espacio, para usarlas en un motor de búsqueda ATS.
         Responde ESTRICTAMENTE en formato JSON puro:
         {
-          "titulo": "Título del puesto (ej: Ayudante de Cocina)",
+          "titulo": "Título del puesto",
           "keywords": "palabra1 palabra2 palabra3..."
         }
         Texto del documento de la empresa:
@@ -435,7 +430,6 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
     }
 });
 
-// 🤖 NUEVO ENDPOINT: Autocompletar formulario leyendo el CV con Gemini
 app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
     try {
         if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });

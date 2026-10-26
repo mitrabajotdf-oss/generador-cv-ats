@@ -38,7 +38,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 const mongoURI = process.env.MONGODB_URI;
 
 // 🔗 CONEXIÓN A LA BASE DE DATOS 'MiTrabajoTDF'
-mongoose.connect(mongoURI, { dbName: 'MiTrabajoTDF' })
+mongoose.connect(mongoURI, { dbName: 'candidatos' })
     .then(() => console.log('✅ Base de datos MiTrabajoTDF conectada con éxito.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
 

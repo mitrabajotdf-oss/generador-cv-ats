@@ -481,7 +481,7 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
 
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        const listaCandidatos = await Candidato.find({}, { cvData: 0, cartaData: 0 }).sort({ id: -1 }).lean();
+        const listaCandidatos = (await Candidato.find({}, { cvData: 0, fotoData: 0, cartaData: 0 }).lean()).sort((a, b) => b.id - a.id);
         return res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
         return res.json({ success: false, error: error.message });

@@ -37,7 +37,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const mongoURI = process.env.MONGODB_URI;
 
-// 🔗 CONEXIÓN FORZADA A LA BASE DE DATOS 'test' (DONDE ESTÁN TUS 36 CVs)
+// 🔗 CONEXIÓN A LA BASE DE DATOS 'test'
 mongoose.connect(mongoURI, { dbName: 'test' })
     .then(() => console.log('✅ Base de datos MongoDB conectada con éxito a la colección test.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
@@ -71,7 +71,8 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 });
 
-const Candidato = mongoose.model('Candidato', candidatoSchema);
+// 📌 APUNTANDO EXPLÍCITAMENTE A LA COLECCIÓN "candidatos" DE MONGODB
+const Candidato = mongoose.model('Candidato', candidatoSchema, 'candidatos');
 
 async function enviarAlertaEmail(candidato) {
     try {

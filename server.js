@@ -105,7 +105,6 @@ async function analizarCVConGemini(textoCrudo) {
     if (!process.env.GEMINI_API_KEY || !textoCrudo || textoCrudo.length < 20) return null;
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        
         const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro:
         {
           "resumen": "Resumen profesional o perfil redactado.",

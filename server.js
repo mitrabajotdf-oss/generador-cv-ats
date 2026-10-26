@@ -37,9 +37,9 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const mongoURI = process.env.MONGODB_URI;
 
-// 🔗 CONEXIÓN A LA BASE DE DATOS
-mongoose.connect(mongoURI, { dbName: 'test' })
-    .then(() => console.log('✅ Base de datos test conectada con éxito.'))
+// 🔗 CONEXIÓN A LA BASE DE DATOS 'MiTrabajoTDF'
+mongoose.connect(mongoURI, { dbName: 'MiTrabajoTDF' })
+    .then(() => console.log('✅ Base de datos MiTrabajoTDF conectada con éxito.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
 
 const candidatoSchema = new mongoose.Schema({
@@ -71,7 +71,8 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 }, { strict: false });
 
-const Candidato = mongoose.model('Candidato', candidatoSchema, 'candidatos');
+// 📌 APUNTANDO A LA COLECCIÓN INTERNA 'test'
+const Candidato = mongoose.model('Candidato', candidatoSchema, 'test');
 
 async function enviarAlertaEmail(candidato) {
     try {
@@ -216,7 +217,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         await nuevoCandidato.save();
         enviarAlertaEmail(nuevoCandidato);
 
-        return res.json({ success: true, candidatoId, message: '¡Postulación procesada!' });
+        return res.json({ success: true, candidatoId, message: '¡Postulación procesada y estructurada con IA!' });
     } catch (error) {
         console.error("Error crítico en postulación:", error);
         return res.status(500).json({ success: false, error: error.message });

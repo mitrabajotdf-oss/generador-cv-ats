@@ -37,7 +37,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const mongoURI = process.env.MONGODB_URI;
 
-// 🔗 CONEXIÓN A LA BASE DE DATOS 'test' (DONDE ESTÁN TUS 36 CVs EN MONGODB)
+// 🔗 CONEXIÓN A LA BASE DE DATOS
 mongoose.connect(mongoURI, { dbName: 'test' })
     .then(() => console.log('✅ Base de datos test conectada con éxito.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
@@ -71,7 +71,6 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 }, { strict: false });
 
-// 📌 APUNTANDO A LA COLECCIÓN 'candidatos'
 const Candidato = mongoose.model('Candidato', candidatoSchema, 'candidatos');
 
 async function enviarAlertaEmail(candidato) {
@@ -217,7 +216,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         await nuevoCandidato.save();
         enviarAlertaEmail(nuevoCandidato);
 
-        return res.json({ success: true, candidatoId, message: '¡Postulación procesada y estructurada con IA!' });
+        return res.json({ success: true, candidatoId, message: '¡Postulación procesada!' });
     } catch (error) {
         console.error("Error crítico en postulación:", error);
         return res.status(500).json({ success: false, error: error.message });

@@ -254,6 +254,10 @@
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label>📂 Adjunta tu CV original (PDF o DOCX) <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
                     <input type="file" id="cvFile" name="cvFile" accept=".pdf,.doc,.docx" required>
+                    
+                    <!-- BOTÓN MÁGICO DE IA -->
+                    <button type="button" onclick="autocompletarFormulario()" id="btnAutoIA" style="background-color: #8b5cf6; color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; font-size: 14px;">⚡ Autocompletar formulario con IA</button>
+                    <p id="msgAutoIA" style="font-size: 13px; color: #6b7280; display: none; margin-top: 5px;"></p>
                 </div>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label>📷 Foto de Perfil <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
@@ -329,6 +333,17 @@
                 </div>
             </div>
 
+            <!-- ACUERDO DE PRIVACIDAD -->
+            <div style="margin-top: 25px; margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; color: #334155;">
+                    <input type="checkbox" name="acuerdoPrivacidad" required style="margin-top: 3px; width: 18px; height: 18px; cursor: pointer;">
+                    <span>
+                        <strong>Acuerdo de Privacidad y Tratamiento de Datos *</strong><br>
+                        Autorizo a <i>Mi Trabajo TDF</i> a procesar mis datos personales, currículum y archivos adjuntos exclusivamente con fines de reclutamiento e intermediación laboral con empresas locales. Entiendo que mi perfil será evaluado mediante Inteligencia Artificial (ATS) y que puedo solicitar la eliminación de mi legajo en cualquier momento.
+                    </span>
+                </label>
+            </div>
+
             <!-- 🛑 Recordatorio Importante ATS antes del envío -->
             <div class="recordatorio-ats-final">
                 ⚠️ <strong>RECORDATORIO CRUCIAL:</strong> Asegurate de haber completado <strong>todos los campos obligatorios de forma correcta y ordenada</strong>. Si la información se envía incompleta o sin una lógica lineal estructurada, tu perfil no pasará los filtros automáticos ATS de las empresas y será <strong>descartado automáticamente</strong>.
@@ -338,16 +353,54 @@
         </form>
     </div>
 
+    <!-- Script de lógica principal del panel y envío -->
     <script src="script.js"></script>
+
+    <!-- Script exclusivo para el Autocompletado con IA -->
+    <script>
+    async function autocompletarFormulario() {
+        const fileInput = document.querySelector('input[name="cvFile"]');
+        if (!fileInput.files[0]) return alert('⚠️ Primero adjuntá el archivo PDF o DOCX del CV original.');
+
+        const btn = document.getElementById('btnAutoIA');
+        const msg = document.getElementById('msgAutoIA');
+        btn.disabled = true;
+        msg.style.display = 'block';
+        msg.style.color = '#6b7280';
+        msg.textContent = '⏳ Gemini está leyendo el CV, por favor esperá...';
+
+        const formData = new FormData();
+        formData.append('cvFile', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/autocompletar-cv', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if (data.success && data.datos) {
+                if (data.datos.nombre) document.querySelector('[name="nombre"]').value = data.datos.nombre;
+                if (data.datos.dni) document.querySelector('[name="dni"]').value = data.datos.dni;
+                if (data.datos.email) document.querySelector('[name="email"]').value = data.datos.email;
+                if (data.datos.telefono) document.querySelector('[name="telefono"]').value = data.datos.telefono;
+                if (data.datos.direccion) document.querySelector('[name="direccion"]').value = data.datos.direccion;
+                if (data.datos.resumen) document.querySelector('[name="resumen"]').value = data.datos.resumen;
+                if (data.datos.experiencia) document.querySelector('[name="experiencia"]').value = data.datos.experiencia;
+                if (data.datos.estudios) document.querySelector('[name="estudios"]').value = data.datos.estudios;
+                if (data.datos.habilidades) document.querySelector('[name="habilidades"]').value = data.datos.habilidades;
+                
+                msg.style.color = '#10b981';
+                msg.textContent = '✅ ¡Formulario autocompletado! Revisá los datos y hacé clic en "Enviar Postulación Final".';
+            } else {
+                msg.style.color = '#ef4444';
+                msg.textContent = '❌ No se pudo extraer texto del archivo. Por favor, completá los datos manualmente.';
+            }
+        } catch (e) {
+            msg.style.color = '#ef4444';
+            msg.textContent = '❌ Error de conexión al intentar autocompletar con IA.';
+        }
+        
+        btn.disabled = false;
+        btn.textContent = '⚡ Autocompletar formulario con IA';
+    }
+    </script>
 </body>
 </html>
-<!-- ACUERDO DE PRIVACIDAD -->
-<div style="margin-top: 25px; margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; color: #334155;">
-        <input type="checkbox" name="acuerdoPrivacidad" required style="margin-top: 3px; width: 18px; height: 18px; cursor: pointer;">
-        <span>
-            <strong>Acuerdo de Privacidad y Tratamiento de Datos *</strong><br>
-            Autorizo a <i>Mi Trabajo TDF</i> a procesar mis datos personales, currículum y archivos adjuntos exclusivamente con fines de reclutamiento e intermediación laboral con empresas locales. Entiendo que mi perfil será evaluado mediante Inteligencia Artificial (ATS) y que puedo solicitar la eliminación de mi legajo en cualquier momento.
-        </span>
-    </label>
-</div>

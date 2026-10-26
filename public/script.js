@@ -112,8 +112,13 @@ if (listaCandidatosDiv) {
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
-    const palabras = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
-    if (palabras.length === 0) return 0;
+    // Separamos las keywords y descartamos las que tienen menos de 2 letras
+    const terminos = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+    if (terminos.length === 0) return 0;
+
+    // Detectamos palabras positivas (buscadas) y negativas (excluidas, empiezan con "-")
+    const palabrasPositivas = terminos.filter(p => !p.startsWith('-'));
+    const palabrasNegativas = terminos.filter(p => p.startsWith('-')).map(p => p.substring(1));
 
     const textoCompleto = `
         ${candidato.empresa || ''}
@@ -125,12 +130,22 @@ function calcularAfinidad(candidato, textoBusqueda) {
         ${candidato.textoExtraidoCV || ''}
     `.toLowerCase();
 
+    // 🛑 FILTRO NEGATIVO: Si el perfil menciona la palabra excluida, lo descartamos al 100%
+    for (let neg of palabrasNegativas) {
+        if (neg.length > 2 && textoCompleto.includes(neg)) {
+            return -1; // Retorna -1 para ocultarlo en la vista
+        }
+    }
+
+    if (palabrasPositivas.length === 0) return 0;
+
+    // Calculamos el porcentaje de afinidad con las palabras positivas
     let coincidencias = 0;
-    palabras.forEach(palabra => {
+    palabrasPositivas.forEach(palabra => {
         if (textoCompleto.includes(palabra)) coincidencias++;
     });
 
-    let porcentaje = Math.round((coincidencias / palabras.length) * 100);
+    let porcentaje = Math.round((coincidencias / palabrasPositivas.length) * 100);
     return Math.min(porcentaje, 100);
 }
 
@@ -150,7 +165,7 @@ function renderizarExploradorCarpetas() {
             <div style="font-size: 36px;">📂</div>
             <div>
                 <div style="font-size: 16px; font-weight: bold; color: #1e293b;">Carpeta: Búsquedas & Vacantes</div>
-                <div style="font-size: 13px; color: #64748b;">${carpetasBusquedas.length} Empresas / Perfiles creados</div>
+                <div style="font-size: 13px; color: #64748b;">${carpetasBusquedas.length} Perfiles de empresas</div>
             </div>
         </div>
     </div>`;
@@ -177,7 +192,8 @@ function renderizarSubcarpetasPostulantes() {
         listaFiltrada = todosLosCandidatos.map(c => {
             const porc = calcularAfinidad(c, busquedaSeleccionadaFiltro);
             return { ...c, porcentaje: porc };
-        });
+        }).filter(c => c.porcentaje !== -1); // 🚫 OCULTA A LOS EXCLUIDOS POR FILTRO NEGATIVO
+        
         listaFiltrada.sort((a, b) => b.porcentaje - a.porcentaje);
     }
 
@@ -190,7 +206,7 @@ function renderizarSubcarpetasPostulantes() {
     </div>`;
 
     if (listaFiltrada.length === 0) {
-        html += '<p style="text-align: center; padding: 30px; color: #64748b;">No hay subcarpetas de postulantes registradas.</p>';
+        html += '<p style="text-align: center; padding: 30px; color: #64748b;">No hay perfiles que cumplan los requisitos. (Todos fueron ocultados o ninguno tiene coincidencia).</p>';
         return html;
     }
 
@@ -409,32 +425,64 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 }
 
+// -------------------------------------------------------------
+// 📁 LÓGICA DE DIRECTORIOS AGRUPADOS POR EMPRESA
+// -------------------------------------------------------------
 function renderizarSubcarpetasBusquedas() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
-        <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #1e293b;">📂 Subcarpetas de Búsquedas y Empresas Corporativas</h3>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <input type="text" id="nuevaEmpresa" placeholder="🏢 Empresa..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-            <button onclick="agregarSubcarpetaBusqueda()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">➕ Crear Subcarpeta</button>
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #1e293b;">📂 Directorio de Empresas y Vacantes</h3>
+        
+        <!-- 🤖 Auto-completar con IA: Escáner de Requisitos -->
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0; align-items: center; flex-wrap: wrap;">
+            <div style="font-size: 14px; font-weight: bold; color: #166534; width: 100%;">🤖 Auto-completar con IA: Subí el PDF/Word de la empresa y Gemini extraerá los requisitos.</div>
+            <input type="file" id="archivoRequisitosIA" accept=".pdf,.doc,.docx" style="font-size: 13px;">
+            <button onclick="analizarRequisitosIA()" id="btnAnalizarIA" style="background: #16a34a; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">Extraer Keywords con Gemini ⚡</button>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px;">`;
 
-    carpetasBusquedas.forEach(b => {
-        html += `
-        <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px 20px; display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">🏢 ${b.empresa || 'Empresa'}</div>
-                <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 ${b.titulo}</div>
-                <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Keywords:</strong> ${b.keywords}</div>
-            </div>
-            <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
-                <button onclick="evaluarSubcarpetaBusqueda('${b.keywords}')" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">🔍 Evaluar</button>
-                <button onclick="eliminarSubcarpetaBusqueda(${b.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer;">🗑️</button>
-            </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 30px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <input type="text" id="nuevaEmpresa" placeholder="🏢 Nombre de la Empresa..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaTitulo" placeholder="💼 Puesto / Vacante..." style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <input type="text" id="nuevaBusquedaKeywords" placeholder="🔑 Keywords ATS (Usa -palabra para excluir)..." style="flex: 2; min-width: 250px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            <button onclick="agregarSubcarpetaBusqueda()" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">➕ Guardar Subcarpeta</button>
         </div>`;
+
+    // 📌 Lógica para agrupar las búsquedas por Empresa
+    const empresasAgrupadas = {};
+    carpetasBusquedas.forEach(b => {
+        const nombreEmpresa = (b.empresa || 'Empresas Generales').toUpperCase();
+        if (!empresasAgrupadas[nombreEmpresa]) {
+            empresasAgrupadas[nombreEmpresa] = [];
+        }
+        empresasAgrupadas[nombreEmpresa].push(b);
     });
+
+    html += `<div style="display: flex; flex-direction: column; gap: 20px;">`;
+
+    for (const [empresa, busquedas] of Object.entries(empresasAgrupadas)) {
+        html += `
+        <div style="background: #f1f5f9; border: 2px solid #cbd5e1; border-radius: 10px; padding: 20px;">
+            <h4 style="margin: 0 0 15px 0; font-size: 18px; color: #0f172a; border-bottom: 2px solid #94a3b8; padding-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                🏢 EMPRESA: ${empresa}
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">`;
+
+        busquedas.forEach(b => {
+            html += `
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="font-size: 16px; font-weight: bold; color: #0284c7; margin-bottom: 6px;">📂 ${b.titulo}</div>
+                    <div style="font-size: 13px; color: #475569; margin-bottom: 12px;"><strong>Keywords:</strong> ${b.keywords}</div>
+                </div>
+                <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+                    <button onclick="evaluarSubcarpetaBusqueda('${b.keywords}')" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">🔍 Filtrar Candidatos ATS</button>
+                    <button onclick="eliminarSubcarpetaBusqueda(${b.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 10px; border-radius: 6px; font-weight: 600; cursor: pointer;">🗑️</button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+    }
 
     html += '</div></div>';
     return html;
@@ -465,6 +513,42 @@ function evaluarSubcarpetaBusqueda(keywords) {
 
 function filtrarSubcarpetas(texto) {
     renderizarExploradorCarpetas();
+}
+
+// 🤖 FUNCIÓN: Conecta el botón visual de requisitos con el servidor (Gemini)
+async function analizarRequisitosIA() {
+    const fileInput = document.getElementById('archivoRequisitosIA');
+    if (!fileInput || !fileInput.files[0]) {
+        return alert('⚠️ Seleccioná el PDF o Word que te envió la empresa primero.');
+    }
+
+    const btn = document.getElementById('btnAnalizarIA');
+    btn.disabled = true;
+    btn.textContent = 'Analizando con Inteligencia Artificial... ⏳';
+
+    const formData = new FormData();
+    formData.append('archivoRequisitos', fileInput.files[0]);
+
+    try {
+        const res = await fetch('/api/analizar-requisitos', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success && data.datos) {
+            if(data.datos.titulo) document.getElementById('nuevaBusquedaTitulo').value = data.datos.titulo;
+            if(data.datos.keywords) document.getElementById('nuevaBusquedaKeywords').value = data.datos.keywords;
+            alert('✅ ¡Requisitos extraídos con éxito! Revisá los campos y hacé clic en "Guardar Subcarpeta".');
+        } else {
+            alert('Error al procesar el archivo: ' + (data.error || 'Desconocido'));
+        }
+    } catch(e) {
+        alert('Error de conexión con el servidor al intentar usar la IA.');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = 'Extraer Keywords con Gemini ⚡';
 }
 
 function verCVATS(c) {

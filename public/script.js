@@ -112,11 +112,9 @@ if (listaCandidatosDiv) {
 function calcularAfinidad(candidato, textoBusqueda) {
     if (!textoBusqueda) return 0;
     
-    // Separamos las keywords y descartamos las que tienen menos de 2 letras
     const terminos = textoBusqueda.toLowerCase().split(/\s+/).filter(p => p.length > 2);
     if (terminos.length === 0) return 0;
 
-    // Detectamos palabras positivas (buscadas) y negativas (excluidas, empiezan con "-")
     const palabrasPositivas = terminos.filter(p => !p.startsWith('-'));
     const palabrasNegativas = terminos.filter(p => p.startsWith('-')).map(p => p.substring(1));
 
@@ -130,16 +128,14 @@ function calcularAfinidad(candidato, textoBusqueda) {
         ${candidato.textoExtraidoCV || ''}
     `.toLowerCase();
 
-    // 🛑 FILTRO NEGATIVO: Si el perfil menciona la palabra excluida, lo descartamos al 100%
     for (let neg of palabrasNegativas) {
         if (neg.length > 2 && textoCompleto.includes(neg)) {
-            return -1; // Retorna -1 para ocultarlo en la vista
+            return -1; 
         }
     }
 
     if (palabrasPositivas.length === 0) return 0;
 
-    // Calculamos el porcentaje de afinidad con las palabras positivas
     let coincidencias = 0;
     palabrasPositivas.forEach(palabra => {
         if (textoCompleto.includes(palabra)) coincidencias++;
@@ -192,7 +188,7 @@ function renderizarSubcarpetasPostulantes() {
         listaFiltrada = todosLosCandidatos.map(c => {
             const porc = calcularAfinidad(c, busquedaSeleccionadaFiltro);
             return { ...c, porcentaje: porc };
-        }).filter(c => c.porcentaje !== -1); // 🚫 OCULTA A LOS EXCLUIDOS POR FILTRO NEGATIVO
+        }).filter(c => c.porcentaje !== -1); 
         
         listaFiltrada.sort((a, b) => b.porcentaje - a.porcentaje);
     }
@@ -250,6 +246,7 @@ function renderizarSubcarpetasPostulantes() {
             <div style="padding: 15px 20px; flex-grow: 1;">
                 <div style="font-size: 13px; color: #334155; margin-bottom: 8px;">
                     <strong>📌 Vacante:</strong> ${c.puestoRequerido || 'Postulación Espontánea'}<br>
+                    <strong>📍 Dirección:</strong> ${c.direccion || 'No especificada'}<br>
                     <strong>📧 Email:</strong> ${c.email || 'No cargado'}<br>
                     <strong>📞 Tel:</strong> ${c.telefono || 'No cargado'}<br>
                     <strong>📅 Postulación:</strong> ${c.fecha}
@@ -330,6 +327,10 @@ function abrirModalEdicion(c) {
                     </div>
                 </div>
                 <div style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Dirección / Localidad:</label>
+                    <input type="text" id="editDireccion" value="${c.direccion || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;" placeholder="Ej: Calle 123, Río Grande">
+                </div>
+                <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Resumen Profesional:</label>
                     <textarea id="editResumen" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.resumen || ''}</textarea>
                 </div>
@@ -366,6 +367,7 @@ async function guardarEdicionCandidato(event, idCandidato) {
         dni: document.getElementById('editDni').value,
         email: document.getElementById('editEmail').value,
         telefono: document.getElementById('editTelefono').value,
+        direccion: document.getElementById('editDireccion').value,
         resumen: document.getElementById('editResumen').value,
         experiencia: document.getElementById('editExperiencia').value,
         estudios: document.getElementById('editEstudios').value,
@@ -425,15 +427,11 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 }
 
-// -------------------------------------------------------------
-// 📁 LÓGICA DE DIRECTORIOS AGRUPADOS POR EMPRESA
-// -------------------------------------------------------------
 function renderizarSubcarpetasBusquedas() {
     let html = `
     <div style="background: white; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
         <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #1e293b;">📂 Directorio de Empresas y Vacantes</h3>
         
-        <!-- 🤖 Auto-completar con IA: Escáner de Requisitos -->
         <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0; align-items: center; flex-wrap: wrap;">
             <div style="font-size: 14px; font-weight: bold; color: #166534; width: 100%;">🤖 Auto-completar con IA: Subí el PDF/Word de la empresa y Gemini extraerá los requisitos.</div>
             <input type="file" id="archivoRequisitosIA" accept=".pdf,.doc,.docx" style="font-size: 13px;">
@@ -447,7 +445,6 @@ function renderizarSubcarpetasBusquedas() {
             <button onclick="agregarSubcarpetaBusqueda()" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">➕ Guardar Subcarpeta</button>
         </div>`;
 
-    // 📌 Lógica para agrupar las búsquedas por Empresa
     const empresasAgrupadas = {};
     carpetasBusquedas.forEach(b => {
         const nombreEmpresa = (b.empresa || 'Empresas Generales').toUpperCase();
@@ -515,7 +512,6 @@ function filtrarSubcarpetas(texto) {
     renderizarExploradorCarpetas();
 }
 
-// 🤖 FUNCIÓN: Conecta el botón visual de requisitos con el servidor (Gemini)
 async function analizarRequisitosIA() {
     const fileInput = document.getElementById('archivoRequisitosIA');
     if (!fileInput || !fileInput.files[0]) {

@@ -37,9 +37,9 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const mongoURI = process.env.MONGODB_URI;
 
-// 🔗 CONEXIÓN A LA BASE DE DATOS 'test'
-mongoose.connect(mongoURI, { dbName: 'test' })
-    .then(() => console.log('✅ Base de datos MongoDB conectada con éxito a la colección test.'))
+// 🔗 CONEXIÓN A LA BASE DE DATOS 'MiTrabajoTDF'
+mongoose.connect(mongoURI, { dbName: 'MiTrabajoTDF' })
+    .then(() => console.log('✅ Base de datos MiTrabajoTDF conectada con éxito.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));
 
 const candidatoSchema = new mongoose.Schema({
@@ -71,8 +71,8 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 }, { strict: false });
 
-// 📌 APUNTANDO EXPLÍCITAMENTE A LA COLECCIÓN "candidatos"
-const Candidato = mongoose.model('Candidato', candidatoSchema, 'candidatos');
+// 📌 APUNTANDO A LA COLECCIÓN INTERNA 'test'
+const Candidato = mongoose.model('Candidato', candidatoSchema, 'test');
 
 async function enviarAlertaEmail(candidato) {
     try {

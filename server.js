@@ -44,6 +44,7 @@ mongoose.connect(mongoURI)
 
 const candidatoSchema = new mongoose.Schema({
     id: Number,
+    empresa: String,
     puestoRequerido: String,
     nombre: String,
     dni: String,
@@ -136,7 +137,7 @@ async function analizarCVConGemini(textoCrudo) {
 // 🌐 Endpoint de Recepción de Postulación
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
-        let { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
+        let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
         
         let cvData = '', cvContentType = '', nombreArchivoOriginal = '';
         let fotoData = '', fotoContentType = '';
@@ -193,6 +194,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         const candidatoId = Date.now();
         const nuevoCandidato = new Candidato({
             id: candidatoId,
+            empresa: limpiarYCorregirTexto(empresa) || 'Base de Datos General',
             puestoRequerido: limpiarYCorregirTexto(puestoRequerido) || 'General',
             nombre: limpiarYCorregirTexto(nombre) || 'Postulante',
             dni: limpiarYCorregirTexto(dni),
@@ -224,28 +226,26 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// 🛠️ RUTAS RECUPERADAS PARA VER Y DESCARGAR ARCHIVOS
+// 🛠️ RUTAS PARA VER, EDITAR Y DESCARGAR ARCHIVOS
 
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
+        const { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, resumen, experiencia, estudios, habilidades } = req.body;
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
 
+        if (empresa !== undefined) candidato.empresa = limpiarYCorregirTexto(empresa);
         if (puestoRequerido !== undefined) candidato.puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
         if (nombre !== undefined) candidato.nombre = limpiarYCorregirTexto(nombre);
         if (dni !== undefined) candidato.dni = limpiarYCorregirTexto(dni);
         if (email !== undefined) candidato.email = limpiarYCorregirTexto(email);
         if (telefono !== undefined) candidato.telefono = limpiarYCorregirTexto(telefono);
         if (direccion !== undefined) candidato.direccion = limpiarYCorregirTexto(direccion);
-        if (disponibilidad !== undefined) candidato.disponibilidad = limpiarYCorregirTexto(disponibilidad);
         if (resumen !== undefined) candidato.resumen = limpiarYCorregirTexto(resumen);
         if (experiencia !== undefined) candidato.experiencia = limpiarYCorregirTexto(experiencia);
         if (estudios !== undefined) candidato.estudios = limpiarYCorregirTexto(estudios);
         if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
-        if (habilidadesDuras !== undefined) candidato.habilidadesDuras = limpiarYCorregirTexto(habilidadesDuras);
-        if (habilidadesBlandas !== undefined) candidato.habilidadesBlandas = limpiarYCorregirTexto(habilidadesBlandas);
 
         await candidato.save();
         return res.json({ success: true, message: 'Legajo editado correctamente.' });
@@ -360,7 +360,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
                 <div class="info">
                     <h1>${candidato.nombre}</h1>
                     <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido}</p>
-                    <p>📧 ${candidato.email} | 📞 ${candidato.telefono} | 📍 ${candidato.direccion}</p>
+                    <p>📧 ${candidato.email} | 📞 ${candidato.telefono} | 📍 ${candidato.direccion || 'No especificada'}</p>
                     <p><strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
                 </div>
             </div>
@@ -392,18 +392,97 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📌 RUTA PRINCIPAL RECUPERADA (AVISA AL PANEL QUE EXISTEN LOS ARCHIVOS)
+// 🤖 NUEVO ENDPOINT: Extraer requisitos de empresas con IA
+app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
+    try {
+        if (!req.file) return res.json({ success: false, error: 'No se subió ningún archivo' });
+
+        let textoPlano = '';
+        if (req.file.mimetype === 'application/pdf') {
+            const pdfData = await pdfParse(req.file.buffer);
+            textoPlano = pdfData.text;
+        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+            const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+            textoPlano = wordResult.value;
+        }
+
+        if (!textoPlano || textoPlano.length < 10) return res.json({ success: false, error: 'No se pudo extraer texto del documento' });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Analiza la siguiente descripción de puesto o requisitos enviados por una empresa. Extrae el título sugerido del puesto y las palabras clave más importantes (habilidades duras, herramientas, certificaciones y competencias clave) separadas por un espacio, para usarlas en un motor de búsqueda ATS.
+        Responde ESTRICTAMENTE en formato JSON puro:
+        {
+          "titulo": "Título del puesto (ej: Ayudante de Cocina)",
+          "keywords": "palabra1 palabra2 palabra3..."
+        }
+        Texto del documento de la empresa:
+        ${textoPlano}`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let textResponse = response.text().trim();
+        
+        if (textResponse.startsWith('```json')) {
+            textResponse = textResponse.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (textResponse.startsWith('```')) {
+            textResponse = textResponse.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+        
+        return res.json({ success: true, datos: JSON.parse(textResponse) });
+    } catch (error) {
+        console.error("Error al analizar requisitos:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 🤖 NUEVO ENDPOINT: Autocompletar formulario leyendo el CV con Gemini
+app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
+    try {
+        if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });
+
+        let textoPlano = '';
+        if (req.file.mimetype === 'application/pdf') {
+            const pdfData = await pdfParse(req.file.buffer);
+            textoPlano = pdfData.text;
+        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+            const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+            textoPlano = wordResult.value;
+        }
+
+        if (!textoPlano || textoPlano.length < 20) return res.json({ success: false, error: 'Texto ilegible' });
+
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Analiza este CV y extrae la información en formato JSON puro. Si no encuentras un dato, déjalo vacío ("").
+        {
+          "nombre": "Nombre completo",
+          "dni": "Documento (solo números)",
+          "email": "Correo electrónico",
+          "telefono": "Número de teléfono",
+          "direccion": "Dirección o ciudad",
+          "resumen": "Breve perfil profesional",
+          "experiencia": "Experiencia laboral detallada",
+          "estudios": "Formación académica",
+          "habilidades": "Lista de habilidades separadas por guiones"
+        }
+        Texto del CV:
+        ${textoPlano}`;
+
+        const result = await model.generateContent(prompt);
+        let textResponse = await result.response.text();
+        
+        textResponse = textResponse.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+
+        return res.json({ success: true, datos: JSON.parse(textResponse) });
+    } catch (error) {
+        console.error("Error en autocompletado:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
-        const listaCandidatos = await Candidato.find().select('-cvData -fotoData -cartaData').sort({ id: -1 }).lean();
-        // Esta línea es la que le faltaba a tu panel frontal para "ver" que sí existen las fotos
-        const listaOptimizada = listaCandidatos.map(c => ({
-            ...c,
-            cvData: c.nombreArchivoCV ? 'true' : '',
-            fotoData: c.fotoContentType ? 'true' : '',
-            cartaData: c.nombreArchivoCarta ? 'true' : ''
-        }));
-        return res.json({ success: true, candidatos: listaOptimizada });
+        const listaCandidatos = await Candidato.find().sort({ id: -1 }).lean();
+        return res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
         return res.json({ success: false, error: error.message });
     }

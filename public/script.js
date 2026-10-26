@@ -116,6 +116,7 @@ function calcularAfinidad(candidato, textoBusqueda) {
     if (palabras.length === 0) return 0;
 
     const textoCompleto = `
+        ${candidato.empresa || ''}
         ${candidato.puestoRequerido || ''} 
         ${candidato.habilidades || ''} 
         ${candidato.resumen || ''} 
@@ -225,13 +226,14 @@ function renderizarSubcarpetasPostulantes() {
             <div style="background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px;">
                 ${avatarHtml}
                 <div style="overflow: hidden;">
-                    <div style="font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">📂 Subcarpeta: ${c.puestoRequerido || 'General'}</div>
+                    <div style="font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">🏢 EMPRESA: ${c.empresa || 'Base de Datos General'}</div>
                     <div style="font-size: 15px; font-weight: bold; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.nombre}">${c.nombre}</div>
                     <div style="font-size: 11px; color: #64748b;">DNI: ${c.dni || 'S/D'}</div>
                 </div>
             </div>
             <div style="padding: 15px 20px; flex-grow: 1;">
                 <div style="font-size: 13px; color: #334155; margin-bottom: 8px;">
+                    <strong>📌 Vacante:</strong> ${c.puestoRequerido || 'Postulación Espontánea'}<br>
                     <strong>📧 Email:</strong> ${c.email || 'No cargado'}<br>
                     <strong>📞 Tel:</strong> ${c.telefono || 'No cargado'}<br>
                     <strong>📅 Postulación:</strong> ${c.fecha}
@@ -281,9 +283,15 @@ function abrirModalEdicion(c) {
         <div style="background: white; width: 100%; max-width: 650px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
             <h2 style="margin-top:0; color:#1e293b; font-size: 20px;">✏️ Editar Legajo de ${c.nombre}</h2>
             <form id="formEditarCandidato" onsubmit="guardarEdicionCandidato(event, ${c.id})">
-                <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido:</label>
-                    <input type="text" id="editPuesto" value="${c.puestoRequerido || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Empresa a la que postula:</label>
+                        <input type="text" id="editEmpresa" value="${c.empresa || 'Base de Datos General'}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido / Vacante:</label>
+                        <input type="text" id="editPuesto" value="${c.puestoRequerido || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div style="flex: 1;">
@@ -336,6 +344,7 @@ function abrirModalEdicion(c) {
 async function guardarEdicionCandidato(event, idCandidato) {
     event.preventDefault();
     const datosEditados = {
+        empresa: document.getElementById('editEmpresa').value,
         puestoRequerido: document.getElementById('editPuesto').value,
         nombre: document.getElementById('editNombre').value,
         dni: document.getElementById('editDni').value,
@@ -483,7 +492,8 @@ function verCVATS(c) {
             <h1>${c.nombre}</h1>
             <div class="contacto">
                 ${c.direccion || ''} | Tel: ${c.telefono || ''} | Email: ${c.email || ''} | DNI: ${c.dni || ''}
-                ${c.puestoRequerido ? `<br><strong>Objetivo / Puesto:</strong> ${c.puestoRequerido}` : ''}
+                <br><strong>Empresa de interés:</strong> ${c.empresa || 'Base de Datos General'}
+                ${c.puestoRequerido ? `<br><strong>Objetivo / Vacante:</strong> ${c.puestoRequerido}` : ''}
                 <br><strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
             </div>
             <h2>Resumen Profesional</h2>

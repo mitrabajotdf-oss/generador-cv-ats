@@ -71,8 +71,8 @@ const candidatoSchema = new mongoose.Schema({
     pagado: { type: Boolean, default: false }
 }, { strict: false });
 
-// 📌 APUNTANDO A LA COLECCIÓN INTERNA 'test'
-const Candidato = mongoose.model('Candidato', candidatoSchema, 'test');
+// 📌 APUNTANDO A LA COLECCIÓN 'candidatos' DENTRO DE LA DB
+const Candidato = mongoose.model('Candidato', candidatoSchema, 'candidatos');
 
 async function enviarAlertaEmail(candidato) {
     try {

@@ -37,7 +37,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 
 const mongoURI = process.env.MONGODB_URI;
 
-// 🔗 CONEXIÓN A LA BASE DE DATOS 'test'
+// 🔗 CONEXIÓN A LA BASE DE DATOS 'test' (DONDE ESTÁN TUS 36 CVs)
 mongoose.connect(mongoURI, { dbName: 'test' })
     .then(() => console.log('✅ Base de datos MongoDB conectada con éxito a la colección test.'))
     .catch(err => console.error('❌ Error al conectar a MongoDB:', err));

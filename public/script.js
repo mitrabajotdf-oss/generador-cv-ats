@@ -181,6 +181,17 @@ function cambiarDirectorio(dir) {
     renderizarExploradorCarpetas();
 }
 
+async function ejecutarMigracionIA() {
+    if (!confirm('¿Querés actualizar automáticamente todos los legajos existentes leyendo sus PDFs y cartas con la IA de Gemini? (No se borrará ningún registro).')) return;
+    try {
+        const res = await fetch('/api/migrar-legajos-ia', { credentials: 'include' });
+        const data = await res.json();
+        alert(data.message || 'Proceso iniciado.');
+    } catch (e) {
+        alert('Error al conectar con el servidor para iniciar la migración.');
+    }
+}
+
 function renderizarSubcarpetasPostulantes() {
     let listaFiltrada = todosLosCandidatos;
     
@@ -198,6 +209,7 @@ function renderizarSubcarpetasPostulantes() {
         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 250px;">
             <input type="text" id="buscadorGeneral" placeholder="🔍 Buscar legajo de postulante..." oninput="filtrarSubcarpetas(this.value)" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none;">
         </div>
+        <button onclick="ejecutarMigracionIA()" style="background: #8b5cf6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">🤖 Actualizar todos los legajos con IA</button>
         ${busquedaSeleccionadaFiltro ? `<div style="background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">Filtrando por Requisitos: "${busquedaSeleccionadaFiltro}" <button onclick="busquedaSeleccionadaFiltro=''; renderizarExploradorCarpetas();" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; margin-left:5px;">✕</button></div>` : ''}
     </div>`;
 
@@ -225,6 +237,13 @@ function renderizarSubcarpetasPostulantes() {
                    <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>` 
             : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">📂 Sin archivo de CV</div>';
+
+        const linkFotoOriginal = c.fotoData
+            ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📷 Foto de Perfil</span>
+                   <a href="/api/descargar-foto/${c.id}" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+               </div>`
+            : '';
 
         const linkCarta = c.cartaData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
@@ -260,6 +279,7 @@ function renderizarSubcarpetasPostulantes() {
                 <div style="margin-top: 10px;">
                     <div style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">Archivos en Subcarpeta:</div>
                     ${linkCvOriginal}
+                    ${linkFotoOriginal}
                     ${linkCarta}
                     
                     <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 6px;">✏️ Editar Datos del Candidato</button>

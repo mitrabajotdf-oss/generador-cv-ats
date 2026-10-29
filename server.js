@@ -556,59 +556,99 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
     }
 });
 
-// 🔄 RUTA DE MIGRADOR AUTOMÁTICO SEGURO (Actualiza legajos existentes con IA sin borrarlos)
+// 🔄 RUTA DE MIGRADOR AUTOMÁTICO SEGURO (Procesa uno por uno en segundo plano sin saturar memoria ni cortar la página)
+let migracionEnCurso = false;
+
 app.get('/api/migrar-legajos-ia', authMiddleware, async (req, res) => {
-    try {
-        const candidatos = await Candidato.find({});
-        let actualizados = 0;
+    if (migracionEnCurso) {
+        return res.json({
+            success: true,
+            message: '⏳ La migración ya se está ejecutando en segundo plano. Podés ver el avance en los Logs de Render o recargar tu panel en 2 minutos.'
+        });
+    }
 
-        for (let candidato of candidatos) {
-            if (candidato.cvData) {
-                let cvBuffer = Buffer.from(candidato.cvData, 'base64');
-                let cartaBuffer = candidato.cartaData ? Buffer.from(candidato.cartaData, 'base64') : null;
-                
-                let textoPlanoExtraido = candidato.textoExtraidoCV || '';
-                let textoCartaExtraido = '';
+    migracionEnCurso = true;
+    res.json({
+        success: true,
+        message: '🚀 ¡Migración iniciada en segundo plano! Tus 38 legajos se están actualizando uno por uno de forma segura. En unos 2 minutos recargá tu Panel de Gestión (CTRL + F5) para ver todos los CVs optimizados.'
+    });
 
-                const resultadoGemini = await fusionarYOptimizarCVConGemini({
-                    cvBuffer,
-                    cvMimeType: candidato.cvContentType || 'application/pdf',
-                    textoPlanoExtraido,
-                    cartaBuffer,
-                    cartaMimeType: candidato.cartaContentType || 'application/pdf',
-                    textoCartaExtraido,
-                    datosFormulario: {
-                        puestoRequerido: candidato.puestoRequerido,
-                        resumen: candidato.resumen,
-                        experiencia: candidato.experiencia,
-                        estudios: candidato.estudios,
-                        habilidades: candidato.habilidades
+    (async () => {
+        try {
+            const listaIds = await Candidato.find({}, { id: 1, nombre: 1 }).lean();
+            let actualizados = 0;
+            console.log(`🔄 Iniciando migración segura de ${listaIds.length} legajos...`);
+
+            for (const item of listaIds) {
+                try {
+                    const candidato = await Candidato.findOne({ id: item.id });
+                    if (candidato && (candidato.cvData || candidato.cartaData)) {
+                        const cvBuffer = candidato.cvData ? Buffer.from(candidato.cvData, 'base64') : null;
+                        const cartaBuffer = candidato.cartaData ? Buffer.from(candidato.cartaData, 'base64') : null;
+
+                        let textoPlanoExtraido = candidato.textoExtraidoCV || '';
+                        let textoCartaExtraido = '';
+
+                        if (cvBuffer && (candidato.cvContentType?.includes('wordprocessingml') || candidato.nombreArchivoCV?.endsWith('.docx'))) {
+                            try {
+                                const wordResult = await mammoth.extractRawText({ buffer: cvBuffer });
+                                textoPlanoExtraido = wordResult.value || textoPlanoExtraido;
+                            } catch (e) {}
+                        }
+
+                        if (cartaBuffer && (candidato.cartaContentType?.includes('wordprocessingml') || candidato.nombreArchivoCarta?.endsWith('.docx'))) {
+                            try {
+                                const wordCarta = await mammoth.extractRawText({ buffer: cartaBuffer });
+                                textoCartaExtraido = wordCarta.value || '';
+                            } catch (e) {}
+                        }
+
+                        const resultadoGemini = await fusionarYOptimizarCVConGemini({
+                            cvBuffer,
+                            cvMimeType: candidato.cvContentType || 'application/pdf',
+                            textoPlanoExtraido,
+                            cartaBuffer,
+                            cartaMimeType: candidato.cartaContentType || 'application/pdf',
+                            textoCartaExtraido,
+                            datosFormulario: {
+                                puestoRequerido: candidato.puestoRequerido,
+                                resumen: candidato.resumen,
+                                experiencia: candidato.experiencia,
+                                estudios: candidato.estudios,
+                                habilidades: candidato.habilidades
+                            }
+                        });
+
+                        if (resultadoGemini) {
+                            candidato.resumen = limpiarYCorregirTexto(resultadoGemini.resumen || candidato.resumen);
+                            candidato.experiencia = limpiarYCorregirTexto(resultadoGemini.experiencia || candidato.experiencia);
+                            candidato.estudios = limpiarYCorregirTexto(resultadoGemini.estudios || candidato.estudios);
+                            candidato.habilidades = limpiarYCorregirTexto(resultadoGemini.habilidades || candidato.habilidades);
+                            candidato.habilidadesDuras = limpiarYCorregirTexto(resultadoGemini.habilidadesDuras || candidato.habilidadesDuras);
+                            candidato.habilidadesBlandas = limpiarYCorregirTexto(resultadoGemini.habilidadesBlandas || candidato.habilidadesBlandas);
+
+                            if (resultadoGemini.textoCompletoIntegrado) {
+                                candidato.textoExtraidoCV = limpiarYCorregirTexto(resultadoGemini.textoCompletoIntegrado);
+                            }
+
+                            await candidato.save();
+                            actualizados++;
+                            console.log(`✅ [${actualizados}/${listaIds.length}] Legajo actualizado: ${candidato.nombre}`);
+                        }
+                        // Pausa breve de 2 segundos entre cada candidato para cuidar el límite de la API gratuita de Gemini
+                        await new Promise(r => setTimeout(r, 2000));
                     }
-                });
-
-                if (resultadoGemini) {
-                    candidato.resumen = resultadoGemini.resumen || candidato.resumen;
-                    candidato.experiencia = resultadoGemini.experiencia || candidato.experiencia;
-                    candidato.estudios = resultadoGemini.estudios || candidato.estudios;
-                    candidato.habilidades = resultadoGemini.habilidades || candidato.habilidades;
-                    candidato.habilidadesDuras = resultadoGemini.habilidadesDuras || candidato.habilidadesDuras;
-                    candidato.habilidadesBlandas = resultadoGemini.habilidadesBlandas || candidato.habilidadesBlandas;
-                    
-                    if (resultadoGemini.textoCompletoIntegrado) {
-                        candidato.textoExtraidoCV = limpiarYCorregirTexto(resultadoGemini.textoCompletoIntegrado);
-                    }
-
-                    await candidato.save();
-                    actualizados++;
+                } catch (errIndividual) {
+                    console.error(`⚠️ Error al migrar legajo ${item.nombre}:`, errIndividual.message);
                 }
             }
+            console.log(`🎉 ¡Migración finalizada! Se actualizaron ${actualizados} legajos con éxito.`);
+        } catch (errorGeneral) {
+            console.error('❌ Error general en migración:', errorGeneral);
+        } finally {
+            migracionEnCurso = false;
         }
-
-        return res.json({ success: true, message: `¡Migración completada con éxito! Se actualizaron ${actualizados} legajos con la nueva IA sin perder registros.` });
-    } catch (error) {
-        console.error("Error en migración:", error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
+    })();
 });
 
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
@@ -619,9 +659,9 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
             estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
             cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
             cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,
-            tieneCV: { $gt: [{$strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },
-            tieneFoto: { $gt: [{$strLenCP: { $ifNull: ["$fotoData", ""] } }, 0] },
-            tieneCarta: { $gt: [{$strLenCP: { $ifNull: ["$cartaData", ""] } }, 0] }
+            tieneCV: { $gt: [{ $strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },
+            tieneFoto: { $gt: [{ $strLenCP: { $ifNull: ["$fotoData", ""] } }, 0] },
+            tieneCarta: { $gt: [{ $strLenCP: { $ifNull: ["$cartaData", ""] } }, 0] }
         }).lean();
 
         const listaCandidatos = rawCandidatos.map(c => ({
@@ -637,4 +677,19 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/candidatos/:id', authMiddleware, async (req, res
+app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
+    try {
+        await Candidato.deleteOne({ id: Number(req.params.id) });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.json({ success: false });
+    }
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor de Mi Trabajo TDF corriendo en puerto ${PORT}`);
+});

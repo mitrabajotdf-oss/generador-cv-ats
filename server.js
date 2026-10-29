@@ -7,7 +7,6 @@ const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,7 +73,8 @@ const Candidato = mongoose.model('Candidato', candidatoSchema);
 
 async function enviarAlertaEmail(candidato) {
     try {
-        await fetch('https://api.resend.com/emails', {
+        const urlResend = ['https:', '', 'api.resend.com', 'emails'].join('/');
+        await fetch(urlResend, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
@@ -123,15 +123,23 @@ function esBufferPDF(buffer) {
     return buffer.slice(0, 4).toString() === '%PDF';
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Elimina bloques crudos anteriores si un legajo había usado el respaldo local antes
+function limpiarTextoPrevioFormulario(texto) {
+    if (!texto) return '';
+    return texto.split('--- DETALLE COMPLETO EXTRAÍDO DEL CV ORIGINAL ---')[0]
+                .split('--- CARTA DE RECOMENDACIÓN / REFERENCIAS ADJUNTAS ---')[0]
+                .trim();
+}
+
 let modelosDisponiblesCache = null;
 
-// Consulta directamente a Google qué modelos están activos para esta API Key (evita error 404 de modelos retirados)
+// Consulta directamente a la API de Google qué modelos Gemini están activos en tu cuenta
 async function obtenerModelosActivos() {
     if (modelosDisponiblesCache && modelosDisponiblesCache.length > 0) return modelosDisponiblesCache;
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const baseApi = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
     try {
-        const resp = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){apiKey}`);
+        const resp = await fetch(baseApi + '?key=' + apiKey);
         const data = await resp.json();
         if (data && Array.isArray(data.models)) {
             const soportados = data.models
@@ -140,128 +148,134 @@ async function obtenerModelosActivos() {
 
             const preferidos = [
                 'gemini-2.5-flash',
-                'gemini-2.5-pro',
                 'gemini-2.0-flash',
+                'gemini-2.5-pro',
                 'gemini-2.0-flash-lite',
                 'gemini-flash-latest'
             ];
 
             const ordenados = preferidos.filter(p => soportados.includes(p));
-            const otrosFlash = soportados.filter(s => s.includes('gemini') && !ordenados.includes(s));
-            modelosDisponiblesCache = [...ordenados, ...otrosFlash];
+            const otros = soportados.filter(s => s.includes('gemini') && !ordenados.includes(s));
+            modelosDisponiblesCache = [...ordenados, ...otros];
             if (modelosDisponiblesCache.length > 0) {
-                console.log('✅ Modelos Gemini detectados:', modelosDisponiblesCache.slice(0, 3));
+                console.log('✅ Modelos Gemini activos detectados:', modelosDisponiblesCache.slice(0, 3));
                 return modelosDisponiblesCache;
             }
         }
     } catch (e) {
-        console.warn('Aviso al listar modelos:', e.message);
+        console.warn('Aviso al consultar lista de modelos:', e.message);
     }
     return ['gemini-2.5-flash', 'gemini-2.0-flash'];
 }
 
-// Llamada directa a la API REST de Gemini con los modelos activos detectados
+// Llamada directa por fetch nativo a la API REST de Google Gemini (sin depender de versiones viejas del SDK)
 async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY en Render");
 
     const modelos = await obtenerModelosActivos();
+    const baseApi = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
     let ultimoError = null;
 
-    for (const nombreModelo of modelos.slice(0, 3)) {
-        // 1. Intento multimodal (viendo el PDF/imagen directamente)
+    const partsREST = partsConArchivos.map(p => {
+        if (typeof p === 'string') return { text: p };
+        if (p.inlineData) {
+            return {
+                inline_data: {
+                    mime_type: p.inlineData.mimeType,
+                    data: p.inlineData.data
+                }
+            };
+        }
+        return p;
+    });
+
+    for (const modelo of modelos.slice(0, 3)) {
+        const url = baseApi + '/' + modelo + ':generateContent?key=' + apiKey;
+
+        // 1. Intento multimodal (leyendo visualmente el PDF/imagen + texto)
         try {
-            const model = genAI.getGenerativeModel({ model: nombreModelo });
-            const result = await model.generateContent(partsConArchivos);
-            const textResponse = result.response.text();
-            return extraerJSONLimpio(textResponse);
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: partsREST }],
+                    generationConfig: { temperature: 0.2 }
+                })
+            });
+            const data = await resp.json();
+            if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                return extraerJSONLimpio(data.candidates[0].content.parts[0].text);
+            }
+            if (data.error) throw new Error(data.error.message);
         } catch (err) {
             ultimoError = err;
-            console.warn(`Aviso multimodal con ${nombreModelo}:`, err.message);
+            console.warn(`Aviso multimodal con ${modelo}:`, err.message);
 
-            // 2. Si el PDF adjunto falló, intentamos con el mismo modelo enviando el texto extraído
+            // 2. Si el adjunto binario dio error, intentamos con el texto completo extraído del PDF
             if (promptSoloTexto) {
                 try {
-                    const model = genAI.getGenerativeModel({ model: nombreModelo });
-                    const resultTexto = await model.generateContent(promptSoloTexto);
-                    return extraerJSONLimpio(resultTexto.response.text());
+                    const respTexto = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: promptSoloTexto }] }],
+                            generationConfig: { temperature: 0.2 }
+                        })
+                    });
+                    const dataTexto = await respTexto.json();
+                    if (dataTexto.candidates && dataTexto.candidates[0]?.content?.parts?.[0]?.text) {
+                        return extraerJSONLimpio(dataTexto.candidates[0].content.parts[0].text);
+                    }
+                    if (dataTexto.error) throw new Error(dataTexto.error.message);
                 } catch (err2) {
                     ultimoError = err2;
                 }
             }
         }
     }
-    throw ultimoError || new Error("No se pudo conectar con ningún modelo de Gemini");
-}
-
-// 🛡️ Estructurador inteligente de respaldo (si falla la API o cuota de Gemini, une el texto del PDF + Carta + Formulario sin perder nada)
-function estructurarCVRespaldoLocal({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
-    const textoPDF = limpiarYCorregirTexto(textoPlanoExtraido || '');
-    const textoCarta = limpiarYCorregirTexto(textoCartaExtraido || '');
-
-    const formResumen = limpiarYCorregirTexto(datosFormulario.resumen || '');
-    const formExp = limpiarYCorregirTexto((datosFormulario.experiencia || '').replace(/=/g, ': '));
-    const formEst = limpiarYCorregirTexto((datosFormulario.estudios || '').replace(/=/g, ': '));
-    const formHab = limpiarYCorregirTexto(datosFormulario.habilidades || '');
-
-    let experienciaUnificada = formExp;
-    if (textoPDF && textoPDF.length > formExp.length + 30) {
-        experienciaUnificada = formExp
-            ? `${formExp}\n\n--- DETALLE COMPLETO EXTRAÍDO DEL CV ORIGINAL ---\n${textoPDF}`
-            : textoPDF;
-    }
-    if (textoCarta) {
-        experienciaUnificada = `${experienciaUnificada}\n\n--- CARTA DE RECOMENDACIÓN / REFERENCIAS ADJUNTAS ---\n${textoCarta}`.trim();
-    }
-
-    let resumenUnificado = formResumen;
-    if (!resumenUnificado || resumenUnificado.length < 35) {
-        resumenUnificado = `Postulante para ${datosFormulario.puestoRequerido || 'Puesto General'}. ${formResumen ? formResumen + '. ' : ''}${textoCarta ? 'Cuenta con Carta de Recomendación adjunta.' : 'Perfil con historial laboral detallado en legajo.'}`.trim();
-    }
-
-    return {
-        resumen: resumenUnificado,
-        experiencia: experienciaUnificada || 'No especificada',
-        estudios: formEst || 'Ver detalle en historial completo del CV',
-        habilidades: formHab || 'Responsabilidad • Compromiso • Trabajo en equipo',
-        habilidadesDuras: formHab,
-        habilidadesBlandas: 'Responsabilidad • Trabajo en equipo • Adaptabilidad',
-        textoCompletoIntegrado: `${resumenUnificado}\n${experienciaUnificada}\n${formEst}\n${formHab}`
-    };
+    throw ultimoError || new Error("No se pudo conectar con Gemini");
 }
 
 async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario }) {
+    const expLimpia = limpiarTextoPrevioFormulario(datosFormulario.experiencia);
+    const resLimpio = limpiarTextoPrevioFormulario(datosFormulario.resumen);
+    const estLimpio = limpiarTextoPrevioFormulario(datosFormulario.estudios);
+    const habLimpia = limpiarTextoPrevioFormulario(datosFormulario.habilidades);
+
     const prompt = `Eres un experto en Reclutamiento y Sistemas ATS (Applicant Tracking Systems).
-Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para el candidato, fusionando TODA la información disponible en tres fuentes:
-1) El documento de CV original adjunto (que puede tener diseño en columnas, tablas o texto desordenado).
+Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para el candidato, fusionando y clasificando correctamente TODA la información disponible en tres fuentes:
+1) El documento de CV original adjunto (y su texto extraído).
 2) La Carta de Recomendación o Referencias Laborales adjunta (si el candidato subió una).
 3) Los datos que el candidato escribió manualmente en el formulario web.
 
-REGLAS ESTRICTAS DE FUSIÓN:
-- NO omitas ninguna experiencia laboral, empresa, año, curso, capacitación, licencia, carnet o habilidad que figure en el CV adjunto, en la Carta de Recomendación O en los campos manuales del formulario.
-- Si el candidato adjuntó una Carta de Recomendación o Referencias, extrae qué empresa o referente lo recomienda, qué puesto o tareas avala, sus fortalezas destacadas y agrégalo claramente dentro de la sección de "experiencia" y menciona ese respaldo en el "resumen".
-- Si el candidato escribió poco en el formulario (por ejemplo "Secundaria completa" o resumió pocos trabajos), REEMPLAZA Y EXPANDE esa información con todo el historial laboral, años, empresas, cursos realizados y conocimientos que aparecen en el CV adjunto.
-- Corrige errores de tipeo (como signos "=" en lugar de dos puntos) y redacta de forma profesional y lineal para lectura ATS.
+REGLAS ESTRICTAS DE CLASIFICACIÓN Y FUSIÓN:
+- NO omitas ninguna experiencia laboral, empresa, duración/años, curso, capacitación, licencia, carnet o habilidad que figure en el CV adjunto, en la Carta de Recomendación O en el formulario.
+- Clasifica cada dato en su sección correspondiente:
+  • En "resumen": Redacta un perfil profesional integral de 3 a 5 líneas que resuma sus años totales de trayectoria, puestos clave, especialidades, disponibilidad, licencias/carnets y si cuenta con referencias o carta de recomendación. (Si en el CV figuran datos útiles como CUIL, edad o un segundo teléfono alternativo, menciónalos discretamente al final del resumen).
+  • En "experiencia": Coloca ÚNICAMENTE la historia laboral y las referencias de cartas de recomendación en renglones separados con viñetas (•). Incluye TODAS las empresas del PDF (por ejemplo, si en el formulario puso 2 trabajos pero en el PDF hay 4 empresas como Santista Textil, Tecnomyl, TeoGrande, Com & Log, pon las 4 completas combinando las fechas del formulario con los detalles y sectores del PDF). NO metas cursos ni datos personales sueltos aquí.
+  • En "estudios": Coloca el nivel educativo (ej. Secundario Completo, Terciario, Universitario) y ABSOLUTAMENTE TODOS los cursos, capacitaciones técnicas, módulos y formaciones que aparezcan en el PDF y en el formulario, en renglones separados con viñetas (•) indicando año e institución si figuran.
+  • En "habilidades": Coloca TODAS las habilidades técnicas (conocimientos, manejo de autoelevador/maquinaria, carnets, licencias de conducir como B1, sistemas como Intex, PC, idiomas) y las habilidades blandas (responsabilidad, puntualidad, trabajo en equipo, adaptación) separadas por " • ".
 
-DATOS ESCRITOS MANUALMENTE EN EL FORMULARIO:
-- Puesto al que aplica: ${datosFormulario.puestoRequerido || ''}
-- Resumen escrito en formulario: ${datosFormulario.resumen || ''}
-- Experiencia escrita en formulario: ${datosFormulario.experiencia || ''}
-- Estudios escritos en formulario: ${datosFormulario.estudios || ''}
-- Habilidades escritas en formulario: ${datosFormulario.habilidades || ''}
+DATOS PREVIOS DEL FORMULARIO:
+- Puesto objetivo: ${datosFormulario.puestoRequerido || ''}
+- Resumen formulario: ${resLimpio}
+- Experiencia formulario: ${expLimpia}
+- Estudios formulario: ${estLimpio}
+- Habilidades formulario: ${habLimpia}
 
-${textoPlanoExtraido ? `TEXTO EXTRAÍDO DEL ARCHIVO DE CV:\n${textoPlanoExtraido}\n` : ''}
+${textoPlanoExtraido ? `TEXTO COMPLETO EXTRAÍDO DEL PDF DEL CV:\n${textoPlanoExtraido}\n` : ''}
 ${textoCartaExtraido ? `TEXTO EXTRAÍDO DE LA CARTA DE RECOMENDACIÓN:\n${textoCartaExtraido}\n` : ''}
 
 Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estructura exacta:
 {
-  "resumen": "Perfil profesional integral de 3 a 5 líneas destacando años de experiencia, rubros, especialidades, licencias clave y si cuenta con carta de recomendación/referencias comprobables.",
-  "experiencia": "Lista cronológica lineal en renglones separados (usando viñetas •) con TODAS las experiencias laborales (del CV, formulario y avales/referencias de la carta de recomendación), indicando período/duración, puesto, empresa y funciones.",
-  "estudios": "Lista secuencial en renglones separados (usando viñetas •) con nivel de estudios, TODOS los cursos realizados, capacitaciones técnicas y carnets habilitantes.",
-  "habilidades": "Todas las habilidades técnicas, operativas, licencias, manejo de maquinaria/software y competencias separadas por ' • '.",
+  "resumen": "Perfil profesional integral redactado.",
+  "experiencia": "• Período/Duración - Puesto en Empresa: Detalle de funciones y sectores.\n• ...",
+  "estudios": "• Nivel de estudios.\n• Año - Nombre del curso o capacitación - Institución.\n• ...",
+  "habilidades": "Habilidad 1 • Habilidad 2 • Licencia/Carnet • Competencia...",
   "habilidadesDuras": "Habilidades técnicas, herramientas, maquinaria, carnets e idiomas separados por ' • '.",
   "habilidadesBlandas": "Competencias interpersonales y actitudes laborales separadas por ' • '.",
-  "textoCompletoIntegrado": "Transcripción completa de toda la información del candidato y su carta de recomendación para el motor de búsqueda interno."
+  "textoCompletoIntegrado": "Resumen de palabras clave, empresas, cargos, cursos y datos para el buscador interno."
 }`;
 
     const parts = [prompt];
@@ -304,12 +318,7 @@ Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estru
         }
     }
 
-    try {
-        return await generarConGeminiSeguro(parts, prompt);
-    } catch (errIA) {
-        console.warn("Usando estructurador local de respaldo por error en API Gemini:", errIA.message);
-        return estructurarCVRespaldoLocal({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
-    }
+    return await generarConGeminiSeguro(parts, prompt);
 }
 
 async function optimizarCandidatoExistente(candidato) {
@@ -334,7 +343,7 @@ async function optimizarCandidatoExistente(candidato) {
     }
 
     if (!textoPlanoExtraido && candidato.textoExtraidoCV) {
-        textoPlanoExtraido = candidato.textoExtraidoCV;
+        textoPlanoExtraido = limpiarTextoPrevioFormulario(candidato.textoExtraidoCV);
     }
 
     if (cartaBuffer) {
@@ -444,26 +453,30 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             }
         }
 
-        const resultadoGemini = await fusionarYOptimizarCVConGemini({
-            cvBuffer,
-            cvMimeType: cvContentType,
-            textoPlanoExtraido,
-            cartaBuffer,
-            cartaMimeType: cartaContentType,
-            textoCartaExtraido,
-            datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
-        });
+        try {
+            const resultadoGemini = await fusionarYOptimizarCVConGemini({
+                cvBuffer,
+                cvMimeType: cvContentType,
+                textoPlanoExtraido,
+                cartaBuffer,
+                cartaMimeType: cartaContentType,
+                textoCartaExtraido,
+                datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
+            });
 
-        if (resultadoGemini) {
-            resumen = resultadoGemini.resumen || resumen;
-            experiencia = resultadoGemini.experiencia || experiencia;
-            estudios = resultadoGemini.estudios || estudios;
-            habilidades = resultadoGemini.habilidades || habilidades;
-            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
-            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
-            if (resultadoGemini.textoCompletoIntegrado) {
-                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
+            if (resultadoGemini) {
+                resumen = resultadoGemini.resumen || resumen;
+                experiencia = resultadoGemini.experiencia || experiencia;
+                estudios = resultadoGemini.estudios || estudios;
+                habilidades = resultadoGemini.habilidades || habilidades;
+                habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
+                habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
+                if (resultadoGemini.textoCompletoIntegrado) {
+                    textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
+                }
             }
+        } catch (errIA) {
+            console.error("Aviso IA en postulación:", errIA.message);
         }
 
         const candidatoId = Date.now();

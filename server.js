@@ -72,13 +72,16 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
-// 📂 Esquema persistente en MongoDB para Búsquedas y Vacantes de Empresas
+// 📂 Esquema de Subcarpetas de Búsquedas/Vacantes (Guarda Empresa, Subcarpeta Puesto, Keywords, Texto WhatsApp y Archivo PDF/Word/Flyer)
 const busquedaSchema = new mongoose.Schema({
     id: Number,
     empresa: String,
     titulo: String,
     keywords: String,
-    notas: String,
+    textoAviso: String,
+    archivoData: String,
+    archivoContentType: String,
+    nombreArchivo: String,
     fechaCreacion: String
 });
 
@@ -353,7 +356,6 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
     const formExpRaw = limpiarTextoPrevioFormulario((datosFormulario.experiencia || '').replace(/=/g, ': '));
     const formEstRaw = limpiarTextoPrevioFormulario((datosFormulario.estudios || '').replace(/=/g, ': '));
     const formHabRaw = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
-    const formResRaw = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
 
     const lineasFormExp = formExpRaw.split('\n')
         .filter(l => !l.trim().startsWith('•'))
@@ -894,54 +896,104 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 📂 RUTAS CRUD EN MONGODB PARA BÚSQUEDAS Y VACANTES DE EMPRESAS
+// 📂 RUTAS CRUD EN MONGODB PARA CARPETAS DE EMPRESAS Y SUBCARPETAS DE PUESTOS
 app.get('/api/busquedas', authMiddleware, async (req, res) => {
     try {
-        const busquedas = await Busqueda.find({}).lean();
-        return res.json({ success: true, busquedas: busquedas.sort((a, b) => b.id - a.id) });
+        const rawBusquedas = await Busqueda.find({}, {
+            id: 1, empresa: 1, titulo: 1, keywords: 1, textoAviso: 1,
+            archivoContentType: 1, nombreArchivo: 1, fechaCreacion: 1,
+            tieneArchivo: { $gt: [{ $strLenCP: { $ifNull: ["$archivoData", ""] } }, 0] }
+        }).lean();
+
+        const busquedas = rawBusquedas.map(b => ({
+            ...b,
+            archivoData: b.tieneArchivo ? 'disponible' : ''
+        })).sort((a, b) => b.id - a.id);
+
+        return res.json({ success: true, busquedas });
     } catch (error) {
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.post('/api/busquedas', authMiddleware, async (req, res) => {
+app.post('/api/busquedas', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
     try {
-        const { id, empresa, titulo, keywords, notas } = req.body;
-        const nuevoId = id || Date.now();
+        const { id, empresa, titulo, keywords, textoAviso } = req.body;
+        const nuevoId = Number(id) || Date.now();
         const existente = await Busqueda.findOne({ id: nuevoId });
         if (existente) return res.json({ success: true, busqueda: existente });
+
+        let archivoData = '', archivoContentType = '', nombreArchivo = '';
+        if (req.file) {
+            archivoData = req.file.buffer.toString('base64');
+            archivoContentType = req.file.mimetype;
+            nombreArchivo = req.file.originalname;
+        }
 
         const nueva = new Busqueda({
             id: nuevoId,
             empresa: limpiarYCorregirTexto(empresa) || 'Empresas Generales',
             titulo: limpiarYCorregirTexto(titulo) || 'Vacante General',
-            keywords: limpiarYCorregirTexto(keywords),
-            notas: limpiarYCorregirTexto(notas || ''),
+            keywords: limpiarYCorregirTexto(keywords || ''),
+            textoAviso: limpiarYCorregirTexto(textoAviso || ''),
+            archivoData,
+            archivoContentType,
+            nombreArchivo,
             fechaCreacion: new Date().toLocaleDateString()
         });
         await nueva.save();
-        return res.json({ success: true, busqueda: nueva });
+
+        const respuestaLimpia = {
+            ...nueva.toObject(),
+            archivoData: archivoData ? 'disponible' : ''
+        };
+        return res.json({ success: true, busqueda: respuestaLimpia });
     } catch (error) {
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.post('/api/busquedas/editar/:id', authMiddleware, async (req, res) => {
+app.post('/api/busquedas/editar/:id', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { empresa, titulo, keywords, notas } = req.body;
+        const { empresa, titulo, keywords, textoAviso } = req.body;
         const b = await Busqueda.findOne({ id });
-        if (!b) return res.status(404).json({ success: false, error: 'Búsqueda no encontrada' });
+        if (!b) return res.status(404).json({ success: false, error: 'Subcarpeta no encontrada' });
 
         if (empresa !== undefined) b.empresa = limpiarYCorregirTexto(empresa);
         if (titulo !== undefined) b.titulo = limpiarYCorregirTexto(titulo);
         if (keywords !== undefined) b.keywords = limpiarYCorregirTexto(keywords);
-        if (notas !== undefined) b.notas = limpiarYCorregirTexto(notas);
+        if (textoAviso !== undefined) b.textoAviso = limpiarYCorregirTexto(textoAviso);
+
+        if (req.file) {
+            b.archivoData = req.file.buffer.toString('base64');
+            b.archivoContentType = req.file.mimetype;
+            b.nombreArchivo = req.file.originalname;
+        }
 
         await b.save();
-        return res.json({ success: true, busqueda: b });
+        const respuestaLimpia = {
+            ...b.toObject(),
+            archivoData: b.archivoData ? 'disponible' : ''
+        };
+        return res.json({ success: true, busqueda: respuestaLimpia });
     } catch (error) {
         return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/busquedas/archivo/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const b = await Busqueda.findOne({ id });
+        if (!b || !b.archivoData) return res.status(404).send('Archivo no disponible en esta subcarpeta.');
+        const buffer = Buffer.from(b.archivoData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(b.nombreArchivo, `Aviso_${b.empresa}_${b.titulo}.pdf`);
+        res.setHeader('Content-Type', b.archivoContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${nombreSeguro}"`);
+        return res.send(buffer);
+    } catch (error) {
+        return res.status(500).send('Error al abrir el archivo de la vacante.');
     }
 });
 
@@ -954,13 +1006,12 @@ app.delete('/api/busquedas/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 🤖 Extractor de respaldo local para vacantes (por si se pega un texto de WhatsApp o falla la cuota de Gemini)
-function extraerRequisitosLocalmente(texto) {
-    const limpio = limpiarYCorregirTexto(texto || '');
+function extraerRequisitosLocalmente(texto, puestoContexto = '') {
+    const limpio = limpiarYCorregirTexto(`${puestoContexto} ${texto || ''}`);
     const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
 
     let empresa = '';
-    let titulo = '';
+    let titulo = puestoContexto || '';
 
     for (const l of lineas) {
         if (!empresa && /^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]/i.test(l)) {
@@ -975,7 +1026,7 @@ function extraerRequisitosLocalmente(texto) {
         titulo = lineas[0].substring(0, 60);
     }
 
-    const stopWords = new Set(['para', 'con', 'los', 'las', 'del', 'una', 'por', 'que', 'mas', 'más', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'todo', 'toda', 'todos', 'todas', 'otro', 'otra', 'otros', 'otras', 'mismo', 'misma', 'importante', 'empresa', 'busca', 'buscamos', 'incorporar', 'personal', 'puesto', 'vacante', 'requisitos', 'excluyente', 'deseable', 'experiencia', 'años', 'año', 'zona', 'horario', 'enviar', 'correo', 'asunto', 'disponibilidad', 'inmediata', 'trabajo', 'laboral', 'minima', 'mínima', 'comprobable', 'tierra', 'fuego', 'grande', 'ushuaia']);
+    const stopWords = new Set(['para', 'con', 'los', 'las', 'del', 'una', 'por', 'que', 'mas', 'más', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'todo', 'toda', 'todos', 'todas', 'otro', 'otra', 'otros', 'otras', 'mismo', 'misma', 'importante', 'empresa', 'busca', 'buscamos', 'incorporar', 'personal', 'puesto', 'vacante', 'requisitos', 'excluyente', 'deseable', 'experiencia', 'años', 'año', 'zona', 'horario', 'enviar', 'correo', 'asunto', 'disponibilidad', 'inmediata', 'trabajo', 'laboral', 'minima', 'mínima', 'comprobable', 'tierra', 'fuego', 'grande', 'ushuaia', 'hola', 'buenas', 'dias', 'tardes']);
 
     const palabras = limpio
         .toLowerCase()
@@ -984,8 +1035,11 @@ function extraerRequisitosLocalmente(texto) {
         .filter(p => p.length > 3 && !stopWords.has(p) && !/^\d+$/.test(p));
 
     const unicas = [];
+    if (puestoContexto && puestoContexto.trim().includes(' ')) {
+        unicas.push(puestoContexto.trim().toLowerCase().replace(/\s+/g, '_'));
+    }
     for (const p of palabras) {
-        if (!unicas.includes(p) && unicas.length < 14) unicas.push(p);
+        if (!unicas.includes(p) && unicas.length < 15) unicas.push(p);
     }
 
     return {
@@ -995,11 +1049,13 @@ function extraerRequisitosLocalmente(texto) {
     };
 }
 
-// 🤖 Analizador de requisitos por Archivo (PDF/Word/Imagen) O Texto directo de WhatsApp
 app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
     try {
         const textoDirecto = req.body.textoRequisitos ? req.body.textoRequisitos.trim() : '';
-        if (!req.file && !textoDirecto) {
+        const puestoContexto = req.body.puestoContexto ? req.body.puestoContexto.trim() : '';
+        const empresaContexto = req.body.empresaContexto ? req.body.empresaContexto.trim() : '';
+
+        if (!req.file && !textoDirecto && !puestoContexto) {
             return res.json({ success: false, error: 'Subí un archivo (PDF, Word o Imagen) o pegá el texto de la búsqueda.' });
         }
 
@@ -1018,19 +1074,18 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
             }
         }
 
-        const prompt = `Analiza la siguiente descripción de puesto, aviso laboral o mensaje de requisitos enviado por una empresa.
-Extrae:
-1) "empresa": El nombre de la empresa, comercio o institución que realiza la búsqueda (si no se menciona el nombre, devuelve "Empresas Generales").
-2) "titulo": El título claro del puesto o vacante buscada (ej: "Jefe de Cocina", "Operario de Logística y Autoelevador", "Administrativo Contable").
-3) "keywords": Las palabras clave técnicas, oficios, herramientas, licencias y competencias más importantes para filtrar CVs en un motor ATS, separadas por espacio. Para términos compuestos clave usa guion bajo (ej: "jefe_de_cocina", "atencion_al_cliente", "carnet_autoelevador") además de las palabras individuales ("cocina pasteleria autoelevador logistica stock"). Si el aviso aclara algo que NO quieren, agrégalo con signo menos delante (ej: "-part_time").
+        const prompt = `Analiza la siguiente búsqueda laboral para la empresa "${empresaContexto || 'Cliente'}" y el puesto "${puestoContexto || 'Vacante'}".
+Extrae las palabras clave técnicas, oficios, herramientas, funciones, licencias y competencias más importantes para filtrar CVs en un motor ATS, separadas por espacio.
+Para el nombre del puesto o términos compuestos usa guion bajo (ej: "jefe_de_cocina", "pastelero", "panaderia", "reposteria", "manipulacion_de_alimentos") además de las palabras sueltas clave. Si el aviso aclara algo excluyente que NO quieren, agrégalo con signo menos delante.
 
 Responde ESTRICTAMENTE en formato JSON puro:
 {
-  "empresa": "Nombre de la Empresa",
-  "titulo": "Título del puesto",
-  "keywords": "palabra1 palabra2 frase_compuesta..."
+  "empresa": "${empresaContexto || 'Nombre de la Empresa'}",
+  "titulo": "${puestoContexto || 'Título del puesto'}",
+  "keywords": "palabra1 palabra2 frase_compuesta...",
+  "textoExtraido": "Resumen claro de los requisitos leídos del archivo o imagen"
 }
-${textoPlano ? `\nTexto de la búsqueda:\n${textoPlano}` : ''}`;
+${textoPlano ? `\nTexto del pedido:\n${textoPlano}` : ''}`;
 
         const parts = [prompt];
         if (req.file) {
@@ -1043,14 +1098,14 @@ ${textoPlano ? `\nTexto de la búsqueda:\n${textoPlano}` : ''}`;
 
         try {
             const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 40));
-            if (datos && (datos.titulo || datos.keywords)) {
+            if (datos && datos.keywords) {
                 return res.json({ success: true, datos });
             }
         } catch (errIA) {
             console.warn("Usando extractor local de requisitos:", errIA.message);
         }
 
-        const datosRespaldo = extraerRequisitosLocalmente(textoPlano);
+        const datosRespaldo = extraerRequisitosLocalmente(textoPlano, puestoContexto);
         return res.json({ success: true, datos: datosRespaldo });
     } catch (error) {
         console.error("Error al analizar requisitos:", error);

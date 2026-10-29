@@ -50,6 +50,7 @@ const candidatoSchema = new mongoose.Schema({
     telefono: String,
     direccion: String,
     disponibilidad: String,
+    datosPersonalesExtra: String,
     resumen: String,
     experiencia: String,
     estudios: String,
@@ -138,7 +139,6 @@ function esBufferPDF(buffer) {
     return buffer.slice(0, 4).toString() === '%PDF';
 }
 
-// Limpia textos autogenerados en pasadas previas para no duplicar frases ni arrastrar viñetas viejas
 function limpiarTextoPrevioFormulario(texto) {
     if (!texto) return '';
     let t = texto
@@ -146,18 +146,19 @@ function limpiarTextoPrevioFormulario(texto) {
         .split('--- CARTA DE RECOMENDACIÓN / REFERENCIAS ADJUNTAS ---')[0]
         .trim();
 
-    // Si es un resumen autogenerado previamente, rescatamos solo la parte original o lo limpiamos
     t = t.replace(/^Perfil postulado para [^.]+\.\s*/gi, '')
          .replace(/^Postulante para [^.]+\.\s*/gi, '')
-         .replace(/Perfil con historial laboral detallado en legajo\.+/gi, '')
+         .replace(/^Perfil profesional con sólida trayectoria[^.]+\.\s*/gi, '')
+         .replace(/Perfil con historial laboral detallado en legajo\.*/gi, '')
+         .replace(/Cuenta con sólida experiencia comprobable en el sector[^.]*\./gi, '')
          .replace(/Cuenta con amplia experiencia operativa comprobable y formación continua\.?/gi, '')
          .replace(/Datos adicionales:.*$/gi, '')
+         .replace(/\.{2,}/g, '.')
          .trim();
 
     return t;
 }
 
-// Une renglones que fueron cortados a mitad de oración por columnas de un PDF
 function unirRenglonesCortados(lineasCrudas) {
     const resultado = [];
     for (let raw of lineasCrudas) {
@@ -170,7 +171,7 @@ function unirRenglonesCortados(lineasCrudas) {
         } else {
             const anterior = resultado[resultado.length - 1];
             const empiezaMinusculaOParentesis = /^[a-záéíóúñ0-9()]/.test(limpia);
-            const anteriorTerminaAbierto = /[-–(/:,]$|\b(de|del|en|el|la|los|las|para|por|con|y|o|a|su|propia|sector|capacitación|charla)$/i.test(anterior);
+            const anteriorTerminaAbierto = /[-–(/:,]$|\b(de|del|en|el|la|los|las|para|por|con|y|o|a|su|propia|sector|capacitación|charla|buenas)$/i.test(anterior);
             const esContinuacionCorta = limpia.length < 42 && !limpia.endsWith('.');
 
             if (empiezaMinusculaOParentesis || anteriorTerminaAbierto || esContinuacionCorta) {
@@ -281,7 +282,7 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
     throw ultimoError || new Error("Tiempo de espera agotado con Gemini");
 }
 
-// 🛡️ Clasificador inteligente local (Une renglones cortados, limpia símbolos y ubica cada sección sin errores)
+// 🛡️ Clasificador y Redactor Profesional Local (Separa Datos Personales en línea y redacta un Resumen Profesional rico basado en las experiencias reales)
 function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
     const lineas = (textoPlanoExtraido || '').split('\n').map(l => l.trim()).filter(Boolean);
     const expCruda = [];
@@ -296,21 +297,20 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         const sinSimbolos = limpiarSimbolosDecorativos(linea);
         if (!sinSimbolos) continue;
 
-        // Ignorar títulos generales de CV
         if (/^CURRICUL[U]?M\s+VITAE/i.test(lUpper) || /^DATOS\s+PERSONALES$/i.test(lUpper)) {
             seccionActual = 'personal';
             continue;
         }
 
-        // Detectar datos de contacto o personales infiltrados en cualquier parte del documento
-        if (/^(CEL\.?|TEL\.?|TEL[EÉ]FONO|C\.?U\.?I\.?L\.?|FECHA DE NACIMIENTO|EDAD|ESTADO CIVIL)\s*[:.]/i.test(sinSimbolos)) {
-            if (/C\.?U\.?I\.?L|NACIMIENTO|EDAD|ESTADO CIVIL|CEL\.?|TEL/i.test(sinSimbolos)) {
-                if (!datosExtra.includes(sinSimbolos)) datosExtra.push(sinSimbolos);
+        // Capturar datos personales para mostrarlos linealmente debajo del nombre (y nunca en estudios ni resumen)
+        if (/^(CEL\.?|TEL\.?|TEL[EÉ]FONO|C\.?U\.?I\.?L\.?|FECHA DE NACIMIENTO|EDAD|ESTADO CIVIL|NACIONALIDAD)\s*[:.]/i.test(sinSimbolos)) {
+            const normalizado = sinSimbolos.replace(/\s+/g, ' ');
+            if (!datosExtra.some(d => d.toLowerCase() === normalizado.toLowerCase())) {
+                datosExtra.push(normalizado);
             }
             continue;
         }
 
-        // Detectar encabezados de sección (incluyendo "ESTUDIOS" a secas o encabezados en 2 líneas)
         if (/^(ESTUDIOS|ESTUDIOS CURSADOS|FORMACI[OÓ]N|FORMACI[OÓ]N ACAD[EÉ]MICA|EDUCACI[OÓ]N|CURSOS REALIZADOS.*|PERIODO EN .*|CAPACITACIONES)$/i.test(lUpper)) {
             seccionActual = 'estudios';
             if (/^PERIODO EN /i.test(lUpper)) {
@@ -336,19 +336,19 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         }
     }
 
-    // Unimos los renglones que el PDF cortó a mitad de frase
     const expUnida = unirRenglonesCortados(expCruda);
     const estUnida = unirRenglonesCortados(estCruda);
     const habUnida = unirRenglonesCortados(habCruda);
 
-    // Rescatamos únicamente lo escrito manualmente en el formulario (sin duplicar si ya se optimizó antes)
     const formExpRaw = limpiarTextoPrevioFormulario((datosFormulario.experiencia || '').replace(/=/g, ': '));
     const formEstRaw = limpiarTextoPrevioFormulario((datosFormulario.estudios || '').replace(/=/g, ': '));
     const formHabRaw = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
     const formResRaw = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
 
-    // Filtramos del formulario líneas que ya tengan viñetas de una corrida previa
-    const lineasFormExp = formExpRaw.split('\n').map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
+    // Ignoramos líneas con viñetas "•" de corridas previas para que no se arrastren errores viejos
+    const lineasFormExp = formExpRaw.split('\n')
+        .filter(l => !l.trim().startsWith('•'))
+        .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
         .filter(l => l && !expUnida.some(e => e.toLowerCase().includes(l.substring(0, 15).toLowerCase())));
 
     const expFinal = [...lineasFormExp, ...expUnida].map(e => `• ${e}`);
@@ -357,13 +357,16 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         expFinal.push(`• Referencia / Carta de Recomendación adjunta: ${limpiarYCorregirTexto(limpiarSimbolosDecorativos(textoCartaExtraido))}`);
     }
 
-    const lineasFormEst = formEstRaw.split('\n').map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
+    const lineasFormEst = formEstRaw.split('\n')
+        .filter(l => !l.trim().startsWith('•') && !/^(CEL\.?|TEL\.?|PERIODO EN)/i.test(l.trim()))
+        .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
         .filter(l => l && !estUnida.some(e => e.toLowerCase().includes(l.substring(0, 15).toLowerCase())));
 
-    // Quitamos duplicados exactos en estudios y cursos
     const estUnicos = [];
     for (const item of [...estUnida, ...lineasFormEst]) {
-        if (!estUnicos.includes(item)) estUnicos.push(item);
+        if (!/^(CEL\.?|TEL\.?|PERIODO EN)/i.test(item) && !estUnicos.includes(item)) {
+            estUnicos.push(item);
+        }
     }
     const estFinal = estUnicos.map(e => `• ${e}`);
 
@@ -378,18 +381,39 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         }
     }
 
-    const puesto = datosFormulario.puestoRequerido || 'Búsqueda General';
-    const notaResumen = (formResRaw && formResRaw.length < 120) ? `${formResRaw}. ` : '';
-    const resumenFinal = `Perfil postulado para ${puesto}. ${notaResumen}Cuenta con sólida experiencia comprobable en el sector, formación técnica continua y disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.${datosExtra.length > 0 ? ' Datos adicionales: ' + datosExtra.join(' | ') + '.' : ''}`;
+    // ✍️ Construcción de un Resumen Profesional desarrollado y vinculado con sus experiencias laborales reales
+    const puesto = datosFormulario.puestoRequerido && datosFormulario.puestoRequerido !== 'General'
+        ? datosFormulario.puestoRequerido
+        : 'operaciones, producción y servicios';
+
+    const listaExperienciasTexto = [...expUnida, ...lineasFormExp]
+        .map(e => e.replace(/^[-•*]\s*/, '').trim())
+        .filter(Boolean);
+
+    const detalleTrayectoria = listaExperienciasTexto.length > 0
+        ? `A lo largo de su trayectoria laboral se ha desempeñado en ${listaExperienciasTexto.slice(0, 4).join('; ')}, desarrollando sólido dominio operativo y cumplimiento de estándares de calidad y seguridad.`
+        : `Cuenta con experiencia comprobable en el sector, adaptándose con rapidez a entornos dinámicos y exigentes.`;
+
+    const nivelEstudios = estUnicos.slice(0, 2).join(', ');
+    const principalesHabilidades = habUnicas.slice(0, 6).join(', ');
+
+    const resumenDesarrollado = [
+        `Perfil profesional orientado al área de ${puesto}, con sólida trayectoria comprobable en procesos operativos, productivos y logísticos.`,
+        detalleTrayectoria,
+        nivelEstudios ? `Posee formación en ${nivelEstudios} junto a capacitación técnica continua en prevención de riesgos, operación de maquinaria y mejora de procesos.` : '',
+        principalesHabilidades ? `Destaca por sus competencias en ${principalesHabilidades}, aportando compromiso, eficiencia y disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.` : '',
+        textoCartaExtraido ? `Cuenta además con referencias laborales comprobables mediante Carta de Recomendación adjunta.` : ''
+    ].filter(Boolean).join(' ');
 
     return {
-        resumen: limpiarYCorregirTexto(resumenFinal),
+        datosPersonalesExtra: datosExtra.join(' | '),
+        resumen: limpiarYCorregirTexto(resumenDesarrollado),
         experiencia: expFinal.length > 0 ? expFinal.join('\n') : (formExpRaw || 'No especificada'),
         estudios: estFinal.length > 0 ? estFinal.join('\n') : (formEstRaw || 'Secundario Completo'),
         habilidades: habUnicas.length > 0 ? habUnicas.join(' • ') : (formHabRaw || 'Responsabilidad • Puntualidad • Trabajo en equipo'),
         habilidadesDuras: habUnicas.join(' • '),
         habilidadesBlandas: 'Responsabilidad • Puntualidad • Adaptación a normas y equipos de trabajo',
-        textoCompletoIntegrado: `${resumenFinal}\n${expFinal.join('\n')}\n${estFinal.join('\n')}\n${habUnicas.join(' • ')}`
+        textoCompletoIntegrado: `${datosExtra.join(' | ')}\n${resumenDesarrollado}\n${expFinal.join('\n')}\n${estFinal.join('\n')}\n${habUnicas.join(' • ')}`
     };
 }
 
@@ -407,12 +431,13 @@ Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para e
 
 REGLAS ESTRICTAS DE CLASIFICACIÓN Y FORMATO:
 - NO omitas ninguna experiencia laboral, empresa, duración/años, nivel de estudios (ej. Secundarios Completos, Terciario Incompleto), curso, capacitación, licencia, carnet o habilidad que figure en el CV adjunto, en la Carta de Recomendación O en el formulario.
-- UNE LOS RENGLONES CORTADOS: Si el PDF cortó una oración en dos renglones (por ejemplo "Santista Textil - Operario maquinista sector" y abajo "Hilandería - (7 años)"), únelos en una sola viñeta coherente.
+- UNE LOS RENGLONES CORTADOS: Si el PDF cortó una oración en dos renglones, únelos en una sola viñeta coherente.
 - ELIMINA símbolos decorativos como ✓, ➢, ☑, ➤. Usa únicamente viñetas limpias "• " al inicio de cada ítem en experiencia y estudios.
 - Clasifica cada dato en su sección correspondiente:
-  • En "resumen": Redacta un perfil profesional integral de 3 a 5 líneas sin repetir frases. Al final del resumen incluye discretamente datos personales adicionales del PDF como C.U.I.L., Fecha de Nacimiento, Edad, Estado Civil o teléfono alternativo.
+  • En "datosPersonalesExtra": Extrae de forma lineal y separada por " | " los datos personales adicionales que figuren en el CV (como Fecha de Nacimiento, Edad, C.U.I.L., Estado Civil, Nacionalidad o teléfonos alternativos). NO pongas estos datos personales dentro del resumen profesional.
+  • En "resumen": Redacta un Resumen Profesional ejecutivo, desarrollado y completo (de 4 a 6 líneas) que sintetice su perfil relacionándolo directamente con sus experiencias laborales reales (mencionando las empresas donde trabajó, años de experiencia, funciones en producción/logística/administración/etc., manejo de maquinaria o autoelevador, licencias y estudios), sin incluir números de teléfono ni CUIL aquí.
   • En "experiencia": Coloca ÚNICAMENTE la historia laboral y las referencias de cartas de recomendación en renglones separados con viñetas (•). Incluye TODAS las empresas del PDF combinando las fechas del formulario con los detalles y sectores del PDF.
-  • En "estudios": Coloca el nivel educativo (ej. • Secundarios Completos, • Terciario Incompleto) y TODOS los cursos y capacitaciones técnicas del PDF y formulario en renglones completos con viñetas (•). NUNCA pongas números de teléfono aquí.
+  • En "estudios": Coloca el nivel educativo (ej. • Secundarios Completos, • Terciario Incompleto) y TODOS los cursos y capacitaciones técnicas del PDF y formulario en renglones completos con viñetas (•). NUNCA pongas números de teléfono ni encabezados sueltos aquí.
   • En "habilidades": Coloca TODAS las habilidades técnicas (licencias B1, manejo de autoelevador, PC, circuito productivo, idiomas) y blandas separadas por " • ", sin cortar frases al medio.
 
 DATOS DEL FORMULARIO:
@@ -427,7 +452,8 @@ ${textoCartaExtraido ? `TEXTO EXTRAÍDO DE LA CARTA DE RECOMENDACIÓN:\n${textoC
 
 Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estructura exacta:
 {
-  "resumen": "Perfil profesional integral redactado.",
+  "datosPersonalesExtra": "Fecha de Nacimiento: ... | Edad: ... | C.U.I.L.: ... | Estado Civil: ... | Tel. Alternativo: ...",
+  "resumen": "Resumen profesional amplio y desarrollado, directamente relacionado con sus experiencias laborales, empresas, cargos, formación y competencias clave.",
   "experiencia": "• Período/Duración - Puesto en Empresa: Detalle de funciones y sectores.\\n• ...",
   "estudios": "• Nivel de estudios.\\n• Nombre completo del curso o capacitación - Institución (Duración) Año.\\n• ...",
   "habilidades": "Habilidad 1 • Habilidad 2 • Licencia/Carnet • Competencia...",
@@ -457,20 +483,22 @@ Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estru
     }
 
     const tieneTextoSuficiente = Boolean(textoPlanoExtraido && textoPlanoExtraido.trim().length > 120);
+    const respaldoLocal = clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
 
     try {
         const respuestaIA = await generarConGeminiSeguro(parts, prompt, tieneTextoSuficiente);
         if (respuestaIA) {
-            respuestaIA.resumen = limpiarSimbolosDecorativos(respuestaIA.resumen);
-            respuestaIA.experiencia = limpiarSimbolosDecorativos(respuestaIA.experiencia);
-            respuestaIA.estudios = limpiarSimbolosDecorativos(respuestaIA.estudios);
-            respuestaIA.habilidades = limpiarSimbolosDecorativos(respuestaIA.habilidades);
+            respuestaIA.datosPersonalesExtra = limpiarSimbolosDecorativos(respuestaIA.datosPersonalesExtra || respaldoLocal.datosPersonalesExtra);
+            respuestaIA.resumen = limpiarSimbolosDecorativos(respuestaIA.resumen || respaldoLocal.resumen);
+            respuestaIA.experiencia = limpiarSimbolosDecorativos(respuestaIA.experiencia || respaldoLocal.experiencia);
+            respuestaIA.estudios = limpiarSimbolosDecorativos(respuestaIA.estudios || respaldoLocal.estudios);
+            respuestaIA.habilidades = limpiarSimbolosDecorativos(respuestaIA.habilidades || respaldoLocal.habilidades);
             return respuestaIA;
         }
     } catch (errIA) {
         console.warn("Usando clasificador local inteligente:", errIA.message);
     }
-    return clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
+    return respaldoLocal;
 }
 
 async function optimizarCandidatoExistente(candidato) {
@@ -528,6 +556,7 @@ async function optimizarCandidatoExistente(candidato) {
     });
 
     if (resultadoGemini) {
+        candidato.datosPersonalesExtra = limpiarYCorregirTexto(resultadoGemini.datosPersonalesExtra || candidato.datosPersonalesExtra || '');
         candidato.resumen = limpiarYCorregirTexto(resultadoGemini.resumen || candidato.resumen);
         candidato.experiencia = limpiarYCorregirTexto(resultadoGemini.experiencia || candidato.experiencia);
         candidato.estudios = limpiarYCorregirTexto(resultadoGemini.estudios || candidato.estudios);
@@ -548,6 +577,7 @@ async function optimizarCandidatoExistente(candidato) {
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
         let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
+        let datosPersonalesExtra = '';
         
         let cvData = '', cvContentType = '', nombreArchivoOriginal = '';
         let cvBuffer = null;
@@ -617,6 +647,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         });
 
         if (resultadoGemini) {
+            datosPersonalesExtra = resultadoGemini.datosPersonalesExtra || '';
             resumen = resultadoGemini.resumen || resumen;
             experiencia = resultadoGemini.experiencia || experiencia;
             estudios = resultadoGemini.estudios || estudios;
@@ -639,6 +670,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             telefono: limpiarYCorregirTexto(telefono),
             direccion: limpiarYCorregirTexto(direccion),
             disponibilidad: limpiarYCorregirTexto(disponibilidad) || 'Inmediata',
+            datosPersonalesExtra: limpiarYCorregirTexto(datosPersonalesExtra),
             resumen: limpiarYCorregirTexto(resumen),
             experiencia: limpiarYCorregirTexto(experiencia),
             estudios: limpiarYCorregirTexto(estudios),
@@ -674,6 +706,7 @@ app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) =>
         return res.json({
             success: true,
             nombre: candidato.nombre,
+            datosPersonalesExtra: candidato.datosPersonalesExtra,
             resumen: candidato.resumen,
             experiencia: candidato.experiencia,
             estudios: candidato.estudios,
@@ -805,7 +838,8 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
                 body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 40px auto; }
                 .header { display: flex; align-items: center; gap: 25px; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 20px; }
                 .foto { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0056b3; }
-                .info h1 { margin: 0; color: #0056b3; font-size: 24px; text-transform: uppercase; }
+                .info h1 { margin: 0 0 6px 0; color: #0056b3; font-size: 24px; text-transform: uppercase; }
+                .info p { margin: 4px 0; font-size: 14px; }
                 .section { margin-bottom: 20px; }
                 .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; font-size: 15px; text-transform: uppercase; }
                 .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; display: block; margin: 30px auto; }
@@ -817,9 +851,9 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
                 ${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto de perfil">` : ''}
                 <div class="info">
                     <h1>${candidato.nombre}</h1>
-                    <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido}</p>
-                    <p>📧 ${candidato.email} | 📞 ${candidato.telefono} | 📍 ${candidato.direccion || 'No especificada'}</p>
-                    <p><strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
+                    <p>📍 ${candidato.direccion || 'No especificada'} | 📞 ${candidato.telefono || 'S/D'} | 📧 ${candidato.email || 'S/D'} | <strong>DNI:</strong> ${candidato.dni || 'S/D'}</p>
+                    ${candidato.datosPersonalesExtra ? `<p>${candidato.datosPersonalesExtra}</p>` : ''}
+                    <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
                 </div>
             </div>
             <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
@@ -928,8 +962,8 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const rawCandidatos = await Candidato.find({}, {
             id: 1, empresa: 1, puestoRequerido: 1, nombre: 1, dni: 1, email: 1,
-            telefono: 1, direccion: 1, disponibilidad: 1, resumen: 1, experiencia: 1,
-            estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
+            telefono: 1, direccion: 1, disponibilidad: 1, datosPersonalesExtra: 1,
+            resumen: 1, experiencia: 1, estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
             cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
             cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,
             tieneCV: { $gt: [{ $strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },

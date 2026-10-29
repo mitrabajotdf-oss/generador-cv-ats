@@ -72,6 +72,18 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
+// 📂 Esquema persistente en MongoDB para Búsquedas y Vacantes de Empresas
+const busquedaSchema = new mongoose.Schema({
+    id: Number,
+    empresa: String,
+    titulo: String,
+    keywords: String,
+    notas: String,
+    fechaCreacion: String
+});
+
+const Busqueda = mongoose.model('Busqueda', busquedaSchema);
+
 async function fetchConTimeout(url, options = {}, timeoutMs = 18000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -282,7 +294,6 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
     throw ultimoError || new Error("Tiempo de espera agotado con Gemini");
 }
 
-// 🛡️ Clasificador y Redactor Profesional Local (Separa Datos Personales en línea y redacta un Resumen Profesional rico basado en las experiencias reales)
 function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
     const lineas = (textoPlanoExtraido || '').split('\n').map(l => l.trim()).filter(Boolean);
     const expCruda = [];
@@ -302,7 +313,6 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
             continue;
         }
 
-        // Capturar datos personales para mostrarlos linealmente debajo del nombre (y nunca en estudios ni resumen)
         if (/^(CEL\.?|TEL\.?|TEL[EÉ]FONO|C\.?U\.?I\.?L\.?|FECHA DE NACIMIENTO|EDAD|ESTADO CIVIL|NACIONALIDAD)\s*[:.]/i.test(sinSimbolos)) {
             const normalizado = sinSimbolos.replace(/\s+/g, ' ');
             if (!datosExtra.some(d => d.toLowerCase() === normalizado.toLowerCase())) {
@@ -345,7 +355,6 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
     const formHabRaw = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
     const formResRaw = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
 
-    // Ignoramos líneas con viñetas "•" de corridas previas para que no se arrastren errores viejos
     const lineasFormExp = formExpRaw.split('\n')
         .filter(l => !l.trim().startsWith('•'))
         .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
@@ -381,7 +390,6 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         }
     }
 
-    // ✍️ Construcción de un Resumen Profesional desarrollado y vinculado con sus experiencias laborales reales
     const puesto = datosFormulario.puestoRequerido && datosFormulario.puestoRequerido !== 'General'
         ? datosFormulario.puestoRequerido
         : 'operaciones, producción y servicios';
@@ -886,31 +894,164 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// 📂 RUTAS CRUD EN MONGODB PARA BÚSQUEDAS Y VACANTES DE EMPRESAS
+app.get('/api/busquedas', authMiddleware, async (req, res) => {
+    try {
+        const busquedas = await Busqueda.find({}).lean();
+        return res.json({ success: true, busquedas: busquedas.sort((a, b) => b.id - a.id) });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/busquedas', authMiddleware, async (req, res) => {
+    try {
+        const { id, empresa, titulo, keywords, notas } = req.body;
+        const nuevoId = id || Date.now();
+        const existente = await Busqueda.findOne({ id: nuevoId });
+        if (existente) return res.json({ success: true, busqueda: existente });
+
+        const nueva = new Busqueda({
+            id: nuevoId,
+            empresa: limpiarYCorregirTexto(empresa) || 'Empresas Generales',
+            titulo: limpiarYCorregirTexto(titulo) || 'Vacante General',
+            keywords: limpiarYCorregirTexto(keywords),
+            notas: limpiarYCorregirTexto(notas || ''),
+            fechaCreacion: new Date().toLocaleDateString()
+        });
+        await nueva.save();
+        return res.json({ success: true, busqueda: nueva });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/busquedas/editar/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { empresa, titulo, keywords, notas } = req.body;
+        const b = await Busqueda.findOne({ id });
+        if (!b) return res.status(404).json({ success: false, error: 'Búsqueda no encontrada' });
+
+        if (empresa !== undefined) b.empresa = limpiarYCorregirTexto(empresa);
+        if (titulo !== undefined) b.titulo = limpiarYCorregirTexto(titulo);
+        if (keywords !== undefined) b.keywords = limpiarYCorregirTexto(keywords);
+        if (notas !== undefined) b.notas = limpiarYCorregirTexto(notas);
+
+        await b.save();
+        return res.json({ success: true, busqueda: b });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.delete('/api/busquedas/:id', authMiddleware, async (req, res) => {
+    try {
+        await Busqueda.deleteOne({ id: Number(req.params.id) });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 🤖 Extractor de respaldo local para vacantes (por si se pega un texto de WhatsApp o falla la cuota de Gemini)
+function extraerRequisitosLocalmente(texto) {
+    const limpio = limpiarYCorregirTexto(texto || '');
+    const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
+
+    let empresa = '';
+    let titulo = '';
+
+    for (const l of lineas) {
+        if (!empresa && /^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]/i.test(l)) {
+            empresa = l.replace(/^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]\s*/i, '').trim();
+        }
+        if (!titulo && /^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]/i.test(l)) {
+            titulo = l.replace(/^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]\s*/i, '').trim();
+        }
+    }
+
+    if (!titulo && lineas.length > 0) {
+        titulo = lineas[0].substring(0, 60);
+    }
+
+    const stopWords = new Set(['para', 'con', 'los', 'las', 'del', 'una', 'por', 'que', 'mas', 'más', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'todo', 'toda', 'todos', 'todas', 'otro', 'otra', 'otros', 'otras', 'mismo', 'misma', 'importante', 'empresa', 'busca', 'buscamos', 'incorporar', 'personal', 'puesto', 'vacante', 'requisitos', 'excluyente', 'deseable', 'experiencia', 'años', 'año', 'zona', 'horario', 'enviar', 'correo', 'asunto', 'disponibilidad', 'inmediata', 'trabajo', 'laboral', 'minima', 'mínima', 'comprobable', 'tierra', 'fuego', 'grande', 'ushuaia']);
+
+    const palabras = limpio
+        .toLowerCase()
+        .replace(/[^\wáéíóúñü\s]/g, ' ')
+        .split(/\s+/)
+        .filter(p => p.length > 3 && !stopWords.has(p) && !/^\d+$/.test(p));
+
+    const unicas = [];
+    for (const p of palabras) {
+        if (!unicas.includes(p) && unicas.length < 14) unicas.push(p);
+    }
+
+    return {
+        empresa: empresa || 'Empresas Generales',
+        titulo: titulo || 'Vacante General',
+        keywords: unicas.join(' ')
+    };
+}
+
+// 🤖 Analizador de requisitos por Archivo (PDF/Word/Imagen) O Texto directo de WhatsApp
 app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
     try {
-        if (!req.file) return res.json({ success: false, error: 'No se subió ningún archivo' });
-        let textoPlano = '';
-        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            try {
-                const pdfData = await pdfParse(req.file.buffer);
-                textoPlano = pdfData.text;
-            } catch (e) {}
-        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
-            const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
-            textoPlano = wordResult.value;
+        const textoDirecto = req.body.textoRequisitos ? req.body.textoRequisitos.trim() : '';
+        if (!req.file && !textoDirecto) {
+            return res.json({ success: false, error: 'Subí un archivo (PDF, Word o Imagen) o pegá el texto de la búsqueda.' });
         }
 
-        const prompt = `Analiza la siguiente descripción de puesto o requisitos enviados por una empresa. Extrae el título sugerido del puesto y las palabras clave más importantes (habilidades duras, herramientas, certificaciones y competencias clave) separadas por un espacio, para usarlas en un motor de búsqueda ATS. Responde ESTRICTAMENTE en formato JSON puro:
-        {"titulo": "Título del puesto (ej: Ayudante de Cocina)", "keywords": "palabra1 palabra2 palabra3..."}
-        ${textoPlano ? `Texto extraído: ${textoPlano}` : ''}`;
+        let textoPlano = textoDirecto;
+        if (req.file) {
+            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+                try {
+                    const pdfData = await pdfParse(req.file.buffer);
+                    textoPlano = `${textoPlano}\n${pdfData.text || ''}`.trim();
+                } catch (e) {}
+            } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+                try {
+                    const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+                    textoPlano = `${textoPlano}\n${wordResult.value || ''}`.trim();
+                } catch (e) {}
+            }
+        }
+
+        const prompt = `Analiza la siguiente descripción de puesto, aviso laboral o mensaje de requisitos enviado por una empresa.
+Extrae:
+1) "empresa": El nombre de la empresa, comercio o institución que realiza la búsqueda (si no se menciona el nombre, devuelve "Empresas Generales").
+2) "titulo": El título claro del puesto o vacante buscada (ej: "Jefe de Cocina", "Operario de Logística y Autoelevador", "Administrativo Contable").
+3) "keywords": Las palabras clave técnicas, oficios, herramientas, licencias y competencias más importantes para filtrar CVs en un motor ATS, separadas por espacio. Para términos compuestos clave usa guion bajo (ej: "jefe_de_cocina", "atencion_al_cliente", "carnet_autoelevador") además de las palabras individuales ("cocina pasteleria autoelevador logistica stock"). Si el aviso aclara algo que NO quieren, agrégalo con signo menos delante (ej: "-part_time").
+
+Responde ESTRICTAMENTE en formato JSON puro:
+{
+  "empresa": "Nombre de la Empresa",
+  "titulo": "Título del puesto",
+  "keywords": "palabra1 palabra2 frase_compuesta..."
+}
+${textoPlano ? `\nTexto de la búsqueda:\n${textoPlano}` : ''}`;
 
         const parts = [prompt];
-        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
+        if (req.file) {
+            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
+            } else if (req.file.mimetype && req.file.mimetype.startsWith('image/')) {
+                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
+            }
         }
 
-        const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 50));
-        return res.json({ success: true, datos });
+        try {
+            const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 40));
+            if (datos && (datos.titulo || datos.keywords)) {
+                return res.json({ success: true, datos });
+            }
+        } catch (errIA) {
+            console.warn("Usando extractor local de requisitos:", errIA.message);
+        }
+
+        const datosRespaldo = extraerRequisitosLocalmente(textoPlano);
+        return res.json({ success: true, datos: datosRespaldo });
     } catch (error) {
         console.error("Error al analizar requisitos:", error);
         return res.status(500).json({ success: false, error: error.message });

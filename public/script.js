@@ -43,6 +43,7 @@ if (formPostulacion) {
 
                 const nombrePostulante = document.getElementById('nombre').value || 'Postulante';
                 const telefonoWhatsApp = '5492964659057';
+                const baseWa = ['https:', '', 'wa.me', telefonoWhatsApp].join('/');
 
                 const mensajeConFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV con foto ($6.000).`);
                 const mensajeSinFoto = encodeURIComponent(`Hola, soy ${nombrePostulante}. Quiero descargar mi CV sin foto ($5.000).`);
@@ -52,9 +53,9 @@ if (formPostulacion) {
                 const btnSinFoto = document.getElementById('linkCvSinFoto');
                 const btnAmbos = document.getElementById('linkCvAmbos');
 
-                if (btnConFoto) btnConFoto.href = `[https://wa.me/$](https://wa.me/$){telefonoWhatsApp}?text=${mensajeConFoto}`;
-                if (btnSinFoto) btnSinFoto.href = `[https://wa.me/$](https://wa.me/$){telefonoWhatsApp}?text=${mensajeSinFoto}`;
-                if (btnAmbos) btnAmbos.href = `[https://wa.me/$](https://wa.me/$){telefonoWhatsApp}?text=${mensajeAmbos}`;
+                if (btnConFoto) btnConFoto.href = `${baseWa}?text=${mensajeConFoto}`;
+                if (btnSinFoto) btnSinFoto.href = `${baseWa}?text=${mensajeSinFoto}`;
+                if (btnAmbos) btnAmbos.href = `${baseWa}?text=${mensajeAmbos}`;
 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
@@ -247,11 +248,11 @@ async function ejecutarMigracionIA() {
             errores++;
         }
 
-        // Pausa de 4 segundos entre cada candidato para respetar el límite por minuto de Gemini gratuito
-        await new Promise(r => setTimeout(r, 4000));
+        // Pausa de 3 segundos entre cada candidato para cuidar el límite por minuto
+        await new Promise(r => setTimeout(r, 3000));
     }
 
-    alert(`🎉 ¡Proceso completado!\n✅ Legajos actualizados: ${exitosos}\n${errores > 0 ? `⚠️ Con demora de límite IA: ${errores} (podés tocar el botón ⚡ individual en su tarjeta)` : ''}`);
+    alert(`🎉 ¡Proceso completado!\n✅ Legajos actualizados: ${exitosos}\n${errores > 0 ? `⚠️ Con demora: ${errores} (podés tocar el botón ⚡ individual en su tarjeta)` : ''}`);
     location.reload();
 }
 
@@ -637,6 +638,15 @@ function verCVATS(c) {
     const habilidadesFinales = c.habilidades || 'Administración • Gestión • Trabajo en Equipo';
     let experienciaFinal = c.experiencia || '';
 
+    // Separamos automáticamente cualquier dato personal ("Datos adicionales:") que haya quedado en resúmenes previos
+    let resumenLimpio = c.resumen || 'No especificado.';
+    let datosExtra = c.datosPersonalesExtra || '';
+    if (resumenLimpio.includes('Datos adicionales:')) {
+        const partes = resumenLimpio.split('Datos adicionales:');
+        resumenLimpio = partes[0].trim();
+        if (!datosExtra) datosExtra = partes[1].replace(/\.$/, '').trim();
+    }
+
     const ventanaATS = window.open('', '_blank');
     ventanaATS.document.write(`
         <!DOCTYPE html>
@@ -646,9 +656,9 @@ function verCVATS(c) {
             <title>CV ATS Optimizado - ${c.nombre}</title>
             <style>
                 body { font-family: Arial, sans-serif; line-height: 1.6; color: #000; max-width: 800px; margin: 40px auto; padding: 20px; }
-                h1 { font-size: 22px; text-transform: uppercase; margin: 0; text-align: center; }
-                .contacto { text-align: center; font-size: 14px; margin-bottom: 25px; color: #333; }
-                h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin-top: 25px; margin-bottom: 8px; }
+                h1 { font-size: 22px; text-transform: uppercase; margin: 0 0 8px 0; text-align: center; }
+                .datos-personales { text-align: center; font-size: 13.5px; margin-bottom: 25px; color: #222; line-height: 1.5; border-bottom: 2px solid #000; padding-bottom: 12px; }
+                h2 { font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin-top: 22px; margin-bottom: 8px; }
                 p { font-size: 14px; text-align: justify; margin: 0 0 10px 0; }
                 .btn-imprimir { background: #3498db; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; display: block; margin: 30px auto; border-radius: 4px; }
                 @media print { .btn-imprimir { display: none; } }
@@ -656,14 +666,15 @@ function verCVATS(c) {
         </head>
         <body>
             <h1>${c.nombre}</h1>
-            <div class="contacto">
-                ${c.direccion || ''} | Tel: ${c.telefono || ''} | Email: ${c.email || ''} | DNI: ${c.dni || ''}
+            <div class="datos-personales">
+                <strong>Dirección:</strong> ${c.direccion || 'No especificada'} | <strong>Tel:</strong> ${c.telefono || 'S/D'} | <strong>Email:</strong> ${c.email || 'S/D'} | <strong>DNI:</strong> ${c.dni || 'S/D'}
+                ${datosExtra ? `<br>${datosExtra}` : ''}
                 <br><strong>Empresa de interés:</strong> ${c.empresa || 'Base de Datos General'}
-                ${c.puestoRequerido ? `<br><strong>Objetivo / Vacante:</strong> ${c.puestoRequerido}` : ''}
-                <br><strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
+                ${c.puestoRequerido ? ` | <strong>Objetivo / Vacante:</strong> ${c.puestoRequerido}` : ''}
+                | <strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
             </div>
             <h2>Resumen Profesional</h2>
-            <p>${c.resumen || 'No especificado.'}</p>
+            <p>${resumenLimpio}</p>
             <h2>Experiencia Laboral</h2>
             <p style="white-space: pre-line;">${experienciaFinal || 'No especificada.'}</p>
             <h2>Estudios y Formación</h2>

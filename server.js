@@ -16,6 +16,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// 🔒 Protección del Panel de Gestión
 const authMiddleware = basicAuth({
     users: { 'MitrabajoTDF': 'EmpleoRG' },
     challenge: true,
@@ -96,36 +97,82 @@ function limpiarYCorregirTexto(texto) {
     return texto.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
+function limpiarNombreArchivo(nombre, porDefecto) {
+    const base = nombre || porDefecto;
+    return base
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-async function analizarCVConGemini(textoCrudo) {
-    if (!process.env.GEMINI_API_KEY || !textoCrudo || textoCrudo.length < 20) return null;
+async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario }) {
+    if (!process.env.GEMINI_API_KEY) return null;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Analiza el siguiente texto de un currículum vitae y extrae la información estructurada estrictamente en formato JSON puro (sin bloques de código markdown, solo el objeto JSON):
-        {
-          "resumen": "Resumen profesional o perfil redactado.",
-          "experiencia": "Experiencia laboral detallada.",
-          "estudios": "Estudios y formaciones.",
-          "habilidadesDuras": "Habilidades técnicas, herramientas o software.",
-          "habilidadesBlandas": "Competencias interpersonales y aptitudes."
-        }
-        Texto del CV:
-        ${textoCrudo}`;
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let textResponse = response.text().trim();
-        
-        if (textResponse.startsWith('```json')) {
-            textResponse = textResponse.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (textResponse.startsWith('```')) {
-            textResponse = textResponse.replace(/^```/, '').replace(/```$/, '').trim();
+        const prompt = `Eres un experto en Reclutamiento y Sistemas ATS (Applicant Tracking Systems).
+Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para el candidato, fusionando TODA la información disponible en tres fuentes:
+1) El documento de CV original adjunto (que puede tener diseño en columnas, tablas o texto desordenado).
+2) La Carta de Recomendación o Referencias Laborales adjunta (si el candidato subió una).
+3) Los datos que el candidato escribió manualmente en el formulario web.
+
+REGLAS ESTRICTAS DE FUSIÓN:
+- NO omitas ninguna experiencia laboral, empresa, año, curso, capacitación, licencia, carnet o habilidad que figure en el CV adjunto, en la Carta de Recomendación O en los campos manuales del formulario.
+- Si el candidato adjuntó una Carta de Recomendación o Referencias, extrae qué empresa o referente lo recomienda, qué puesto o tareas avala, sus fortalezas destacadas y agrégalo claramente dentro de la sección de "experiencia" y menciona ese respaldo en el "resumen".
+- Si el candidato escribió poco en el formulario, COMPLEMENTA Y EXPANDE esa información con todo el historial laboral, cursos y conocimientos que aparecen en los documentos adjuntos.
+- Corrige errores de tipeo y redacta de forma profesional y lineal para lectura ATS.
+
+DATOS ESCRITOS MANUALMENTE EN EL FORMULARIO:
+- Puesto al que aplica: ${datosFormulario.puestoRequerido || ''}
+- Resumen escrito en formulario: ${datosFormulario.resumen || ''}
+- Experiencia escrita en formulario: ${datosFormulario.experiencia || ''}
+- Estudios escritos en formulario: ${datosFormulario.estudios || ''}
+- Habilidades escritas en formulario: ${datosFormulario.habilidades || ''}
+
+${textoPlanoExtraido ? `TEXTO EXTRAÍDO AUXILIAR DEL CV:\n${textoPlanoExtraido}\n` : ''}
+${textoCartaExtraido ? `TEXTO EXTRAÍDO DE LA CARTA DE RECOMENDACIÓN:\n${textoCartaExtraido}\n` : ''}
+
+Devuelve ESTRICTAMENTE un objeto JSON con esta estructura exacta:
+{
+  "resumen": "Perfil profesional integral de 3 a 5 líneas destacando años de experiencia, rubros, especialidades, licencias clave y si cuenta con carta de recomendación/referencias comprobables.",
+  "experiencia": "Lista cronológica lineal en renglones separados (usando viñetas •) con TODAS las experiencias laborales (del CV, formulario y avales/referencias de la carta de recomendación), indicando período/duración, puesto, empresa y funciones.",
+  "estudios": "Lista secuencial en renglones separados (usando viñetas •) con nivel de estudios, TODOS los cursos realizados, capacitaciones técnicas y carnets habilitantes.",
+  "habilidades": "Todas las habilidades técnicas, operativas, licencias, manejo de maquinaria/software y competencias separadas por ' • '.",
+  "habilidadesDuras": "Habilidades técnicas, herramientas, maquinaria, carnets e idiomas separados por ' • '.",
+  "habilidadesBlandas": "Competencias interpersonales y actitudes laborales (incluyendo cualidades destacadas en la carta de recomendación) separadas por ' • '.",
+  "textoCompletoIntegrado": "Transcripción completa de toda la información del candidato y su carta de recomendación para el motor de búsqueda interno."
+}`;
+
+        const parts = [prompt];
+
+        if (cvBuffer && (cvMimeType === 'application/pdf' || (cvMimeType && cvMimeType.startsWith('image/')))) {
+            parts.push({
+                inlineData: {
+                    data: cvBuffer.toString('base64'),
+                    mimeType: cvMimeType
+                }
+            });
         }
-        
+
+        if (cartaBuffer && (cartaMimeType === 'application/pdf' || (cartaMimeType && cartaMimeType.startsWith('image/')))) {
+            parts.push({
+                inlineData: {
+                    data: cartaBuffer.toString('base64'),
+                    mimeType: cartaMimeType
+                }
+            });
+        }
+
+        const result = await model.generateContent(parts);
+        const textResponse = result.response.text().trim();
         return JSON.parse(textResponse);
     } catch (error) {
-        console.error("Error al procesar con SDK de Google Gemini:", error);
+        console.error("Error al fusionar y optimizar CV con Gemini:", error);
         return null;
     }
 }
@@ -135,9 +182,12 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
         
         let cvData = '', cvContentType = '', nombreArchivoOriginal = '';
+        let cvBuffer = null;
         let fotoData = '', fotoContentType = '';
         let cartaData = '', cartaContentType = '', nombreArchivoCarta = '';
+        let cartaBuffer = null;
         let textoPlanoExtraido = '';
+        let textoCartaExtraido = '';
 
         if (req.files && req.files.length > 0) {
             const cvFile = req.files.find(f => f.fieldname === 'cvFile');
@@ -145,6 +195,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
 
             if (cvFile) {
+                cvBuffer = cvFile.buffer;
                 cvData = cvFile.buffer.toString('base64');
                 cvContentType = cvFile.mimetype;
                 nombreArchivoOriginal = cvFile.originalname;
@@ -158,7 +209,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                         textoPlanoExtraido = wordResult.value;
                     }
                 } catch (err) {
-                    console.error('Error al extraer texto del documento:', err);
+                    console.error('Aviso: extracción de texto auxiliar de CV omitida:', err.message);
                 }
             }
 
@@ -166,23 +217,46 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 fotoData = fotoPerfil.buffer.toString('base64');
                 fotoContentType = fotoPerfil.mimetype;
             }
+
             if (cartaFile) {
+                cartaBuffer = cartaFile.buffer;
                 cartaData = cartaFile.buffer.toString('base64');
                 cartaContentType = cartaFile.mimetype;
                 nombreArchivoCarta = cartaFile.originalname;
+
+                try {
+                    if (cartaContentType === 'application/pdf') {
+                        const pdfCartaParsed = await pdfParse(cartaFile.buffer);
+                        textoCartaExtraido = pdfCartaParsed.text;
+                    } else if (cartaContentType.includes('wordprocessingml') || nombreArchivoCarta.endsWith('.docx')) {
+                        const wordCartaResult = await mammoth.extractRawText({ buffer: cartaFile.buffer });
+                        textoCartaExtraido = wordCartaResult.value;
+                    }
+                } catch (err) {
+                    console.error('Aviso: extracción de texto auxiliar de Carta omitida:', err.message);
+                }
             }
         }
 
-        if (textoPlanoExtraido) {
-            const resultadoGemini = await analizarCVConGemini(textoPlanoExtraido);
-            if (resultadoGemini) {
-                if (!resumen) resumen = resultadoGemini.resumen;
-                if (!experiencia) experiencia = resultadoGemini.experiencia;
-                if (!estudios) estudios = resultadoGemini.estudios;
-                if (!habilidadesDuras) habilidadesDuras = resultadoGemini.habilidadesDuras;
-                if (!habilidadesBlandas) habilidadesBlandas = resultadoGemini.habilidadesBlandas;
-            } else {
-                experiencia = experiencia || textoPlanoExtraido;
+        const resultadoGemini = await fusionarYOptimizarCVConGemini({
+            cvBuffer,
+            cvMimeType: cvContentType,
+            textoPlanoExtraido,
+            cartaBuffer,
+            cartaMimeType: cartaContentType,
+            textoCartaExtraido,
+            datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
+        });
+
+        if (resultadoGemini) {
+            resumen = resultadoGemini.resumen || resumen;
+            experiencia = resultadoGemini.experiencia || experiencia;
+            estudios = resultadoGemini.estudios || estudios;
+            habilidades = resultadoGemini.habilidades || habilidades;
+            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
+            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
+            if (resultadoGemini.textoCompletoIntegrado) {
+                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
             }
         }
 
@@ -206,7 +280,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             cvData, cvContentType, nombreArchivoCV: nombreArchivoOriginal,
             fotoData, fotoContentType,
             cartaData, cartaContentType, nombreArchivoCarta,
-            textoExtraidoCV: textoPlanoExtraido || experiencia || '',
+            textoExtraidoCV: limpiarYCorregirTexto(textoPlanoExtraido || `${resumen} ${experiencia} ${estudios} ${habilidades}`),
             fecha: new Date().toLocaleString(),
             pagado: false
         });
@@ -300,9 +374,10 @@ app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato || !candidato.fotoData) return res.status(404).send('Foto de perfil no disponible.');
         const fotoBuffer = Buffer.from(candidato.fotoData, 'base64');
-        const ext = candidato.fotoContentType ? candidato.fotoContentType.split('/')[1] || 'jpg' : 'jpg';
+        const ext = candidato.fotoContentType ? (candidato.fotoContentType.split('/')[1] || 'jpg').replace(/[^a-zA-Z0-9]/g, '') : 'jpg';
+        const nombreSeguro = limpiarNombreArchivo(`Foto_${candidato.nombre || id}.${ext}`, `Foto_${id}.jpg`);
         res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
-        res.setHeader('Content-Disposition', `attachment; filename="Foto_${candidato.nombre.replace(/\s+/g, '_')}.${ext}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(fotoBuffer);
     } catch (error) {
         return res.status(500).send('Error al procesar la descarga de la foto.');
@@ -315,8 +390,9 @@ app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato || !candidato.cartaData) return res.status(404).send('Carta de recomendación no disponible.');
         const cartaBuffer = Buffer.from(candidato.cartaData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCarta, `Carta_${candidato.nombre || id}.pdf`);
         res.setHeader('Content-Type', candidato.cartaContentType || 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${candidato.nombreArchivoCarta || 'Carta_Recomendacion.pdf'}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(cartaBuffer);
     } catch (error) {
         return res.status(500).send('Error al procesar la descarga.');
@@ -376,10 +452,12 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
         const candidato = await Candidato.findOne({ id: id });
         if (!candidato || !candidato.cvData) return res.status(404).send('Archivo de CV no disponible.');
         const cvBuffer = Buffer.from(candidato.cvData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCV, `CV_${candidato.nombre || id}.pdf`);
         res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${candidato.nombreArchivoCV || 'CV_Postulante.pdf'}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(cvBuffer);
     } catch (error) {
+        console.error('Error al descargar CV:', error);
         return res.status(500).send('Error al procesar la descarga.');
     }
 });
@@ -389,28 +467,36 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
         if (!req.file) return res.json({ success: false, error: 'No se subió ningún archivo' });
         let textoPlano = '';
         if (req.file.mimetype === 'application/pdf') {
-            const pdfData = await pdfParse(req.file.buffer);
-            textoPlano = pdfData.text;
+            try {
+                const pdfData = await pdfParse(req.file.buffer);
+                textoPlano = pdfData.text;
+            } catch (e) {}
         } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
             const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
             textoPlano = wordResult.value;
         }
-        if (!textoPlano || textoPlano.length < 10) return res.json({ success: false, error: 'No se pudo extraer texto del documento' });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
         const prompt = `Analiza la siguiente descripción de puesto o requisitos enviados por una empresa. Extrae el título sugerido del puesto y las palabras clave más importantes (habilidades duras, herramientas, certificaciones y competencias clave) separadas por un espacio, para usarlas en un motor de búsqueda ATS. Responde ESTRICTAMENTE en formato JSON puro:
         {"titulo": "Título del puesto (ej: Ayudante de Cocina)", "keywords": "palabra1 palabra2 palabra3..."}
-        Texto del documento de la empresa:
-        ${textoPlano}`;
+        ${textoPlano ? `Texto extraído: ${textoPlano}` : ''}`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let textResponse = response.text().trim();
-        if (textResponse.startsWith('```json')) {
-            textResponse = textResponse.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (textResponse.startsWith('```')) {
-            textResponse = textResponse.replace(/^```/, '').replace(/```$/, '').trim();
+        const parts = [prompt];
+        if (req.file.mimetype === 'application/pdf') {
+            parts.push({
+                inlineData: {
+                    data: req.file.buffer.toString('base64'),
+                    mimeType: 'application/pdf'
+                }
+            });
         }
+
+        const result = await model.generateContent(parts);
+        const textResponse = result.response.text().trim();
         return res.json({ success: true, datos: JSON.parse(textResponse) });
     } catch (error) {
         console.error("Error al analizar requisitos:", error);
@@ -423,32 +509,46 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
         if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });
         let textoPlano = '';
         if (req.file.mimetype === 'application/pdf') {
-            const pdfData = await pdfParse(req.file.buffer);
-            textoPlano = pdfData.text;
+            try {
+                const pdfData = await pdfParse(req.file.buffer);
+                textoPlano = pdfData.text;
+            } catch (e) {}
         } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
             const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
             textoPlano = wordResult.value;
         }
-        if (!textoPlano || textoPlano.length < 20) return res.json({ success: false, error: 'Texto ilegible' });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Analiza este CV y extrae la información en formato JSON puro. Si no encuentras un dato, déjalo vacío ("").
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `Analiza este CV completo (incluso si tiene diseño en columnas, tablas o recuadros) y extrae toda la información estructurada de forma lineal para un sistema ATS en formato JSON puro. Si no encuentras un dato personal, déjalo vacío ("").
         {
-          "nombre": "Nombre completo",
-          "dni": "Documento (solo números)",
+          "nombre": "Nombre y apellido completo",
+          "dni": "Documento DNI (solo números, sin puntos)",
           "email": "Correo electrónico",
           "telefono": "Número de teléfono",
-          "direccion": "Dirección o ciudad",
-          "resumen": "Breve perfil profesional",
-          "experiencia": "Experiencia laboral detallada",
-          "estudios": "Formación académica",
-          "habilidades": "Lista de habilidades separadas por guiones"
+          "direccion": "Domicilio y localidad",
+          "resumen": "Resumen profesional integral redactado en base a toda su trayectoria, conocimientos y perfil",
+          "experiencia": "Todas las experiencias laborales detalladas en renglones separados con viñetas (•), incluyendo empresa, puesto, duración/años y tareas",
+          "estudios": "Todos los estudios, cursos realizados, capacitaciones técnicas y carnets en renglones separados con viñetas (•)",
+          "habilidades": "Lista completa de habilidades técnicas, conocimientos, licencias y aptitudes separadas por ' • '"
         }
-        Texto del CV: ${textoPlano}`;
+        ${textoPlano ? `Texto auxiliar del CV: ${textoPlano}` : ''}`;
 
-        const result = await model.generateContent(prompt);
-        let textResponse = await result.response.text();
-        textResponse = textResponse.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        const parts = [prompt];
+        if (req.file.mimetype === 'application/pdf') {
+            parts.push({
+                inlineData: {
+                    data: req.file.buffer.toString('base64'),
+                    mimeType: 'application/pdf'
+                }
+            });
+        }
+
+        const result = await model.generateContent(parts);
+        const textResponse = result.response.text().trim();
         return res.json({ success: true, datos: JSON.parse(textResponse) });
     } catch (error) {
         console.error("Error en autocompletado:", error);

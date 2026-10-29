@@ -556,6 +556,61 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
     }
 });
 
+// 🔄 RUTA DE MIGRADOR AUTOMÁTICO SEGURO (Actualiza legajos existentes con IA sin borrarlos)
+app.get('/api/migrar-legajos-ia', authMiddleware, async (req, res) => {
+    try {
+        const candidatos = await Candidato.find({});
+        let actualizados = 0;
+
+        for (let candidato of candidatos) {
+            if (candidato.cvData) {
+                let cvBuffer = Buffer.from(candidato.cvData, 'base64');
+                let cartaBuffer = candidato.cartaData ? Buffer.from(candidato.cartaData, 'base64') : null;
+                
+                let textoPlanoExtraido = candidato.textoExtraidoCV || '';
+                let textoCartaExtraido = '';
+
+                const resultadoGemini = await fusionarYOptimizarCVConGemini({
+                    cvBuffer,
+                    cvMimeType: candidato.cvContentType || 'application/pdf',
+                    textoPlanoExtraido,
+                    cartaBuffer,
+                    cartaMimeType: candidato.cartaContentType || 'application/pdf',
+                    textoCartaExtraido,
+                    datosFormulario: {
+                        puestoRequerido: candidato.puestoRequerido,
+                        resumen: candidato.resumen,
+                        experiencia: candidato.experiencia,
+                        estudios: candidato.estudios,
+                        habilidades: candidato.habilidades
+                    }
+                });
+
+                if (resultadoGemini) {
+                    candidato.resumen = resultadoGemini.resumen || candidato.resumen;
+                    candidato.experiencia = resultadoGemini.experiencia || candidato.experiencia;
+                    candidato.estudios = resultadoGemini.estudios || candidato.estudios;
+                    candidato.habilidades = resultadoGemini.habilidades || candidato.habilidades;
+                    candidato.habilidadesDuras = resultadoGemini.habilidadesDuras || candidato.habilidadesDuras;
+                    candidato.habilidadesBlandas = resultadoGemini.habilidadesBlandas || candidato.habilidadesBlandas;
+                    
+                    if (resultadoGemini.textoCompletoIntegrado) {
+                        candidato.textoExtraidoCV = limpiarYCorregirTexto(resultadoGemini.textoCompletoIntegrado);
+                    }
+
+                    await candidato.save();
+                    actualizados++;
+                }
+            }
+        }
+
+        return res.json({ success: true, message: `¡Migración completada con éxito! Se actualizaron ${actualizados} legajos con la nueva IA sin perder registros.` });
+    } catch (error) {
+        console.error("Error en migración:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const rawCandidatos = await Candidato.find({}, {
@@ -564,9 +619,9 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
             estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
             cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
             cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,
-            tieneCV: { $gt: [{ $strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },
-            tieneFoto: { $gt: [{ $strLenCP: { $ifNull: ["$fotoData", ""] } }, 0] },
-            tieneCarta: { $gt: [{ $strLenCP: { $ifNull: ["$cartaData", ""] } }, 0] }
+            tieneCV: { $gt: [{$strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },
+            tieneFoto: { $gt: [{$strLenCP: { $ifNull: ["$fotoData", ""] } }, 0] },
+            tieneCarta: { $gt: [{$strLenCP: { $ifNull: ["$cartaData", ""] } }, 0] }
         }).lean();
 
         const listaCandidatos = rawCandidatos.map(c => ({
@@ -582,19 +637,4 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
-    try {
-        await Candidato.deleteOne({ id: Number(req.params.id) });
-        return res.json({ success: true });
-    } catch (error) {
-        return res.json({ success: false });
-    }
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor de Mi Trabajo TDF corriendo en puerto ${PORT}`);
-});
+app.delete('/api/candidatos/:id', authMiddleware, async (req, res

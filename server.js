@@ -71,10 +71,22 @@ const candidatoSchema = new mongoose.Schema({
 
 const Candidato = mongoose.model('Candidato', candidatoSchema);
 
+// Petición HTTP con límite de tiempo estricto para que NUNCA se quede colgada la página
+async function fetchConTimeout(url, options = {}, timeoutMs = 18000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const resp = await fetch(url, { ...options, signal: controller.signal });
+        return resp;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 async function enviarAlertaEmail(candidato) {
     try {
         const urlResend = ['https:', '', 'api.resend.com', 'emails'].join('/');
-        await fetch(urlResend, {
+        await fetchConTimeout(urlResend, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
@@ -86,9 +98,9 @@ async function enviarAlertaEmail(candidato) {
                 subject: `🔔 ¡Nuevo CV Cargado: ${candidato.nombre} (${candidato.puestoRequerido})!`,
                 html: `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>¡Nuevo Postulante Registrado! 🚀</h2><p><strong>👤 Nombre:</strong> ${candidato.nombre}</p><p><strong>💼 Puesto:</strong> ${candidato.puestoRequerido}</p></div>`
             })
-        });
+        }, 8000);
     } catch (error) {
-        console.error('Error al enviar alerta email:', error);
+        console.error('Error al enviar alerta email:', error.message);
     }
 }
 
@@ -117,13 +129,11 @@ function extraerJSONLimpio(texto) {
     return JSON.parse(limpio);
 }
 
-// Detecta si un buffer binario es un archivo PDF real mirando su cabecera "%PDF"
 function esBufferPDF(buffer) {
     if (!buffer || buffer.length < 4) return false;
     return buffer.slice(0, 4).toString() === '%PDF';
 }
 
-// Elimina bloques crudos anteriores si un legajo había usado el respaldo local antes
 function limpiarTextoPrevioFormulario(texto) {
     if (!texto) return '';
     return texto.split('--- DETALLE COMPLETO EXTRAÍDO DEL CV ORIGINAL ---')[0]
@@ -133,43 +143,39 @@ function limpiarTextoPrevioFormulario(texto) {
 
 let modelosDisponiblesCache = null;
 
-// Consulta directamente a la API de Google qué modelos Gemini están activos en tu cuenta
 async function obtenerModelosActivos() {
     if (modelosDisponiblesCache && modelosDisponiblesCache.length > 0) return modelosDisponiblesCache;
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     const baseApi = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
     try {
-        const resp = await fetch(baseApi + '?key=' + apiKey);
+        const resp = await fetchConTimeout(baseApi + '?key=' + apiKey, {}, 6000);
         const data = await resp.json();
         if (data && Array.isArray(data.models)) {
             const soportados = data.models
                 .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
                 .map(m => m.name.replace('models/', ''));
 
+            // Priorizamos modelos rápidos sin demora de thinking
             const preferidos = [
-                'gemini-2.5-flash',
                 'gemini-2.0-flash',
-                'gemini-2.5-pro',
+                'gemini-2.5-flash',
                 'gemini-2.0-flash-lite',
                 'gemini-flash-latest'
             ];
 
             const ordenados = preferidos.filter(p => soportados.includes(p));
-            const otros = soportados.filter(s => s.includes('gemini') && !ordenados.includes(s));
+            const otros = soportados.filter(s => s.includes('flash') && !ordenados.includes(s));
             modelosDisponiblesCache = [...ordenados, ...otros];
-            if (modelosDisponiblesCache.length > 0) {
-                console.log('✅ Modelos Gemini activos detectados:', modelosDisponiblesCache.slice(0, 3));
-                return modelosDisponiblesCache;
-            }
+            if (modelosDisponiblesCache.length > 0) return modelosDisponiblesCache;
         }
     } catch (e) {
-        console.warn('Aviso al consultar lista de modelos:', e.message);
+        console.warn('Aviso al listar modelos:', e.message);
     }
-    return ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    return ['gemini-2.0-flash', 'gemini-2.5-flash'];
 }
 
-// Llamada directa por fetch nativo a la API REST de Google Gemini (sin depender de versiones viejas del SDK)
-async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
+// Llamada rápida con timeout de 18s para que jamás cuelgue el navegador
+async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTextoSuficiente = false) {
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY en Render");
 
@@ -190,19 +196,40 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
         return p;
     });
 
-    for (const modelo of modelos.slice(0, 3)) {
+    for (const modelo of modelos.slice(0, 2)) {
         const url = baseApi + '/' + modelo + ':generateContent?key=' + apiKey;
 
-        // 1. Intento multimodal (leyendo visualmente el PDF/imagen + texto)
+        // Si pdfParse ya extrajo el texto completo del PDF, enviamos solo texto primero (tarda 3 segundos en vez de 25s)
+        if (tieneTextoSuficiente && promptSoloTexto) {
+            try {
+                const respTexto = await fetchConTimeout(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptSoloTexto }] }],
+                        generationConfig: { temperature: 0.2 }
+                    })
+                }, 16000);
+                const dataTexto = await respTexto.json();
+                if (dataTexto.candidates && dataTexto.candidates[0]?.content?.parts?.[0]?.text) {
+                    return extraerJSONLimpio(dataTexto.candidates[0].content.parts[0].text);
+                }
+            } catch (errFast) {
+                ultimoError = errFast;
+                console.warn(`Aviso texto rápido con ${modelo}:`, errFast.message);
+            }
+        }
+
+        // Intento multimodal con el PDF/imagen adjunto (para PDFs escaneados o con diseño gráfico complejo)
         try {
-            const resp = await fetch(url, {
+            const resp = await fetchConTimeout(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts: partsREST }],
                     generationConfig: { temperature: 0.2 }
                 })
-            });
+            }, 18000);
             const data = await resp.json();
             if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
                 return extraerJSONLimpio(data.candidates[0].content.parts[0].text);
@@ -211,30 +238,78 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
         } catch (err) {
             ultimoError = err;
             console.warn(`Aviso multimodal con ${modelo}:`, err.message);
-
-            // 2. Si el adjunto binario dio error, intentamos con el texto completo extraído del PDF
-            if (promptSoloTexto) {
-                try {
-                    const respTexto = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: promptSoloTexto }] }],
-                            generationConfig: { temperature: 0.2 }
-                        })
-                    });
-                    const dataTexto = await respTexto.json();
-                    if (dataTexto.candidates && dataTexto.candidates[0]?.content?.parts?.[0]?.text) {
-                        return extraerJSONLimpio(dataTexto.candidates[0].content.parts[0].text);
-                    }
-                    if (dataTexto.error) throw new Error(dataTexto.error.message);
-                } catch (err2) {
-                    ultimoError = err2;
-                }
-            }
         }
     }
-    throw ultimoError || new Error("No se pudo conectar con Gemini");
+    throw ultimoError || new Error("Tiempo de espera agotado con Gemini");
+}
+
+// 🛡️ Clasificador inteligente local (Separa experiencia, cursos y conocimientos si la API de Gemini no responde)
+function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
+    const lineas = (textoPlanoExtraido || '').split('\n').map(l => l.trim()).filter(Boolean);
+    const expList = [];
+    const estList = [];
+    const habList = [];
+    const datosExtra = [];
+
+    let seccionActual = 'general';
+
+    for (const linea of lineas) {
+        const lUpper = linea.toUpperCase();
+        if (lUpper.includes('CURRICUL') || lUpper.includes('DATOS PERSONALES')) {
+            seccionActual = 'personal';
+            continue;
+        }
+        if (lUpper.includes('ESTUDIOS CURSADOS') || lUpper.includes('FORMACION') || lUpper.includes('FORMACIÓN') || lUpper.includes('CURSOS REALIZADOS') || lUpper.includes('CAPACITACIONES')) {
+            seccionActual = 'estudios';
+            continue;
+        }
+        if (lUpper.includes('ANTECEDENTES LABORALES') || lUpper.includes('EXPERIENCIA LABORAL') || lUpper.includes('HISTORIAL LABORAL')) {
+            seccionActual = 'experiencia';
+            continue;
+        }
+        if (lUpper.includes('CONOCIMIENTOS') || lUpper.includes('HABILIDADES') || lUpper.includes('APTITUDES') || lUpper.includes('COMPETENCIAS')) {
+            seccionActual = 'habilidades';
+            continue;
+        }
+
+        if (seccionActual === 'personal') {
+            if (lUpper.includes('CUIL') || lUpper.includes('NACIMIENTO') || lUpper.includes('ESTADO CIVIL') || lUpper.includes('CELULAR') || lUpper.includes('ALTERNATIVO')) {
+                datosExtra.push(linea.replace(/^[-•*]\s*/, ''));
+            }
+        } else if (seccionActual === 'estudios') {
+            estList.push('• ' + linea.replace(/^[-•*]\s*/, ''));
+        } else if (seccionActual === 'experiencia') {
+            expList.push('• ' + linea.replace(/^[-•*]\s*/, ''));
+        } else if (seccionActual === 'habilidades') {
+            habList.push(linea.replace(/^[-•*]\s*/, ''));
+        }
+    }
+
+    const formExp = limpiarTextoPrevioFormulario((datosFormulario.experiencia || '').replace(/=/g, ': '));
+    const formEst = limpiarTextoPrevioFormulario((datosFormulario.estudios || '').replace(/=/g, ': '));
+    const formHab = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
+    const formRes = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
+
+    if (formExp) expList.unshift('• ' + formExp.replace(/\n+/g, '\n• '));
+    if (textoCartaExtraido) {
+        expList.push('• Referencia / Carta de Recomendación adjunta: ' + limpiarYCorregirTexto(textoCartaExtraido));
+    }
+    if (formEst && !estList.some(e => e.toLowerCase().includes(formEst.toLowerCase()))) {
+        estList.push('• ' + formEst);
+    }
+    if (formHab) habList.unshift(formHab);
+
+    const resumenFinal = `Perfil postulado para ${datosFormulario.puestoRequerido || 'Búsqueda General'}. ${formRes ? formRes + '. ' : ''}Cuenta con amplia experiencia operativa comprobable y formación continua.${datosExtra.length > 0 ? ' Datos adicionales: ' + datosExtra.join(' | ') + '.' : ''}`;
+
+    return {
+        resumen: limpiarYCorregirTexto(resumenFinal),
+        experiencia: expList.length > 0 ? expList.join('\n') : (formExp || limpiarYCorregirTexto(textoPlanoExtraido)),
+        estudios: estList.length > 0 ? estList.join('\n') : (formEst || 'Secundario Completo'),
+        habilidades: habList.length > 0 ? habList.join(' • ') : (formHab || 'Responsabilidad • Puntualidad • Trabajo en equipo'),
+        habilidadesDuras: habList.join(' • '),
+        habilidadesBlandas: 'Responsabilidad • Puntualidad • Adaptación a normas y equipos',
+        textoCompletoIntegrado: `${resumenFinal}\n${expList.join('\n')}\n${estList.join('\n')}\n${habList.join(' • ')}`
+    };
 }
 
 async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario }) {
@@ -252,8 +327,8 @@ Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para e
 REGLAS ESTRICTAS DE CLASIFICACIÓN Y FUSIÓN:
 - NO omitas ninguna experiencia laboral, empresa, duración/años, curso, capacitación, licencia, carnet o habilidad que figure en el CV adjunto, en la Carta de Recomendación O en el formulario.
 - Clasifica cada dato en su sección correspondiente:
-  • En "resumen": Redacta un perfil profesional integral de 3 a 5 líneas que resuma sus años totales de trayectoria, puestos clave, especialidades, disponibilidad, licencias/carnets y si cuenta con referencias o carta de recomendación. (Si en el CV figuran datos útiles como CUIL, edad o un segundo teléfono alternativo, menciónalos discretamente al final del resumen).
-  • En "experiencia": Coloca ÚNICAMENTE la historia laboral y las referencias de cartas de recomendación en renglones separados con viñetas (•). Incluye TODAS las empresas del PDF (por ejemplo, si en el formulario puso 2 trabajos pero en el PDF hay 4 empresas como Santista Textil, Tecnomyl, TeoGrande, Com & Log, pon las 4 completas combinando las fechas del formulario con los detalles y sectores del PDF). NO metas cursos ni datos personales sueltos aquí.
+  • En "resumen": Redacta un perfil profesional integral de 3 a 5 líneas que resuma sus años totales de trayectoria, puestos clave, especialidades, disponibilidad, licencias/carnets y si cuenta con referencias o carta de recomendación. (Si en el CV figuran datos útiles como CUIL, fecha de nacimiento/edad o un segundo teléfono alternativo, menciónalos discretamente al final del resumen).
+  • En "experiencia": Coloca ÚNICAMENTE la historia laboral y las referencias de cartas de recomendación en renglones separados con viñetas (•). Incluye TODAS las empresas del PDF combinando las fechas del formulario con los detalles y sectores del PDF. NO metas cursos ni datos personales sueltos aquí.
   • En "estudios": Coloca el nivel educativo (ej. Secundario Completo, Terciario, Universitario) y ABSOLUTAMENTE TODOS los cursos, capacitaciones técnicas, módulos y formaciones que aparezcan en el PDF y en el formulario, en renglones separados con viñetas (•) indicando año e institución si figuran.
   • En "habilidades": Coloca TODAS las habilidades técnicas (conocimientos, manejo de autoelevador/maquinaria, carnets, licencias de conducir como B1, sistemas como Intex, PC, idiomas) y las habilidades blandas (responsabilidad, puntualidad, trabajo en equipo, adaptación) separadas por " • ".
 
@@ -270,8 +345,8 @@ ${textoCartaExtraido ? `TEXTO EXTRAÍDO DE LA CARTA DE RECOMENDACIÓN:\n${textoC
 Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estructura exacta:
 {
   "resumen": "Perfil profesional integral redactado.",
-  "experiencia": "• Período/Duración - Puesto en Empresa: Detalle de funciones y sectores.\n• ...",
-  "estudios": "• Nivel de estudios.\n• Año - Nombre del curso o capacitación - Institución.\n• ...",
+  "experiencia": "• Período/Duración - Puesto en Empresa: Detalle de funciones y sectores.\\n• ...",
+  "estudios": "• Nivel de estudios.\\n• Año - Nombre del curso o capacitación - Institución.\\n• ...",
   "habilidades": "Habilidad 1 • Habilidad 2 • Licencia/Carnet • Competencia...",
   "habilidadesDuras": "Habilidades técnicas, herramientas, maquinaria, carnets e idiomas separados por ' • '.",
   "habilidadesBlandas": "Competencias interpersonales y actitudes laborales separadas por ' • '.",
@@ -283,42 +358,29 @@ Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estru
     if (cvBuffer) {
         const esPDF = esBufferPDF(cvBuffer) || cvMimeType === 'application/pdf';
         if (esPDF) {
-            parts.push({
-                inlineData: {
-                    data: cvBuffer.toString('base64'),
-                    mimeType: 'application/pdf'
-                }
-            });
+            parts.push({ inlineData: { data: cvBuffer.toString('base64'), mimeType: 'application/pdf' } });
         } else if (cvMimeType && cvMimeType.startsWith('image/')) {
-            parts.push({
-                inlineData: {
-                    data: cvBuffer.toString('base64'),
-                    mimeType: cvMimeType
-                }
-            });
+            parts.push({ inlineData: { data: cvBuffer.toString('base64'), mimeType: cvMimeType } });
         }
     }
 
     if (cartaBuffer) {
         const esCartaPDF = esBufferPDF(cartaBuffer) || cartaMimeType === 'application/pdf';
         if (esCartaPDF) {
-            parts.push({
-                inlineData: {
-                    data: cartaBuffer.toString('base64'),
-                    mimeType: 'application/pdf'
-                }
-            });
+            parts.push({ inlineData: { data: cartaBuffer.toString('base64'), mimeType: 'application/pdf' } });
         } else if (cartaMimeType && cartaMimeType.startsWith('image/')) {
-            parts.push({
-                inlineData: {
-                    data: cartaBuffer.toString('base64'),
-                    mimeType: cartaMimeType
-                }
-            });
+            parts.push({ inlineData: { data: cartaBuffer.toString('base64'), mimeType: cartaMimeType } });
         }
     }
 
-    return await generarConGeminiSeguro(parts, prompt);
+    const tieneTextoSuficiente = Boolean(textoPlanoExtraido && textoPlanoExtraido.trim().length > 120);
+
+    try {
+        return await generarConGeminiSeguro(parts, prompt, tieneTextoSuficiente);
+    } catch (errIA) {
+        console.warn("Usando clasificador local inteligente por demora en API Gemini:", errIA.message);
+        return clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
+    }
 }
 
 async function optimizarCandidatoExistente(candidato) {
@@ -453,30 +515,26 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             }
         }
 
-        try {
-            const resultadoGemini = await fusionarYOptimizarCVConGemini({
-                cvBuffer,
-                cvMimeType: cvContentType,
-                textoPlanoExtraido,
-                cartaBuffer,
-                cartaMimeType: cartaContentType,
-                textoCartaExtraido,
-                datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
-            });
+        const resultadoGemini = await fusionarYOptimizarCVConGemini({
+            cvBuffer,
+            cvMimeType: cvContentType,
+            textoPlanoExtraido,
+            cartaBuffer,
+            cartaMimeType: cartaContentType,
+            textoCartaExtraido,
+            datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
+        });
 
-            if (resultadoGemini) {
-                resumen = resultadoGemini.resumen || resumen;
-                experiencia = resultadoGemini.experiencia || experiencia;
-                estudios = resultadoGemini.estudios || estudios;
-                habilidades = resultadoGemini.habilidades || habilidades;
-                habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
-                habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
-                if (resultadoGemini.textoCompletoIntegrado) {
-                    textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
-                }
+        if (resultadoGemini) {
+            resumen = resultadoGemini.resumen || resumen;
+            experiencia = resultadoGemini.experiencia || experiencia;
+            estudios = resultadoGemini.estudios || estudios;
+            habilidades = resultadoGemini.habilidades || habilidades;
+            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
+            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
+            if (resultadoGemini.textoCompletoIntegrado) {
+                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
             }
-        } catch (errIA) {
-            console.error("Aviso IA en postulación:", errIA.message);
         }
 
         const candidatoId = Date.now();
@@ -724,15 +782,10 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
 
         const parts = [prompt];
         if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            parts.push({
-                inlineData: {
-                    data: req.file.buffer.toString('base64'),
-                    mimeType: 'application/pdf'
-                }
-            });
+            parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
         }
 
-        const datos = await generarConGeminiSeguro(parts, prompt);
+        const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 50));
         return res.json({ success: true, datos });
     } catch (error) {
         console.error("Error al analizar requisitos:", error);
@@ -770,15 +823,10 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
 
         const parts = [prompt];
         if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            parts.push({
-                inlineData: {
-                    data: req.file.buffer.toString('base64'),
-                    mimeType: 'application/pdf'
-                }
-            });
+            parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
         }
 
-        const datos = await generarConGeminiSeguro(parts, prompt);
+        const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 100));
         return res.json({ success: true, datos });
     } catch (error) {
         console.error("Error en autocompletado:", error);

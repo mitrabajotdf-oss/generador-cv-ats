@@ -117,14 +117,59 @@ function extraerJSONLimpio(texto) {
     return JSON.parse(limpio);
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Detecta si un buffer binario es un archivo PDF real mirando su cabecera "%PDF"
+function esBufferPDF(buffer) {
+    if (!buffer || buffer.length < 4) return false;
+    return buffer.slice(0, 4).toString() === '%PDF';
+}
 
-// Función que intenta primero con visión multimodal y si falla usa texto extraído
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+let modelosDisponiblesCache = null;
+
+// Consulta directamente a Google qué modelos están activos para esta API Key (evita error 404 de modelos retirados)
+async function obtenerModelosActivos() {
+    if (modelosDisponiblesCache && modelosDisponiblesCache.length > 0) return modelosDisponiblesCache;
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    try {
+        const resp = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){apiKey}`);
+        const data = await resp.json();
+        if (data && Array.isArray(data.models)) {
+            const soportados = data.models
+                .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                .map(m => m.name.replace('models/', ''));
+
+            const preferidos = [
+                'gemini-2.5-flash',
+                'gemini-2.5-pro',
+                'gemini-2.0-flash',
+                'gemini-2.0-flash-lite',
+                'gemini-flash-latest'
+            ];
+
+            const ordenados = preferidos.filter(p => soportados.includes(p));
+            const otrosFlash = soportados.filter(s => s.includes('gemini') && !ordenados.includes(s));
+            modelosDisponiblesCache = [...ordenados, ...otrosFlash];
+            if (modelosDisponiblesCache.length > 0) {
+                console.log('✅ Modelos Gemini detectados:', modelosDisponiblesCache.slice(0, 3));
+                return modelosDisponiblesCache;
+            }
+        }
+    } catch (e) {
+        console.warn('Aviso al listar modelos:', e.message);
+    }
+    return ['gemini-2.5-flash', 'gemini-2.0-flash'];
+}
+
+// Llamada directa a la API REST de Gemini con los modelos activos detectados
 async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
-    const modelos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY en Render");
+
+    const modelos = await obtenerModelosActivos();
     let ultimoError = null;
 
-    for (const nombreModelo of modelos) {
+    for (const nombreModelo of modelos.slice(0, 3)) {
+        // 1. Intento multimodal (viendo el PDF/imagen directamente)
         try {
             const model = genAI.getGenerativeModel({ model: nombreModelo });
             const result = await model.generateContent(partsConArchivos);
@@ -132,8 +177,9 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
             return extraerJSONLimpio(textResponse);
         } catch (err) {
             ultimoError = err;
-            console.warn(`Aviso con ${nombreModelo} (multimodal):`, err.message);
-            // Si falló el envío del PDF en base64, probamos solo con el texto extraído
+            console.warn(`Aviso multimodal con ${nombreModelo}:`, err.message);
+
+            // 2. Si el PDF adjunto falló, intentamos con el mismo modelo enviando el texto extraído
             if (promptSoloTexto) {
                 try {
                     const model = genAI.getGenerativeModel({ model: nombreModelo });
@@ -145,12 +191,46 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
             }
         }
     }
-    throw ultimoError || new Error("No se pudo conectar con Gemini");
+    throw ultimoError || new Error("No se pudo conectar con ningún modelo de Gemini");
+}
+
+// 🛡️ Estructurador inteligente de respaldo (si falla la API o cuota de Gemini, une el texto del PDF + Carta + Formulario sin perder nada)
+function estructurarCVRespaldoLocal({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
+    const textoPDF = limpiarYCorregirTexto(textoPlanoExtraido || '');
+    const textoCarta = limpiarYCorregirTexto(textoCartaExtraido || '');
+
+    const formResumen = limpiarYCorregirTexto(datosFormulario.resumen || '');
+    const formExp = limpiarYCorregirTexto((datosFormulario.experiencia || '').replace(/=/g, ': '));
+    const formEst = limpiarYCorregirTexto((datosFormulario.estudios || '').replace(/=/g, ': '));
+    const formHab = limpiarYCorregirTexto(datosFormulario.habilidades || '');
+
+    let experienciaUnificada = formExp;
+    if (textoPDF && textoPDF.length > formExp.length + 30) {
+        experienciaUnificada = formExp
+            ? `${formExp}\n\n--- DETALLE COMPLETO EXTRAÍDO DEL CV ORIGINAL ---\n${textoPDF}`
+            : textoPDF;
+    }
+    if (textoCarta) {
+        experienciaUnificada = `${experienciaUnificada}\n\n--- CARTA DE RECOMENDACIÓN / REFERENCIAS ADJUNTAS ---\n${textoCarta}`.trim();
+    }
+
+    let resumenUnificado = formResumen;
+    if (!resumenUnificado || resumenUnificado.length < 35) {
+        resumenUnificado = `Postulante para ${datosFormulario.puestoRequerido || 'Puesto General'}. ${formResumen ? formResumen + '. ' : ''}${textoCarta ? 'Cuenta con Carta de Recomendación adjunta.' : 'Perfil con historial laboral detallado en legajo.'}`.trim();
+    }
+
+    return {
+        resumen: resumenUnificado,
+        experiencia: experienciaUnificada || 'No especificada',
+        estudios: formEst || 'Ver detalle en historial completo del CV',
+        habilidades: formHab || 'Responsabilidad • Compromiso • Trabajo en equipo',
+        habilidadesDuras: formHab,
+        habilidadesBlandas: 'Responsabilidad • Trabajo en equipo • Adaptabilidad',
+        textoCompletoIntegrado: `${resumenUnificado}\n${experienciaUnificada}\n${formEst}\n${formHab}`
+    };
 }
 
 async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario }) {
-    if (!process.env.GEMINI_API_KEY) throw new Error("Falta GEMINI_API_KEY en Render");
-
     const prompt = `Eres un experto en Reclutamiento y Sistemas ATS (Applicant Tracking Systems).
 Tu objetivo es crear un CV ATS Optimizado, completo, lineal y profesional para el candidato, fusionando TODA la información disponible en tres fuentes:
 1) El documento de CV original adjunto (que puede tener diseño en columnas, tablas o texto desordenado).
@@ -186,28 +266,52 @@ Devuelve ESTRICTAMENTE un objeto JSON puro (sin bloques markdown) con esta estru
 
     const parts = [prompt];
 
-    if (cvBuffer && (cvMimeType === 'application/pdf' || (cvMimeType && cvMimeType.startsWith('image/')))) {
-        parts.push({
-            inlineData: {
-                data: cvBuffer.toString('base64'),
-                mimeType: cvMimeType
-            }
-        });
+    if (cvBuffer) {
+        const esPDF = esBufferPDF(cvBuffer) || cvMimeType === 'application/pdf';
+        if (esPDF) {
+            parts.push({
+                inlineData: {
+                    data: cvBuffer.toString('base64'),
+                    mimeType: 'application/pdf'
+                }
+            });
+        } else if (cvMimeType && cvMimeType.startsWith('image/')) {
+            parts.push({
+                inlineData: {
+                    data: cvBuffer.toString('base64'),
+                    mimeType: cvMimeType
+                }
+            });
+        }
     }
 
-    if (cartaBuffer && (cartaMimeType === 'application/pdf' || (cartaMimeType && cartaMimeType.startsWith('image/')))) {
-        parts.push({
-            inlineData: {
-                data: cartaBuffer.toString('base64'),
-                mimeType: cartaMimeType
-            }
-        });
+    if (cartaBuffer) {
+        const esCartaPDF = esBufferPDF(cartaBuffer) || cartaMimeType === 'application/pdf';
+        if (esCartaPDF) {
+            parts.push({
+                inlineData: {
+                    data: cartaBuffer.toString('base64'),
+                    mimeType: 'application/pdf'
+                }
+            });
+        } else if (cartaMimeType && cartaMimeType.startsWith('image/')) {
+            parts.push({
+                inlineData: {
+                    data: cartaBuffer.toString('base64'),
+                    mimeType: cartaMimeType
+                }
+            });
+        }
     }
 
-    return await generarConGeminiSeguro(parts, prompt);
+    try {
+        return await generarConGeminiSeguro(parts, prompt);
+    } catch (errIA) {
+        console.warn("Usando estructurador local de respaldo por error en API Gemini:", errIA.message);
+        return estructurarCVRespaldoLocal({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
+    }
 }
 
-// Función auxiliar para procesar y actualizar un candidato existente por su documento de MongoDB
 async function optimizarCandidatoExistente(candidato) {
     const cvBuffer = candidato.cvData ? Buffer.from(candidato.cvData, 'base64') : null;
     const cartaBuffer = candidato.cartaData ? Buffer.from(candidato.cartaData, 'base64') : null;
@@ -215,10 +319,9 @@ async function optimizarCandidatoExistente(candidato) {
     let textoPlanoExtraido = '';
     let textoCartaExtraido = '';
 
-    // Extraemos siempre el texto fresco del archivo binario guardado en la base de datos
     if (cvBuffer) {
         try {
-            if (candidato.cvContentType === 'application/pdf' || !candidato.cvContentType || candidato.nombreArchivoCV?.toLowerCase().endsWith('.pdf')) {
+            if (esBufferPDF(cvBuffer) || candidato.cvContentType === 'application/pdf' || candidato.nombreArchivoCV?.toLowerCase().endsWith('.pdf')) {
                 const pdfDataParsed = await pdfParse(cvBuffer);
                 textoPlanoExtraido = pdfDataParsed.text || '';
             } else if (candidato.cvContentType?.includes('wordprocessingml') || candidato.nombreArchivoCV?.toLowerCase().endsWith('.docx')) {
@@ -236,7 +339,7 @@ async function optimizarCandidatoExistente(candidato) {
 
     if (cartaBuffer) {
         try {
-            if (candidato.cartaContentType === 'application/pdf' || candidato.nombreArchivoCarta?.toLowerCase().endsWith('.pdf')) {
+            if (esBufferPDF(cartaBuffer) || candidato.cartaContentType === 'application/pdf' || candidato.nombreArchivoCarta?.toLowerCase().endsWith('.pdf')) {
                 const pdfCarta = await pdfParse(cartaBuffer);
                 textoCartaExtraido = pdfCarta.text || '';
             } else if (candidato.cartaContentType?.includes('wordprocessingml') || candidato.nombreArchivoCarta?.toLowerCase().endsWith('.docx')) {
@@ -304,7 +407,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 nombreArchivoOriginal = cvFile.originalname;
 
                 try {
-                    if (cvContentType === 'application/pdf') {
+                    if (esBufferPDF(cvFile.buffer) || cvContentType === 'application/pdf') {
                         const pdfDataParsed = await pdfParse(cvFile.buffer);
                         textoPlanoExtraido = pdfDataParsed.text;
                     } else if (cvContentType.includes('wordprocessingml') || nombreArchivoOriginal.endsWith('.docx')) {
@@ -328,7 +431,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                 nombreArchivoCarta = cartaFile.originalname;
 
                 try {
-                    if (cartaContentType === 'application/pdf') {
+                    if (esBufferPDF(cartaFile.buffer) || cartaContentType === 'application/pdf') {
                         const pdfCartaParsed = await pdfParse(cartaFile.buffer);
                         textoCartaExtraido = pdfCartaParsed.text;
                     } else if (cartaContentType.includes('wordprocessingml') || nombreArchivoCarta.endsWith('.docx')) {
@@ -341,30 +444,26 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             }
         }
 
-        try {
-            const resultadoGemini = await fusionarYOptimizarCVConGemini({
-                cvBuffer,
-                cvMimeType: cvContentType,
-                textoPlanoExtraido,
-                cartaBuffer,
-                cartaMimeType: cartaContentType,
-                textoCartaExtraido,
-                datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
-            });
+        const resultadoGemini = await fusionarYOptimizarCVConGemini({
+            cvBuffer,
+            cvMimeType: cvContentType,
+            textoPlanoExtraido,
+            cartaBuffer,
+            cartaMimeType: cartaContentType,
+            textoCartaExtraido,
+            datosFormulario: { puestoRequerido, resumen, experiencia, estudios, habilidades }
+        });
 
-            if (resultadoGemini) {
-                resumen = resultadoGemini.resumen || resumen;
-                experiencia = resultadoGemini.experiencia || experiencia;
-                estudios = resultadoGemini.estudios || estudios;
-                habilidades = resultadoGemini.habilidades || habilidades;
-                habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
-                habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
-                if (resultadoGemini.textoCompletoIntegrado) {
-                    textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
-                }
+        if (resultadoGemini) {
+            resumen = resultadoGemini.resumen || resumen;
+            experiencia = resultadoGemini.experiencia || experiencia;
+            estudios = resultadoGemini.estudios || estudios;
+            habilidades = resultadoGemini.habilidades || habilidades;
+            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
+            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
+            if (resultadoGemini.textoCompletoIntegrado) {
+                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
             }
-        } catch (errIA) {
-            console.error("Aviso IA en postulación:", errIA.message);
         }
 
         const candidatoId = Date.now();
@@ -402,7 +501,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     }
 });
 
-// ⚡ NUEVA RUTA: Optimizar UN legajo específico con IA en el acto y devolver el resultado
+// ⚡ Optimizar UN legajo específico con IA en el acto
 app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) => {
     try {
         const id = Number(req.params.id);
@@ -596,7 +695,7 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
     try {
         if (!req.file) return res.json({ success: false, error: 'No se subió ningún archivo' });
         let textoPlano = '';
-        if (req.file.mimetype === 'application/pdf') {
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
             try {
                 const pdfData = await pdfParse(req.file.buffer);
                 textoPlano = pdfData.text;
@@ -611,7 +710,7 @@ app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequi
         ${textoPlano ? `Texto extraído: ${textoPlano}` : ''}`;
 
         const parts = [prompt];
-        if (req.file.mimetype === 'application/pdf') {
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
             parts.push({
                 inlineData: {
                     data: req.file.buffer.toString('base64'),
@@ -632,7 +731,7 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
     try {
         if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });
         let textoPlano = '';
-        if (req.file.mimetype === 'application/pdf') {
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
             try {
                 const pdfData = await pdfParse(req.file.buffer);
                 textoPlano = pdfData.text;
@@ -657,7 +756,7 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
         ${textoPlano ? `Texto auxiliar del CV: ${textoPlano}` : ''}`;
 
         const parts = [prompt];
-        if (req.file.mimetype === 'application/pdf') {
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
             parts.push({
                 inlineData: {
                     data: req.file.buffer.toString('base64'),

@@ -22,14 +22,16 @@ const authMiddleware = basicAuth({
 });
 
 app.get('/', authMiddleware, (req, res) => {
+    res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/formulario.html', (req, res) => {
+    res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'formulario.html'));
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
@@ -83,6 +85,20 @@ const busquedaSchema = new mongoose.Schema({
 });
 
 const Busqueda = mongoose.model('Busqueda', busquedaSchema);
+
+// Busca tanto por id numérico como por _id de MongoDB para que ningún legajo falle al editar
+async function buscarCandidatoDB(paramId) {
+    const limpio = String(paramId || '').trim();
+    const numId = Number(limpio);
+    if (!Number.isNaN(numId) && limpio !== '') {
+        const porId = await Candidato.findOne({ id: numId });
+        if (porId) return porId;
+    }
+    if (mongoose.Types.ObjectId.isValid(limpio)) {
+        return await Candidato.findById(limpio);
+    }
+    return null;
+}
 
 async function fetchConTimeout(url, options = {}, timeoutMs = 25000) {
     const controller = new AbortController();
@@ -582,7 +598,7 @@ async function optimizarCandidatoExistente(candidato) {
         candidato.experiencia = limpiarYCorregirTexto(resultadoGemini.experiencia || candidato.experiencia);
         candidato.estudios = limpiarYCorregirTexto(resultadoGemini.estudios || candidato.estudios);
         candidato.habilidades = limpiarYCorregirTexto(resultadoGemini.habilidades || candidato.habilidades);
-        candidato.habilidadesDuras = limpiarYCorregirTexto(resultadoGemini.habilidadesDuras || candidato.habilidadesDuras);
+        candidato.habilidadesDuras = limpiarYCorregirTexto(resultadoGemini.habilidadesDuras || candidato.habilidades);
         candidato.habilidadesBlandas = limpiarYCorregirTexto(resultadoGemini.habilidadesBlandas || candidato.habilidadesBlandas);
         if (resultadoGemini.textoCompletoIntegrado) {
             candidato.textoExtraidoCV = limpiarYCorregirTexto(`${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`);
@@ -699,7 +715,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
 
 app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) => {
     try {
-        const candidato = await Candidato.findOne({ id: Number(req.params.id) });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato) return res.status(404).json({ success: false, error: 'Candidato no encontrado' });
         await optimizarCandidatoExistente(candidato);
         return res.json({
@@ -717,24 +733,57 @@ app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) =>
     }
 });
 
+// ✏️ Guardado directo y literal de ediciones manuales desde el Panel
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
-        const candidato = await Candidato.findOne({ id: Number(req.params.id) });
-        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
+        const candidato = await buscarCandidatoDB(req.params.id);
+        if (!candidato) return res.status(404).json({ success: false, error: 'Candidato no encontrado en MongoDB' });
+
         const campos = ['empresa', 'puestoRequerido', 'nombre', 'dni', 'email', 'telefono', 'direccion', 'disponibilidad', 'disponibilidadViajar', 'resumen', 'experiencia', 'estudios', 'habilidades'];
         for (const c of campos) {
-            if (req.body[c] !== undefined) candidato[c] = limpiarYCorregirTexto(req.body[c]);
+            if (req.body[c] !== undefined) {
+                candidato[c] = String(req.body[c]).replace(/\r\n/g, '\n').trim();
+            }
         }
+
+        // Sincronizamos también habilidadesDuras y el índice ATS para que el CV Corporativo y los filtros reflejen tus cambios
+        if (req.body.habilidades !== undefined) {
+            candidato.habilidadesDuras = candidato.habilidades;
+        }
+        candidato.textoExtraidoCV = `${candidato.resumen || ''}\n${candidato.experiencia || ''}\n${candidato.estudios || ''}\n${candidato.habilidades || ''}`.trim();
+
         await candidato.save();
-        return res.json({ success: true, message: 'Legajo editado correctamente.' });
+        return res.json({
+            success: true,
+            message: 'Legajo editado correctamente.',
+            candidato: {
+                id: candidato.id,
+                _id: candidato._id,
+                empresa: candidato.empresa,
+                puestoRequerido: candidato.puestoRequerido,
+                nombre: candidato.nombre,
+                dni: candidato.dni,
+                email: candidato.email,
+                telefono: candidato.telefono,
+                direccion: candidato.direccion,
+                disponibilidad: candidato.disponibilidad,
+                disponibilidadViajar: candidato.disponibilidadViajar,
+                resumen: candidato.resumen,
+                experiencia: candidato.experiencia,
+                estudios: candidato.estudios,
+                habilidades: candidato.habilidades,
+                habilidadesDuras: candidato.habilidadesDuras
+            }
+        });
     } catch (error) {
+        console.error('Error al editar legajo:', error);
         return res.status(500).json({ success: false, error: error.message });
     }
 });
 
 app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
-        const candidato = await Candidato.findOne({ id: Number(req.params.id) });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
         if (req.files && req.files.length > 0) {
             const cvFile = req.files.find(f => f.fieldname === 'cvFile');
@@ -754,7 +803,7 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
 
 app.get('/api/foto/:id', async (req, res) => {
     try {
-        const candidato = await Candidato.findOne({ id: Number(req.params.id) });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato || !candidato.fotoData) return res.status(404).send('Foto no encontrada');
         res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
         return res.send(Buffer.from(candidato.fotoData, 'base64'));
@@ -765,11 +814,10 @@ app.get('/api/foto/:id', async (req, res) => {
 
 app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
     try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato || !candidato.fotoData) return res.status(404).send('Foto no disponible.');
         const ext = candidato.fotoContentType ? (candidato.fotoContentType.split('/')[1] || 'jpg').replace(/[^a-zA-Z0-9]/g, '') : 'jpg';
-        const nombreSeguro = limpiarNombreArchivo(`Foto_${candidato.nombre || id}.${ext}`, `Foto_${id}.jpg`);
+        const nombreSeguro = limpiarNombreArchivo(`Foto_${candidato.nombre || req.params.id}.${ext}`, `Foto_${req.params.id}.jpg`);
         res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
         res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(Buffer.from(candidato.fotoData, 'base64'));
@@ -780,10 +828,9 @@ app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
     try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato || !candidato.cartaData) return res.status(404).send('Carta no disponible.');
-        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCarta, `Carta_${candidato.nombre || id}.pdf`);
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCarta, `Carta_${candidato.nombre || req.params.id}.pdf`);
         res.setHeader('Content-Type', candidato.cartaContentType || 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(Buffer.from(candidato.cartaData, 'base64'));
@@ -794,9 +841,11 @@ app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
     try {
-        const candidato = await Candidato.findOne({ id: Number(req.params.id) });
+        res.set('Cache-Control', 'no-store');
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato) return res.status(404).send('Candidato no encontrado.');
-        const fotoSrc = candidato.fotoData ? `/api/foto/${candidato.id}` : '';
+        const idRef = candidato.id || candidato._id;
+        const fotoSrc = candidato.fotoData ? `/api/foto/${idRef}` : '';
         const htmlCV = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>CV Corporativo - ${candidato.nombre}</title>
         <style>body{font-family:Arial,sans-serif;color:#333;line-height:1.6;max-width:800px;margin:40px auto;padding:0 20px}.header{display:flex;align-items:center;gap:25px;border-bottom:2px solid #0056b3;padding-bottom:20px;margin-bottom:20px}.foto{width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid #0056b3}.info h1{margin:0 0 6px 0;color:#0056b3;font-size:24px;text-transform:uppercase}.info p{margin:4px 0;font-size:14px}.section{margin-bottom:20px}.section h3{border-bottom:1px solid #ddd;padding-bottom:5px;color:#333;font-size:15px;text-transform:uppercase}.btn-print{padding:10px 20px;background:#0056b3;color:#fff;border:none;border-radius:5px;cursor:pointer;display:block;margin:30px auto}@media print{.btn-print{display:none}}</style></head>
         <body><div class="header">${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto">` : ''}<div class="info"><h1>${candidato.nombre}</h1>
@@ -817,10 +866,9 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
     try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id });
+        const candidato = await buscarCandidatoDB(req.params.id);
         if (!candidato || !candidato.cvData) return res.status(404).send('Archivo de CV no disponible.');
-        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCV, `CV_${candidato.nombre || id}.pdf`);
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCV, `CV_${candidato.nombre || req.params.id}.pdf`);
         res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(Buffer.from(candidato.cvData, 'base64'));
@@ -831,6 +879,7 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/busquedas', authMiddleware, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const rawBusquedas = await Busqueda.find({}, {
             id: 1, empresa: 1, titulo: 1, keywords: 1, textoAviso: 1,
             archivoContentType: 1, nombreArchivo: 1, fechaCreacion: 1,
@@ -993,6 +1042,7 @@ ${textoPlano ? `Texto auxiliar: ${textoPlano}` : ''}`;
 
 app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         const rawCandidatos = await Candidato.find({}, {
             id: 1, empresa: 1, puestoRequerido: 1, nombre: 1, dni: 1, email: 1,
             telefono: 1, direccion: 1, disponibilidad: 1, disponibilidadViajar: 1, datosPersonalesExtra: 1,
@@ -1009,7 +1059,7 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
             cvData: c.tieneCV ? 'disponible' : '',
             fotoData: c.tieneFoto ? 'disponible' : '',
             cartaData: c.tieneCarta ? 'disponible' : ''
-        })).sort((a, b) => b.id - a.id);
+        })).sort((a, b) => (b.id || 0) - (a.id || 0));
 
         return res.json({ success: true, candidatos: listaCandidatos });
     } catch (error) {
@@ -1019,7 +1069,10 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
 
 app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
     try {
-        await Candidato.deleteOne({ id: Number(req.params.id) });
+        const candidato = await buscarCandidatoDB(req.params.id);
+        if (candidato) {
+            await Candidato.deleteOne({ _id: candidato._id });
+        }
         return res.json({ success: true });
     } catch (error) {
         return res.json({ success: false });

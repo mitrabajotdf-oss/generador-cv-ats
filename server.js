@@ -87,7 +87,7 @@ const busquedaSchema = new mongoose.Schema({
 
 const Busqueda = mongoose.model('Busqueda', busquedaSchema);
 
-async function fetchConTimeout(url, options = {}, timeoutMs = 20000) {
+async function fetchConTimeout(url, options = {}, timeoutMs = 25000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -123,7 +123,6 @@ function limpiarYCorregirTexto(texto) {
     if (!texto) return '';
     return texto
         .replace(/\r\n/g, '\n')
-        // Separa palabras pegadas por salto de PDF como "2026Capacitación" -> "2026 - Capacitación"
         .replace(/(\d{4})([A-ZÁÉÍÓÚÑ])/g, '$1 - $2')
         .replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ]{3,})/g, '$1 - $2')
         .replace(/[ \t]+/g, ' ')
@@ -161,6 +160,7 @@ function esBufferPDF(buffer) {
     return buffer.slice(0, 4).toString() === '%PDF';
 }
 
+// Limpia solo las frases plantilleras viejas sin borrar lo que el usuario haya editado manualmente
 function limpiarTextoPrevioFormulario(texto) {
     if (!texto) return '';
     let t = texto
@@ -168,7 +168,8 @@ function limpiarTextoPrevioFormulario(texto) {
         .split('--- CARTA DE RECOMENDACIÓN / REFERENCIAS ADJUNTAS ---')[0]
         .trim();
 
-    t = t.replace(/^Perfil postulado para [^.]+\.\s*/gi, '')
+    t = t.replace(/^Perfil versátil con sólida experiencia en[\s\S]*$/gi, '')
+         .replace(/^Perfil postulado para [^.]+\.\s*/gi, '')
          .replace(/^Postulante para [^.]+\.\s*/gi, '')
          .replace(/^Perfil profesional orientado al área de [^.]+\.\s*/gi, '')
          .replace(/^Perfil profesional con sólida trayectoria[^.]+\.\s*/gi, '')
@@ -183,22 +184,43 @@ function limpiarTextoPrevioFormulario(texto) {
     return t;
 }
 
+// Detecta si un renglón es el comienzo de un nuevo puesto laboral o un nuevo estudio para NO pegarlo al anterior
+function pareceNuevoItemLaboralOEstudio(linea) {
+    const l = linea.trim();
+    if (/^[✓✔☑➢➤►•*]|^\d{4}\s*[-–/]/.test(l)) return true;
+    if (/^(Administrativo|Supervisor|Operario|Operador|Encargado|Jefe|Ayudante|Auxiliar|Técnico|Vendedor|Cajero|Recepcionista|Chofer|Seguridad Privada|Personal de|Carga y Descarga| Atención al Cliente| Analista| Asistente| Coordinador| Gerente| Pastelero| Pastelera| Panadero| Cocinero| Bachero| Mozo| Camarera)/i.test(l)) {
+        return true;
+    }
+    if (/^(Primario Completo|Primario Incompleto|Secundario Completo|Secundarios Completos|Secundario Incompleto|Terciario|Universitario|Licenciatura|Tecnicatura|Curso |Capacitación|Certificación|Instituto |Escuela |Colegio )/i.test(l)) {
+        return true;
+    }
+    return false;
+}
+
 function unirRenglonesCortados(lineasCrudas) {
     const resultado = [];
     for (let raw of lineasCrudas) {
-        const tieneMarcadorNuevo = /^[✓✔☑➢➤►•*]|^\d{4}\s*[-–]/.test(raw.trim());
         let limpia = limpiarSimbolosDecorativos(raw).replace(/^[-•*]\s*/, '').trim();
         if (!limpia) continue;
 
-        if (resultado.length === 0 || tieneMarcadorNuevo) {
+        // Si en medio del mismo renglón quedó pegado "Secundario Incompleto" o similar después de una ciudad, lo partimos
+        if (/\b(Primario Completo|Secundario Completo|Secundario Incompleto|Terciario Completo|Terciario Incompleto)\b/i.test(limpia) && limpia.length > 45) {
+            const partesEst = limpia.split(/(?=\b(?:Primario|Secundario|Terciario|Universitario)\s+(?:Completo|Incompleto)\b)/i).map(s => s.trim()).filter(Boolean);
+            if (partesEst.length > 1) {
+                for (const p of partesEst) resultado.push(p);
+                continue;
+            }
+        }
+
+        if (resultado.length === 0 || pareceNuevoItemLaboralOEstudio(raw)) {
             resultado.push(limpia);
         } else {
             const anterior = resultado[resultado.length - 1];
             const empiezaMinusculaOParentesis = /^[a-záéíóúñ0-9()]/.test(limpia);
-            const anteriorTerminaAbierto = /[-–(/:,]$|\b(de|del|en|el|la|los|las|para|por|con|y|o|a|su|propia|sector|capacitación|charla|buenas)$/i.test(anterior);
-            const esContinuacionCorta = limpia.length < 42 && !limpia.endsWith('.') && anterior.length < 110;
+            const anteriorTerminaAbierto = /[-–(/:,]$\vert{}\b(de\vert{}del\vert{}en\vert{}el\vert{}la\vert{}los\vert{}las\vert{}para\vert{}por\vert{}con\vert{}y\vert{}o\vert{}a\vert{}su\vert{}propia\vert{}sector\vert{}capacitación\vert{}charla\vert{}buenas\vert{}taller\vert{}escuela\vert{}dr\.\vert{}sra\.\vert{}ing\.)$/i.test(anterior);
+            const anteriorTerminaEnPuntoFinal = /\.$/.test(anterior) && !/\b(S\.A\.\vert{}S\.R\.L\.\vert{}Dr\.\vert{}Sr\.\vert{}Sra\.\vert{}Lic\.\vert{}Ing\.\vert{}N\.°\vert{}N°\.)$/i.test(anterior);
 
-            if (empiezaMinusculaOParentesis || anteriorTerminaAbierto || esContinuacionCorta) {
+            if (!anteriorTerminaEnPuntoFinal && (empiezaMinusculaOParentesis || anteriorTerminaAbierto || anterior.length < 75)) {
                 resultado[resultado.length - 1] = `${anterior} ${limpia}`.replace(/\s+/g, ' ');
             } else {
                 resultado.push(limpia);
@@ -222,11 +244,12 @@ async function obtenerModelosActivos() {
                 .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
                 .map(m => m.name.replace('models/', ''));
 
+            // Priorizamos gemini-2.5-flash y gemini-1.5-flash que son los más estables y activos hoy
             const preferidos = [
-                'gemini-2.0-flash',
                 'gemini-2.5-flash',
-                'gemini-2.0-flash-lite',
-                'gemini-flash-latest'
+                'gemini-2.5-flash-lite',
+                'gemini-1.5-flash',
+                'gemini-2.0-flash'
             ];
 
             const ordenados = preferidos.filter(p => soportados.includes(p));
@@ -237,21 +260,10 @@ async function obtenerModelosActivos() {
     } catch (e) {
         console.warn('Aviso al listar modelos:', e.message);
     }
-    return ['gemini-2.0-flash', 'gemini-2.5-flash'];
+    return ['gemini-2.5-flash', 'gemini-1.5-flash'];
 }
 
-function armarConfiguracionModelo(modelo) {
-    const config = {
-        temperature: 0.25,
-        responseMimeType: 'application/json'
-    };
-    // Evita que gemini-2.5-flash consuma segundos extra razonando internamente
-    if (modelo.includes('2.5')) {
-        config.thinkingConfig = { thinkingBudget: 0 };
-    }
-    return config;
-}
-
+// Configuración limpia compatible con TODOS los modelos v1beta sin causar Error 400
 async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTextoSuficiente = false) {
     const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY en Render");
@@ -259,6 +271,11 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
     const modelos = await obtenerModelosActivos();
     const baseApi = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
     let ultimoError = null;
+
+    const generationConfig = {
+        temperature: 0.2,
+        responseMimeType: 'application/json'
+    };
 
     const partsREST = partsConArchivos.map(p => {
         if (typeof p === 'string') return { text: p };
@@ -275,7 +292,6 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
 
     for (const modelo of modelos.slice(0, 3)) {
         const url = baseApi + '/' + modelo + ':generateContent?key=' + apiKey;
-        const generationConfig = armarConfiguracionModelo(modelo);
 
         if (tieneTextoSuficiente && promptSoloTexto) {
             try {
@@ -286,14 +302,17 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
                         contents: [{ parts: [{ text: promptSoloTexto }] }],
                         generationConfig
                     })
-                }, 18000);
+                }, 22000);
                 const dataTexto = await respTexto.json();
                 if (dataTexto.candidates && dataTexto.candidates[0]?.content?.parts?.[0]?.text) {
                     return extraerJSONLimpio(dataTexto.candidates[0].content.parts[0].text);
                 }
+                if (dataTexto.error) {
+                    console.warn(`Aviso API texto (${modelo}):`, dataTexto.error.message);
+                }
             } catch (errFast) {
                 ultimoError = errFast;
-                console.warn(`Aviso texto rápido con ${modelo}:`, errFast.message);
+                console.warn(`Aviso timeout texto (${modelo}):`, errFast.message);
             }
         }
 
@@ -305,7 +324,7 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
                     contents: [{ parts: partsREST }],
                     generationConfig
                 })
-            }, 20000);
+            }, 25000);
             const data = await resp.json();
             if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
                 return extraerJSONLimpio(data.candidates[0].content.parts[0].text);
@@ -313,22 +332,28 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto, tieneTe
             if (data.error) throw new Error(data.error.message);
         } catch (err) {
             ultimoError = err;
-            console.warn(`Aviso multimodal con ${modelo}:`, err.message);
+            console.warn(`Aviso multimodal (${modelo}):`, err.message);
         }
     }
     throw ultimoError || new Error("Tiempo de espera agotado con Gemini");
 }
 
-// Extrae solo el título/empresa corto de un ítem de experiencia para mencionarlo en el Resumen sin copiar las tareas
+// Extrae titular corto respetando abreviaturas como Dr., S.A., S.R.L., Ing., Lic.
 function resumirTitularExperiencia(lineaExp) {
     let limpia = lineaExp.replace(/^[-•*]\s*/, '').trim();
-    // Cortamos en el primer punto seguido o dos puntos si viene seguido de una lista larga de funciones
-    const cortePunto = limpia.split(/\.\s+/)[0];
-    if (cortePunto.length <= 75) return cortePunto.replace(/[.;:,]+$/, '');
-    return limpia.substring(0, 70).replace(/\s+\S*$/, '').replace(/[.;:,]+$/, '');
+    // Protegemos abreviaturas temporalmente para no cortar en "Dr." o "S.R.L."
+    const protegida = limpia
+        .replace(/\b(Dr|Sr|Sra|Lic|Ing|Prof|Tec)\./gi, '$1_PUNTO_')
+        .replace(/S\.R\.L\./gi, 'SRL_PUNTO_')
+        .replace(/S\.A\./gi, 'SA_PUNTO_');
+
+    const primerBloque = protegida.split(/\.\s+|:\s+/)[0]
+        .replace(/_PUNTO_/g, '.');
+
+    if (primerBloque.length <= 75) return primerBloque.replace(/[.;:,]+$/, '').trim();
+    return limpia.substring(0, 68).replace(/\s+\S*$/, '').replace(/[.;:,]+$/, '').trim();
 }
 
-// Deduce las áreas profesionales reales del candidato cuando el puesto dice "General / Sin especificar"
 function deducirAreasPrincipales(textoTotal, puestoFormulario) {
     const p = (puestoFormulario || '').trim();
     if (p && !/^(general|sin especificar|general\s*\/\s*sin especificar|postulaci[oó]n espont[aá]nea|base de datos general)$/i.test(p)) {
@@ -337,25 +362,23 @@ function deducirAreasPrincipales(textoTotal, puestoFormulario) {
 
     const t = (textoTotal || '').toLowerCase();
     const areasDetectadas = [];
-    if (/log[ií]stica|dep[oó]sito|autoelevador|stock|inventario|carga y descarga/.test(t)) areasDetectadas.push('logística y gestión de depósitos');
-    if (/aduana|aduaner|comercio exterior|despachante/.test(t)) areasDetectadas.push('operaciones aduaneras');
-    if (/administraci[oó]n|administrativ|contable|facturaci[oó]n|documental/.test(t)) areasDetectadas.push('gestión administrativa y documental');
-    if (/producci[oó]n|operario|planta|maquinista|hilander[ií]a|industrial/.test(t)) areasDetectadas.push('producción industrial');
-    if (/cocina|gastronom|pasteler|panader|chef/.test(t)) areasDetectadas.push('gastronomía y producción culinaria');
-    if (/ventas|comercial|atenci[oó]n al cliente|cajer/.test(t)) areasDetectadas.push('atención al cliente y gestión comercial');
-    if (/supervis|encargad|jefe|liderazgo/.test(t)) areasDetectadas.push('supervisión de equipos operativos');
-    if (/seguridad privada|vigilancia|control de accesos/.test(t)) areasDetectadas.push('seguridad patrimonial');
-    if (/mantenimiento|refrigeraci[oó]n|alba[ñn]il|t[eé]cnico/.test(t)) areasDetectadas.push('mantenimiento y servicios técnicos');
+    if (/log[ií]stica|dep[oó]sito|autoelevador|stock|inventario|carga y descarga/.test(t)) areasDetectadas.push('Operaciones Logísticas y Depósito Fiscal');
+    if (/aduana|aduaner|comercio exterior|despachante/.test(t)) areasDetectadas.push('Gestión Aduanera');
+    if (/administraci[oó]n|administrativ|contable|facturaci[oó]n|documental/.test(t)) areasDetectadas.push('Administración Documental');
+    if (/producci[oó]n|operario|planta|maquinista|hilander[ií]a|industrial/.test(t)) areasDetectadas.push('Producción Industrial');
+    if (/cocina|gastronom|pasteler|panader|chef/.test(t)) areasDetectadas.push('Gastronomía y Pastelería');
+    if (/ventas|comercial|atenci[oó]n al cliente|cajer/.test(t)) areasDetectadas.push('Atención al Cliente y Ventas');
+    if (/supervis|encargad|jefe|liderazgo/.test(t)) areasDetectadas.push('Supervisión de Equipos');
+    if (/seguridad privada|vigilancia|control de accesos/.test(t)) areasDetectadas.push('Seguridad Patrimonial');
 
     if (areasDetectadas.length > 0) {
         return areasDetectadas.slice(0, 3).join(', ');
     }
-    return 'operaciones, gestión administrativa y servicios generales';
+    return 'Operaciones, Administración y Servicios';
 }
 
-// 🛡️ Clasificador local mejorado: reconoce cualquier encabezado compuesto y redacta un Resumen Ejecutivo sintético (NUNCA repite las tareas de experiencia)
+// 🛡️ Clasificador local mejorado (respeta ediciones manuales del panel y nunca corta abreviaturas ni une empresas distintas)
 function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
-    // Si una línea trae pegado un encabezado al final (ej: "...materiales. ESTUDIOS Y FORMACIÓN"), lo separamos en dos líneas
     const textoPreprocesado = (textoPlanoExtraido || '')
         .replace(/\s+(ESTUDIOS Y FORMACI[OÓ]N|EDUCACI[OÓ]N Y FORMACI[OÓ]N|HABILIDADES Y COMPETENCIAS(?:\s+CLAVE)?|EXPERIENCIA LABORAL|ANTECEDENTES LABORALES|RESUMEN PROFESIONAL)\b/gi, '\n$1\n');
 
@@ -389,11 +412,10 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
             continue;
         }
 
-        // Detecta encabezados simples y compuestos ("ESTUDIOS Y FORMACIÓN", "HABILIDADES Y COMPETENCIAS CLAVE", etc.)
         if (/^(ESTUDIOS(\s+Y\s+FORMACI[OÓ]N|\s+CURSADOS|\s+ACAD[EÉ]MICOS)?|FORMACI[OÓ]N(\s+ACAD[EÉ]MICA|\s+Y\s+CURSOS)?|EDUCACI[OÓ]N(\s+Y\s+FORMACI[OÓ]N)?|CURSOS(\s+REALIZADOS.*|\s+Y\s+CAPACITACIONES)?|PERIODO EN .*|CAPACITACIONES)$/i.test(lUpper)) {
             seccionActual = 'estudios';
             if (/^PERIODO EN /i.test(lUpper)) {
-                estCruda.push('• Capacitaciones en ' + sinSimbolos.replace(/^PERIODO EN\s*/i, ''));
+                estCruda.push('Capacitaciones en ' + sinSimbolos.replace(/^PERIODO EN\s*/i, ''));
             }
             continue;
         }
@@ -415,97 +437,97 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
         }
     }
 
-    const expUnida = unirRenglonesCortados(expCruda);
-    const estUnida = unirRenglonesCortados(estCruda);
-    const habUnida = unirRenglonesCortados(habCruda);
+    const expUnidaPDF = unirRenglonesCortados(expCruda);
+    const estUnidaPDF = unirRenglonesCortados(estCruda);
+    const habUnidaPDF = unirRenglonesCortados(habCruda);
 
     const formExpRaw = limpiarTextoPrevioFormulario((datosFormulario.experiencia || '').replace(/=/g, ': '));
     const formEstRaw = limpiarTextoPrevioFormulario((datosFormulario.estudios || '').replace(/=/g, ': '));
     const formHabRaw = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
+    const formResRaw = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
 
+    // Respetamos los renglones editados en el panel (aunque tengan "•"), evitando duplicados con el PDF
     const lineasFormExp = formExpRaw.split('\n')
-        .filter(l => !l.trim().startsWith('•'))
         .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
-        .filter(l => l && !expUnida.some(e => e.toLowerCase().includes(l.substring(0, 15).toLowerCase())));
+        .filter(l => l && !/^(ESTUDIOS|HABILIDADES|EDUCACI[OÓ]N)/i.test(l));
 
-    const expFinal = [...lineasFormExp, ...expUnida]
-        .filter(e => !/^(ESTUDIOS|HABILIDADES|EDUCACI[OÓ]N)/i.test(e))
-        .map(e => `• ${e}`);
+    const expCombinada = [...lineasFormExp];
+    for (const itemPDF of expUnidaPDF) {
+        const prefijo = itemPDF.substring(0, 20).toLowerCase();
+        if (!expCombinada.some(x => x.toLowerCase().includes(prefijo))) {
+            expCombinada.push(itemPDF);
+        }
+    }
+    const expFinal = expCombinada.map(e => `• ${e}`);
 
     if (textoCartaExtraido) {
-        expFinal.push(`• Referencia / Carta de Recomendación adjunta: ${limpiarYCorregirTexto(limpiarSimbolosDecorativos(textoCartaExtraido))}`);
+        const textoCartaLimpio = limpiarYCorregirTexto(limpiarSimbolosDecorativos(textoCartaExtraido));
+        if (!expFinal.some(x => x.includes('Carta de Recomendación'))) {
+            expFinal.push(`• Referencia / Carta de Recomendación adjunta: ${textoCartaLimpio}`);
+        }
     }
 
     const lineasFormEst = formEstRaw.split('\n')
-        .filter(l => !l.trim().startsWith('•') && !/^(CEL\.?|TEL\.?|PERIODO EN)/i.test(l.trim()))
         .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
-        .filter(l => l && !estUnida.some(e => e.toLowerCase().includes(l.substring(0, 15).toLowerCase())));
+        .filter(l => l && !/^(CEL\.?|TEL\.?|PERIODO EN|HABILIDADES)/i.test(l));
 
-    const estUnicos = [];
-    for (const item of [...estUnida, ...lineasFormEst]) {
+    const estUnicos = [...lineasFormEst];
+    for (const item of estUnidaPDF) {
         const itemSeparado = limpiarYCorregirTexto(item);
-        if (!/^(CEL\.?|TEL\.?|PERIODO EN|HABILIDADES)/i.test(itemSeparado) && !estUnicos.includes(itemSeparado)) {
+        const prefijo = itemSeparado.substring(0, 18).toLowerCase();
+        if (!/^(CEL\.?|TEL\.?|PERIODO EN|HABILIDADES)/i.test(itemSeparado) && !estUnicos.some(x => x.toLowerCase().includes(prefijo))) {
             estUnicos.push(itemSeparado);
         }
     }
     const estFinal = estUnicos.map(e => `• ${e}`);
 
-    const itemsFormHab = formHabRaw.split(/[•,]|\s-\s/).map(h => limpiarSimbolosDecorativos(h).trim())
-        .filter(h => h && h.length > 2 && !habUnida.some(x => x.toLowerCase().includes(h.toLowerCase())));
-
     const habUnicas = [];
-    for (const h of [...itemsFormHab, ...habUnida]) {
-        // Si viene una tira con "•", la abrimos en habilidades individuales limpias
-        const subItems = h.split('•').map(s => s.replace(/\.$/, '').trim()).filter(Boolean);
+    for (const fuente of [formHabRaw, ...habUnidaPDF]) {
+        const subItems = (fuente || '').split(/[•,]|\s-\s/).map(s => limpiarSimbolosDecorativos(s).replace(/\.$/, '').trim()).filter(Boolean);
         for (const sub of subItems) {
-            if (sub.length > 2 && !habUnicas.some(u => u.toLowerCase() === sub.toLowerCase())) {
-                habUnicas.push(sub);
+            // Quitamos prefijos de categoría largos como "Logística y Operaciones: Gestión de depósitos" -> "Gestión de depósitos"
+            const limpiaSub = sub.replace(/^(Logística y Operaciones|Administración y Aduana|Liderazgo y Trabajo en Campo|Herramientas Digitales)\s*:\s*/i, '').trim();
+            if (limpiaSub.length > 2 && !habUnicas.some(u => u.toLowerCase() === limpiaSub.toLowerCase())) {
+                habUnicas.push(limpiaSub);
             }
         }
     }
 
-    // ✍️ Redacción ejecutiva sintética (NUNCA copia y pega las funciones largas de Experiencia Laboral)
     const textoGlobalParaAnalisis = `${textoPlanoExtraido}\n${formExpRaw}\n${formEstRaw}\n${formHabRaw}`;
     const areasPerfil = deducirAreasPrincipales(textoGlobalParaAnalisis, datosFormulario.puestoRequerido);
 
-    const titularesCortos = [...expUnida, ...lineasFormExp]
-        .map(resumirTitularExperiencia)
-        .filter(t => t.length > 3);
+    // Si el usuario escribió o editó manualmente un buen Resumen propio en el panel, lo respetamos y pulimos
+    let resumenFinal = '';
+    if (formResRaw && formResRaw.length > 80) {
+        resumenFinal = formResRaw;
+    } else {
+        const titularesCortos = expCombinada
+            .map(resumirTitularExperiencia)
+            .filter(t => t.length > 4 && !/^(Coordinación|Gestión|Cumplimiento|Seguimiento|Control|Atención|Recepción)/i.test(t));
 
-    const sintesisRoles = titularesCortos.length > 0
-        ? `Cuenta con recorrido laboral comprobable ocupando roles como ${titularesCortos.slice(0, 4).join(', ')}, aportando capacidad de organización, control operativo y cumplimiento de objetivos.`
-        : `Cuenta con experiencia práctica comprobable, adaptándose con solvencia a equipos de trabajo y estándares operativos exigentes.`;
+        const mencionCargos = titularesCortos.length > 0
+            ? `Ha desarrollado funciones clave como ${titularesCortos.slice(0, 3).join(', ')}, garantizando orden documental, control de inventarios y cumplimiento de normativas operativas y de seguridad.`
+            : `Aporta experiencia práctica comprobable en control de procesos, organización operativa y cumplimiento de estándares de calidad.`;
 
-    const formacionDestacada = estUnicos.length > 0
-        ? `Complementa su perfil con formación en ${resumirTitularExperiencia(estUnicos[0])}${estUnicos.length > 1 ? ' y capacitación continua aplicable al puesto' : ''}.`
-        : '';
+        const skillsDestacadas = habUnicas.filter(s => s.length < 40).slice(0, 5);
 
-    const skillsCortas = habUnicas
-        .map(s => s.replace(/^[^:]+:\s*/, '').trim())
-        .filter(s => s.length > 2 && s.length < 45)
-        .slice(0, 5);
-
-    const cierreCompetencias = skillsCortas.length > 0
-        ? `Sobresale por su manejo en ${skillsCortas.join(', ')}, con disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.`
-        : `Posee marcada orientación a resultados, responsabilidad y disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.`;
-
-    const resumenSintetico = [
-        `Perfil versátil con sólida experiencia en ${areasPerfil}.`,
-        sintesisRoles,
-        formacionDestacada,
-        cierreCompetencias,
-        textoCartaExtraido ? `Dispone de referencias laborales comprobables adjuntas en su legajo.` : ''
-    ].filter(Boolean).join(' ');
+        resumenFinal = [
+            `Perfil profesional especializado en ${areasPerfil}, con sólida trayectoria comprobable en entornos operativos exigentes.`,
+            mencionCargos,
+            skillsDestacadas.length > 0 ? `Destaca por sus competencias en ${skillsDestacadas.join(', ')}, adaptabilidad al trabajo en equipo y disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.` : `Posee alta capacidad resolutiva, compromiso y disponibilidad ${datosFormulario.disponibilidad || 'inmediata'}.`
+        ].join(' ');
+    }
 
     return {
+        puestoSugerido: areasPerfil,
         datosPersonalesExtra: datosExtra.join(' | '),
-        resumen: limpiarYCorregirTexto(resumenSintetico),
+        resumen: limpiarYCorregirTexto(resumenFinal),
         experiencia: expFinal.length > 0 ? expFinal.join('\n') : (formExpRaw || 'No especificada'),
         estudios: estFinal.length > 0 ? estFinal.join('\n') : (formEstRaw || 'Secundario Completo'),
         habilidades: habUnicas.length > 0 ? habUnicas.join(' • ') : (formHabRaw || 'Responsabilidad • Puntualidad • Trabajo en equipo'),
         habilidadesDuras: habUnicas.join(' • '),
-        habilidadesBlandas: 'Responsabilidad • Puntualidad • Adaptación a normas y equipos de trabajo',
-        textoCompletoIntegrado: `${datosExtra.join(' | ')}\n${resumenSintetico}\n${expFinal.join('\n')}\n${estFinal.join('\n')}\n${habUnicas.join(' • ')}`
+        habilidadesBlandas: 'Responsabilidad • Puntualidad • Trabajo en equipo • Proactividad',
+        textoCompletoIntegrado: `${datosExtra.join(' | ')}\n${resumenFinal}\n${expFinal.join('\n')}\n${estFinal.join('\n')}\n${habUnicas.join(' • ')}`
     };
 }
 
@@ -515,39 +537,39 @@ async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoE
     const estLimpio = limpiarTextoPrevioFormulario(datosFormulario.estudios);
     const habLimpia = limpiarTextoPrevioFormulario(datosFormulario.habilidades);
 
-    const puestoLimpio = (datosFormulario.puestoRequerido || '').replace(/general\s*\/\s*sin especificar/i, '').trim();
+    const puestoDeclarado = (datosFormulario.puestoRequerido || '').replace(/general(\s*\/\s*sin especificar)?/i, '').trim();
 
-    const prompt = `Eres un Consultor Senior en Selección de Personal y Redacción Ejecutiva de CVs ATS.
-Tu tarea es estructurar y optimizar el CV completo del postulante unificando toda la información de su CV adjunto, su Carta de Recomendación (si tiene) y el formulario.
+    const prompt = `Eres un Consultor Experto en Recursos Humanos y Redacción de CVs ATS en Argentina.
+Debes generar el CV ATS Optimizado del candidato combinando:
+1) Los datos editados/cargados en el Panel o Formulario (TIENEN PRIORIDAD si el reclutador agregó cursos, fechas o correcciones).
+2) El texto/documento del CV original adjunto.
+3) La Carta de Recomendación adjunta (si existe).
 
-REGLAS CRÍTICAS DE ORO (CUMPLIMIENTO OBLIGATORIO):
-1) DIFERENCIA TOTAL ENTRE "resumen" Y "experiencia":
-   - PROHIBIDO copiar y pegar la lista de trabajos o las descripciones de tareas dentro del "resumen".
-   - El "resumen" debe ser un PÁRRAFO EJECUTIVO DE SÍNTESIS (de 4 a 5 líneas fluidas, máx. 95 palabras) que defina quién es profesionalmente el candidato, qué rubros domina (ej. logística fiscal, gestión aduanera, supervisión operativa, gastronomía, etc.), cuál es su valor diferencial, su formación principal y su disponibilidad. NUNCA escribas frases como "orientado al área de General / Sin especificar"; deduce su especialidad real a partir de su trayectoria.
-2) SECCIÓN "experiencia" (DETALLADA Y SEPARADA POR EMPRESA):
-   - Aquí va CADA puesto o empresa en su PROPIA viñeta "• " en un renglón aparte (NUNCA mezcles dos empresas distintas en la misma viñeta).
-   - Formato de cada viñeta: "• Cargo — Empresa (Período si figura): Descripción clara y concreta de responsabilidades y logros."
-   - JAMÁS incluyas estudios, escuelas ni listas de habilidades al final de "experiencia".
-3) SECCIÓN "estudios":
-   - Cada título académico, curso o certificación va en su PROPIA viñeta "• " en renglones separados (ej: "• Asistente Aduanero — Instituto ICA (Agosto 2026)"). Separa cualquier texto que haya venido pegado.
-4) SECCIÓN "datosPersonalesExtra":
-   - Solo datos filiatorios adicionales que estén en el CV (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay datos extra, devuelve "".
-5) SECCIÓN "habilidades":
-   - Competencias técnicas, sistemas, normativas, carnets y habilidades blandas limpias, separadas por " • ".
+REGLAS OBLIGATORIAS DE CALIDAD:
+1) "puestoSugerido": Si la vacante declarada está vacía o dice "General", redacta un objetivo profesional corto y preciso acorde a su perfil real (ej: "Logística, Depósito Fiscal y Gestión Aduanera"). Si ya tenía un puesto claro, mantenlo.
+2) "datosPersonalesExtra": Únicamente datos personales adicionales del CV (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay, devuelve "".
+3) "resumen": Redacta un Resumen Profesional IMPECABLE, natural y ejecutivo de 4 a 5 líneas (70 a 100 palabras).
+   - Sintetiza su perfil profesional, años/solidez de experiencia, rubros principales (ej. operatoria en depósitos fiscales, gestión aduanera, logística, producción, gastronomía, etc.), sus estudios/cursos más relevantes (si hizo cursos recientes, destácalos, NUNCA pongas "Escuela Dr." cortado ni resaltes solo la primaria si tiene cursos técnicos) y sus fortalezas clave.
+   - PROHIBIDO copiar listas de tareas o pegar renglones crudos del CV. Debe leerse fluido y 100% profesional.
+4) "experiencia": Coloca CADA puesto/empresa en una viñeta "• " separada por salto de línea (\\n).
+   - NUNCA juntes dos empresas distintas en la misma viñeta. Si en el texto original estaban pegadas (ej. JOW KON LOGÍSTICA, LOGÍSTICA FUEGUINA, Depósito Fiscal N° 12, Susana Mabel Sanabria, PRESEG, STEAL, Ayudante de Albañil, ANSAL), sepáralas una por una en su propia viñeta "• Cargo — Empresa: Tareas resumidas con claridad.".
+5) "estudios": Coloca CADA estudio, nivel educativo o curso en su propia viñeta "• " separada por salto de línea (\\n). Incluye TODOS los estudios/cursos que figuren tanto en "Estudios del Panel/Formulario" como en el CV original, sin cortar nombres de instituciones.
+6) "habilidades": Lista limpia de competencias técnicas, herramientas y habilidades blandas separadas por " • " (sin títulos largos adelante como "Logística y Operaciones:").
 
-DATOS DEL FORMULARIO:
-- Vacante / Objetivo declarado: ${puestoLimpio || 'Deducir según experiencia'}
+DATOS DEL PANEL / FORMULARIO (RESPETAR TODA INFORMACIÓN AGREGADA AQUÍ):
+- Vacante declarada: ${puestoDeclarado || 'Deducir según perfil'}
 - Disponibilidad: ${datosFormulario.disponibilidad || 'Inmediata'}
-- Resumen previo: ${resLimpio}
-- Experiencia previa: ${expLimpia}
-- Estudios previos: ${estLimpio}
-- Habilidades previas: ${habLimpia}
+- Resumen en Panel: ${resLimpio}
+- Experiencia en Panel: ${expLimpia}
+- Estudios en Panel: ${estLimpio}
+- Habilidades en Panel: ${habLimpia}
 
 ${textoPlanoExtraido ? `TEXTO EXTRAÍDO DEL ARCHIVO DE CV:\n${textoPlanoExtraido}\n` : ''}
 ${textoCartaExtraido ? `TEXTO DE CARTA DE RECOMENDACIÓN:\n${textoCartaExtraido}\n` : ''}
 
-Devuelve ÚNICAMENTE un objeto JSON válido con estas claves exactas:
+Devuelve ESTRICTAMENTE este JSON puro:
 {
+  "puestoSugerido": "",
   "datosPersonalesExtra": "",
   "resumen": "",
   "experiencia": "",
@@ -578,12 +600,13 @@ Devuelve ÚNICAMENTE un objeto JSON válido con estas claves exactas:
         }
     }
 
-    const tieneTextoSuficiente = Boolean(textoPlanoExtraido && textoPlanoExtraido.trim().length > 100);
+    const tieneTextoSuficiente = Boolean((textoPlanoExtraido && textoPlanoExtraido.trim().length > 80) || expLimpia.length > 80);
     const respaldoLocal = clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
 
     try {
         const respuestaIA = await generarConGeminiSeguro(parts, prompt, tieneTextoSuficiente);
         if (respuestaIA && respuestaIA.resumen && respuestaIA.experiencia) {
+            respuestaIA.puestoSugerido = limpiarSimbolosDecorativos(respuestaIA.puestoSugerido || respaldoLocal.puestoSugerido);
             respuestaIA.datosPersonalesExtra = limpiarSimbolosDecorativos(respuestaIA.datosPersonalesExtra || respaldoLocal.datosPersonalesExtra);
             respuestaIA.resumen = limpiarSimbolosDecorativos(respuestaIA.resumen);
             respuestaIA.experiencia = limpiarSimbolosDecorativos(respuestaIA.experiencia);
@@ -592,7 +615,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido con estas claves exactas:
             return respuestaIA;
         }
     } catch (errIA) {
-        console.warn("Usando clasificador local sintético:", errIA.message);
+        console.warn("Usando clasificador local mejorado:", errIA.message);
     }
     return respaldoLocal;
 }
@@ -652,6 +675,12 @@ async function optimizarCandidatoExistente(candidato) {
     });
 
     if (resultadoGemini) {
+        // Si el candidato tenía "General / Sin especificar", le colocamos automáticamente su especialidad real
+        if (!candidato.puestoRequerido || /general(\s*\/\s*sin especificar)?/i.test(candidato.puestoRequerido)) {
+            if (resultadoGemini.puestoSugerido) {
+                candidato.puestoRequerido = limpiarYCorregirTexto(resultadoGemini.puestoSugerido);
+            }
+        }
         candidato.datosPersonalesExtra = limpiarYCorregirTexto(resultadoGemini.datosPersonalesExtra || '');
         candidato.resumen = limpiarYCorregirTexto(resultadoGemini.resumen || candidato.resumen);
         candidato.experiencia = limpiarYCorregirTexto(resultadoGemini.experiencia || candidato.experiencia);
@@ -722,563 +751,4 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                     if (esBufferPDF(cartaFile.buffer) || cartaContentType === 'application/pdf') {
                         const pdfCartaParsed = await pdfParse(cartaFile.buffer);
                         textoCartaExtraido = pdfCartaParsed.text;
-                    } else if (cartaContentType.includes('wordprocessingml') || nombreArchivoCarta.endsWith('.docx')) {
-                        const wordCartaResult = await mammoth.extractRawText({ buffer: cartaFile.buffer });
-                        textoCartaExtraido = wordCartaResult.value;
-                    }
-                } catch (err) {
-                    console.error('Aviso: extracción de texto auxiliar de Carta omitida:', err.message);
-                }
-            }
-        }
-
-        const resultadoGemini = await fusionarYOptimizarCVConGemini({
-            cvBuffer,
-            cvMimeType: cvContentType,
-            textoPlanoExtraido,
-            cartaBuffer,
-            cartaMimeType: cartaContentType,
-            textoCartaExtraido,
-            datosFormulario: { puestoRequerido, disponibilidad, resumen, experiencia, estudios, habilidades }
-        });
-
-        if (resultadoGemini) {
-            datosPersonalesExtra = resultadoGemini.datosPersonalesExtra || '';
-            resumen = resultadoGemini.resumen || resumen;
-            experiencia = resultadoGemini.experiencia || experiencia;
-            estudios = resultadoGemini.estudios || estudios;
-            habilidades = resultadoGemini.habilidades || habilidades;
-            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
-            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
-            if (resultadoGemini.textoCompletoIntegrado) {
-                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
-            }
-        }
-
-        const candidatoId = Date.now();
-        const nuevoCandidato = new Candidato({
-            id: candidatoId,
-            empresa: limpiarYCorregirTexto(empresa) || 'Base de Datos General',
-            puestoRequerido: limpiarYCorregirTexto(puestoRequerido) || 'General',
-            nombre: limpiarYCorregirTexto(nombre) || 'Postulante',
-            dni: limpiarYCorregirTexto(dni),
-            email: limpiarYCorregirTexto(email),
-            telefono: limpiarYCorregirTexto(telefono),
-            direccion: limpiarYCorregirTexto(direccion),
-            disponibilidad: limpiarYCorregirTexto(disponibilidad) || 'Inmediata',
-            datosPersonalesExtra: limpiarYCorregirTexto(datosPersonalesExtra),
-            resumen: limpiarYCorregirTexto(resumen),
-            experiencia: limpiarYCorregirTexto(experiencia),
-            estudios: limpiarYCorregirTexto(estudios),
-            habilidades: limpiarYCorregirTexto(habilidades),
-            habilidadesDuras: limpiarYCorregirTexto(habilidadesDuras),
-            habilidadesBlandas: limpiarYCorregirTexto(habilidadesBlandas),
-            cvData, cvContentType, nombreArchivoCV: nombreArchivoOriginal,
-            fotoData, fotoContentType,
-            cartaData, cartaContentType, nombreArchivoCarta,
-            textoExtraidoCV: limpiarYCorregirTexto(textoPlanoExtraido || `${resumen} ${experiencia} ${estudios} ${habilidades}`),
-            fecha: new Date().toLocaleString(),
-            pagado: false
-        });
-
-        await nuevoCandidato.save();
-        enviarAlertaEmail(nuevoCandidato);
-
-        return res.json({ success: true, candidatoId, message: '¡Postulación procesada y estructurada con IA!' });
-    } catch (error) {
-        console.error("Error crítico en postulación:", error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) return res.status(404).json({ success: false, error: 'Candidato no encontrado' });
-
-        await optimizarCandidatoExistente(candidato);
-
-        return res.json({
-            success: true,
-            nombre: candidato.nombre,
-            datosPersonalesExtra: candidato.datosPersonalesExtra,
-            resumen: candidato.resumen,
-            experiencia: candidato.experiencia,
-            estudios: candidato.estudios,
-            habilidades: candidato.habilidades
-        });
-    } catch (error) {
-        console.error(`Error al optimizar legajo ${req.params.id}:`, error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, resumen, experiencia, estudios, habilidades } = req.body;
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
-
-        if (empresa !== undefined) candidato.empresa = limpiarYCorregirTexto(empresa);
-        if (puestoRequerido !== undefined) candidato.puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
-        if (nombre !== undefined) candidato.nombre = limpiarYCorregirTexto(nombre);
-        if (dni !== undefined) candidato.dni = limpiarYCorregirTexto(dni);
-        if (email !== undefined) candidato.email = limpiarYCorregirTexto(email);
-        if (telefono !== undefined) candidato.telefono = limpiarYCorregirTexto(telefono);
-        if (direccion !== undefined) candidato.direccion = limpiarYCorregirTexto(direccion);
-        if (resumen !== undefined) candidato.resumen = limpiarYCorregirTexto(resumen);
-        if (experiencia !== undefined) candidato.experiencia = limpiarYCorregirTexto(experiencia);
-        if (estudios !== undefined) candidato.estudios = limpiarYCorregirTexto(estudios);
-        if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
-
-        await candidato.save();
-        return res.json({ success: true, message: 'Legajo editado correctamente.' });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
-
-        if (req.files && req.files.length > 0) {
-            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
-            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
-            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
-
-            if (cvFile) {
-                candidato.cvData = cvFile.buffer.toString('base64');
-                candidato.cvContentType = cvFile.mimetype;
-                candidato.nombreArchivoCV = cvFile.originalname;
-            }
-            if (fotoPerfil) {
-                candidato.fotoData = fotoPerfil.buffer.toString('base64');
-                candidato.fotoContentType = fotoPerfil.mimetype;
-            }
-            if (cartaFile) {
-                candidato.cartaData = cartaFile.buffer.toString('base64');
-                candidato.cartaContentType = cartaFile.mimetype;
-                candidato.nombreArchivoCarta = cartaFile.originalname;
-            }
-            await candidato.save();
-            return res.json({ success: true, message: 'Archivos actualizados con éxito' });
-        }
-        return res.json({ success: false, error: 'No se detectaron archivos' });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.get('/api/foto/:id', async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto no encontrada');
-        const imgBuffer = Buffer.from(candidato.fotoData, 'base64');
-        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
-        return res.send(imgBuffer);
-    } catch (e) {
-        return res.status(500).send('Error al cargar la foto');
-    }
-});
-
-app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto de perfil no disponible.');
-        const fotoBuffer = Buffer.from(candidato.fotoData, 'base64');
-        const ext = candidato.fotoContentType ? (candidato.fotoContentType.split('/')[1] || 'jpg').replace(/[^a-zA-Z0-9]/g, '') : 'jpg';
-        const nombreSeguro = limpiarNombreArchivo(`Foto_${candidato.nombre || id}.${ext}`, `Foto_${id}.jpg`);
-        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
-        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
-        return res.send(fotoBuffer);
-    } catch (error) {
-        return res.status(500).send('Error al procesar la descarga de la foto.');
-    }
-});
-
-app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato || !candidato.cartaData) return res.status(404).send('Carta de recomendación no disponible.');
-        const cartaBuffer = Buffer.from(candidato.cartaData, 'base64');
-        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCarta, `Carta_${candidato.nombre || id}.pdf`);
-        res.setHeader('Content-Type', candidato.cartaContentType || 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
-        return res.send(cartaBuffer);
-    } catch (error) {
-        return res.status(500).send('Error al procesar la descarga.');
-    }
-});
-
-app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato) return res.status(404).send('Candidato no encontrado.');
-        const fotoSrc = candidato.fotoData ? `/api/foto/${candidato.id}` : '';
-        const htmlCV = `
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <title>CV Corporativo - ${candidato.nombre}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 40px auto; }
-                .header { display: flex; align-items: center; gap: 25px; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 20px; }
-                .foto { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0056b3; }
-                .info h1 { margin: 0 0 6px 0; color: #0056b3; font-size: 24px; text-transform: uppercase; }
-                .info p { margin: 4px 0; font-size: 14px; }
-                .section { margin-bottom: 20px; }
-                .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; font-size: 15px; text-transform: uppercase; }
-                .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; display: block; margin: 30px auto; }
-                @media print { .btn-print { display: none; } }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                ${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto de perfil">` : ''}
-                <div class="info">
-                    <h1>${candidato.nombre}</h1>
-                    <p>📍 ${candidato.direccion || 'No especificada'} | 📞 ${candidato.telefono || 'S/D'} | 📧 ${candidato.email || 'S/D'} | <strong>DNI:</strong> ${candidato.dni || 'S/D'}</p>
-                    ${candidato.datosPersonalesExtra ? `<p>${candidato.datosPersonalesExtra}</p>` : ''}
-                    <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
-                </div>
-            </div>
-            <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
-            <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || 'No especificada'}</p></div>
-            <div class="section"><h3>Estudios y Formación</h3><p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p></div>
-            <div class="section"><h3>Habilidades Técnicas (Duras)</h3><p>${candidato.habilidadesDuras || candidato.habilidades || 'No especificadas'}</p></div>
-            <div class="section"><h3>Habilidades y Competencias (Blandas)</h3><p>${candidato.habilidadesBlandas || 'No especificadas'}</p></div>
-            <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
-        </body>
-        </html>`;
-        return res.send(htmlCV);
-    } catch (error) {
-        return res.status(500).send('Error al generar el CV corporativo.');
-    }
-});
-
-app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const candidato = await Candidato.findOne({ id: id });
-        if (!candidato || !candidato.cvData) return res.status(404).send('Archivo de CV no disponible.');
-        const cvBuffer = Buffer.from(candidato.cvData, 'base64');
-        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCV, `CV_${candidato.nombre || id}.pdf`);
-        res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
-        return res.send(cvBuffer);
-    } catch (error) {
-        console.error('Error al descargar CV:', error);
-        return res.status(500).send('Error al procesar la descarga.');
-    }
-});
-
-// 📂 RUTAS CRUD EN MONGODB PARA CARPETAS DE EMPRESAS Y SUBCARPETAS DE PUESTOS
-app.get('/api/busquedas', authMiddleware, async (req, res) => {
-    try {
-        const rawBusquedas = await Busqueda.find({}, {
-            id: 1, empresa: 1, titulo: 1, keywords: 1, textoAviso: 1,
-            archivoContentType: 1, nombreArchivo: 1, fechaCreacion: 1,
-            tieneArchivo: { $gt: [{ $strLenCP: { $ifNull: ["$archivoData", ""] } }, 0] }
-        }).lean();
-
-        const busquedas = rawBusquedas.map(b => ({
-            ...b,
-            archivoData: b.tieneArchivo ? 'disponible' : ''
-        })).sort((a, b) => b.id - a.id);
-
-        return res.json({ success: true, busquedas });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/busquedas', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
-    try {
-        const { id, empresa, titulo, keywords, textoAviso } = req.body;
-        const nuevoId = Number(id) || Date.now();
-        const existente = await Busqueda.findOne({ id: nuevoId });
-        if (existente) return res.json({ success: true, busqueda: existente });
-
-        let archivoData = '', archivoContentType = '', nombreArchivo = '';
-        if (req.file) {
-            archivoData = req.file.buffer.toString('base64');
-            archivoContentType = req.file.mimetype;
-            nombreArchivo = req.file.originalname;
-        }
-
-        const nueva = new Busqueda({
-            id: nuevoId,
-            empresa: limpiarYCorregirTexto(empresa) || 'Empresas Generales',
-            titulo: limpiarYCorregirTexto(titulo) || 'Vacante General',
-            keywords: limpiarYCorregirTexto(keywords || ''),
-            textoAviso: limpiarYCorregirTexto(textoAviso || ''),
-            archivoData,
-            archivoContentType,
-            nombreArchivo,
-            fechaCreacion: new Date().toLocaleDateString()
-        });
-        await nueva.save();
-
-        const respuestaLimpia = {
-            ...nueva.toObject(),
-            archivoData: archivoData ? 'disponible' : ''
-        };
-        return res.json({ success: true, busqueda: respuestaLimpia });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/busquedas/editar/:id', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const { empresa, titulo, keywords, textoAviso } = req.body;
-        const b = await Busqueda.findOne({ id });
-        if (!b) return res.status(404).json({ success: false, error: 'Subcarpeta no encontrada' });
-
-        if (empresa !== undefined) b.empresa = limpiarYCorregirTexto(empresa);
-        if (titulo !== undefined) b.titulo = limpiarYCorregirTexto(titulo);
-        if (keywords !== undefined) b.keywords = limpiarYCorregirTexto(keywords);
-        if (textoAviso !== undefined) b.textoAviso = limpiarYCorregirTexto(textoAviso);
-
-        if (req.file) {
-            b.archivoData = req.file.buffer.toString('base64');
-            b.archivoContentType = req.file.mimetype;
-            b.nombreArchivo = req.file.originalname;
-        }
-
-        await b.save();
-        const respuestaLimpia = {
-            ...b.toObject(),
-            archivoData: b.archivoData ? 'disponible' : ''
-        };
-        return res.json({ success: true, busqueda: respuestaLimpia });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.get('/api/busquedas/archivo/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const b = await Busqueda.findOne({ id });
-        if (!b || !b.archivoData) return res.status(404).send('Archivo no disponible en esta subcarpeta.');
-        const buffer = Buffer.from(b.archivoData, 'base64');
-        const nombreSeguro = limpiarNombreArchivo(b.nombreArchivo, `Aviso_${b.empresa}_${b.titulo}.pdf`);
-        res.setHeader('Content-Type', b.archivoContentType || 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${nombreSeguro}"`);
-        return res.send(buffer);
-    } catch (error) {
-        return res.status(500).send('Error al abrir el archivo de la vacante.');
-    }
-});
-
-app.delete('/api/busquedas/:id', authMiddleware, async (req, res) => {
-    try {
-        await Busqueda.deleteOne({ id: Number(req.params.id) });
-        return res.json({ success: true });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-function extraerRequisitosLocalmente(texto, puestoContexto = '') {
-    const limpio = limpiarYCorregirTexto(`${puestoContexto} ${texto || ''}`);
-    const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
-
-    let empresa = '';
-    let titulo = puestoContexto || '';
-
-    for (const l of lineas) {
-        if (!empresa && /^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]/i.test(l)) {
-            empresa = l.replace(/^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]\s*/i, '').trim();
-        }
-        if (!titulo && /^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]/i.test(l)) {
-            titulo = l.replace(/^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]\s*/i, '').trim();
-        }
-    }
-
-    if (!titulo && lineas.length > 0) {
-        titulo = lineas[0].substring(0, 60);
-    }
-
-    const stopWords = new Set(['para', 'con', 'los', 'las', 'del', 'una', 'por', 'que', 'mas', 'más', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'todo', 'toda', 'todos', 'todas', 'otro', 'otra', 'otros', 'otras', 'mismo', 'misma', 'importante', 'empresa', 'busca', 'buscamos', 'incorporar', 'personal', 'puesto', 'vacante', 'requisitos', 'excluyente', 'deseable', 'experiencia', 'años', 'año', 'zona', 'horario', 'enviar', 'correo', 'asunto', 'disponibilidad', 'inmediata', 'trabajo', 'laboral', 'minima', 'mínima', 'comprobable', 'tierra', 'fuego', 'grande', 'ushuaia', 'hola', 'buenas', 'dias', 'tardes']);
-
-    const palabras = limpio
-        .toLowerCase()
-        .replace(/[^\wáéíóúñü\s]/g, ' ')
-        .split(/\s+/)
-        .filter(p => p.length > 3 && !stopWords.has(p) && !/^\d+$/.test(p));
-
-    const unicas = [];
-    if (puestoContexto && puestoContexto.trim().includes(' ')) {
-        unicas.push(puestoContexto.trim().toLowerCase().replace(/\s+/g, '_'));
-    }
-    for (const p of palabras) {
-        if (!unicas.includes(p) && unicas.length < 15) unicas.push(p);
-    }
-
-    return {
-        empresa: empresa || 'Empresas Generales',
-        titulo: titulo || 'Vacante General',
-        keywords: unicas.join(' ')
-    };
-}
-
-app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
-    try {
-        const textoDirecto = req.body.textoRequisitos ? req.body.textoRequisitos.trim() : '';
-        const puestoContexto = req.body.puestoContexto ? req.body.puestoContexto.trim() : '';
-        const empresaContexto = req.body.empresaContexto ? req.body.empresaContexto.trim() : '';
-
-        if (!req.file && !textoDirecto && !puestoContexto) {
-            return res.json({ success: false, error: 'Subí un archivo (PDF, Word o Imagen) o pegá el texto de la búsqueda.' });
-        }
-
-        let textoPlano = textoDirecto;
-        if (req.file) {
-            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-                try {
-                    const pdfData = await pdfParse(req.file.buffer);
-                    textoPlano = `${textoPlano}\n${pdfData.text || ''}`.trim();
-                } catch (e) {}
-            } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
-                try {
-                    const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
-                    textoPlano = `${textoPlano}\n${wordResult.value || ''}`.trim();
-                } catch (e) {}
-            }
-        }
-
-        const prompt = `Analiza la siguiente búsqueda laboral para la empresa "${empresaContexto || 'Cliente'}" y el puesto "${puestoContexto || 'Vacante'}".
-Extrae las palabras clave técnicas, oficios, herramientas, funciones, licencias y competencias más importantes para filtrar CVs en un motor ATS, separadas por espacio.
-Para el nombre del puesto o términos compuestos usa guion bajo (ej: "jefe_de_cocina", "pastelero", "panaderia", "reposteria", "manipulacion_de_alimentos") además de las palabras sueltas clave. Si el aviso aclara algo excluyente que NO quieren, agrégalo con signo menos delante.
-
-Responde ESTRICTAMENTE en formato JSON puro:
-{
-  "empresa": "${empresaContexto || 'Nombre de la Empresa'}",
-  "titulo": "${puestoContexto || 'Título del puesto'}",
-  "keywords": "palabra1 palabra2 frase_compuesta...",
-  "textoExtraido": "Resumen claro de los requisitos leídos del archivo o imagen"
-}
-${textoPlano ? `\nTexto del pedido:\n${textoPlano}` : ''}`;
-
-        const parts = [prompt];
-        if (req.file) {
-            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
-            } else if (req.file.mimetype && req.file.mimetype.startsWith('image/')) {
-                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
-            }
-        }
-
-        try {
-            const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 40));
-            if (datos && datos.keywords) {
-                return res.json({ success: true, datos });
-            }
-        } catch (errIA) {
-            console.warn("Usando extractor local de requisitos:", errIA.message);
-        }
-
-        const datosRespaldo = extraerRequisitosLocalmente(textoPlano, puestoContexto);
-        return res.json({ success: true, datos: datosRespaldo });
-    } catch (error) {
-        console.error("Error al analizar requisitos:", error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
-    try {
-        if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });
-        let textoPlano = '';
-        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            try {
-                const pdfData = await pdfParse(req.file.buffer);
-                textoPlano = pdfData.text;
-            } catch (e) {}
-        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
-            const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
-            textoPlano = wordResult.value;
-        }
-
-        const prompt = `Analiza este CV completo (incluso si tiene diseño en columnas, tablas o recuadros) y extrae toda la información estructurada de forma lineal para un sistema ATS en formato JSON puro. Si no encuentras un dato personal, déjalo vacío ("").
-        {
-          "nombre": "Nombre y apellido completo",
-          "dni": "Documento DNI (solo números, sin puntos)",
-          "email": "Correo electrónico",
-          "telefono": "Número de teléfono",
-          "direccion": "Domicilio y localidad",
-          "resumen": "Resumen ejecutivo sintético de 4 líneas (sin copiar las experiencias palabra por palabra)",
-          "experiencia": "Todas las experiencias laborales detalladas en renglones separados con viñetas (•), una viñeta por empresa",
-          "estudios": "Todos los estudios, cursos realizados, capacitaciones técnicas y carnets en renglones separados con viñetas (•)",
-          "habilidades": "Lista completa de habilidades técnicas, conocimientos, licencias y aptitudes separadas por ' • '"
-        }
-        ${textoPlano ? `Texto auxiliar del CV: ${textoPlano}` : ''}`;
-
-        const parts = [prompt];
-        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
-            parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
-        }
-
-        const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 100));
-        return res.json({ success: true, datos });
-    } catch (error) {
-        console.error("Error en autocompletado:", error);
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.get('/api/candidatos', authMiddleware, async (req, res) => {
-    try {
-        const rawCandidatos = await Candidato.find({}, {
-            id: 1, empresa: 1, puestoRequerido: 1, nombre: 1, dni: 1, email: 1,
-            telefono: 1, direccion: 1, disponibilidad: 1, datosPersonalesExtra: 1,
-            resumen: 1, experiencia: 1, estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
-            cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
-            cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,
-            tieneCV: { $gt: [{ $strLenCP: { $ifNull: ["$cvData", ""] } }, 0] },
-            tieneFoto: { $gt: [{ $strLenCP: { $ifNull: ["$fotoData", ""] } }, 0] },
-            tieneCarta: { $gt: [{ $strLenCP: { $ifNull: ["$cartaData", ""] } }, 0] }
-        }).lean();
-
-        const listaCandidatos = rawCandidatos.map(c => ({
-            ...c,
-            cvData: c.tieneCV ? 'disponible' : '',
-            fotoData: c.tieneFoto ? 'disponible' : '',
-            cartaData: c.tieneCarta ? 'disponible' : ''
-        })).sort((a, b) => b.id - a.id);
-
-        return res.json({ success: true, candidatos: listaCandidatos });
-    } catch (error) {
-        return res.json({ success: false, error: error.message });
-    }
-});
-
-app.delete('/api/candidatos/:id', authMiddleware, async (req, res) => {
-    try {
-        await Candidato.deleteOne({ id: Number(req.params.id) });
-        return res.json({ success: true });
-    } catch (error) {
-        return res.json({ success: false });
-    }
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor de Mi Trabajo TDF corriendo en puerto ${PORT}`);
-});
+                    } else if (cartaContentType.includes('

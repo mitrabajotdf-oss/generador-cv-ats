@@ -217,8 +217,8 @@ function unirRenglonesCortados(lineasCrudas) {
         } else {
             const anterior = resultado[resultado.length - 1];
             const empiezaMinusculaOParentesis = /^[a-záéíóúñ0-9()]/.test(limpia);
-            const anteriorTerminaAbierto = /[-–(/:,]$\vert{}\b(de\vert{}del\vert{}en\vert{}el\vert{}la\vert{}los\vert{}las\vert{}para\vert{}por\vert{}con\vert{}y\vert{}o\vert{}a\vert{}su\vert{}propia\vert{}sector\vert{}capacitación\vert{}charla\vert{}buenas\vert{}taller\vert{}escuela\vert{}dr\.\vert{}sra\.\vert{}ing\.)$/i.test(anterior);
-            const anteriorTerminaEnPuntoFinal = /\.$/.test(anterior) && !/\b(S\.A\.\vert{}S\.R\.L\.\vert{}Dr\.\vert{}Sr\.\vert{}Sra\.\vert{}Lic\.\vert{}Ing\.\vert{}N\.°\vert{}N°\.)$/i.test(anterior);
+            const anteriorTerminaAbierto = /[-–(/:,]$|\b(de|del|en|el|la|los|las|para|por|con|y|o|a|su|propia|sector|capacitación|charla|buenas|taller|escuela|dr\.|sra\.|ing\.)$/i.test(anterior);
+            const anteriorTerminaEnPuntoFinal = /\.$/.test(anterior) && !/\b(S\.A\.|S\.R\.L\.|Dr\.|Sr\.|Sra\.|Lic\.|Ing\.|N\.°|N°\.)$/i.test(anterior);
 
             if (!anteriorTerminaEnPuntoFinal && (empiezaMinusculaOParentesis || anteriorTerminaAbierto || anterior.length < 75)) {
                 resultado[resultado.length - 1] = `${anterior} ${limpia}`.replace(/\s+/g, ' ');
@@ -751,4 +751,532 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
                     if (esBufferPDF(cartaFile.buffer) || cartaContentType === 'application/pdf') {
                         const pdfCartaParsed = await pdfParse(cartaFile.buffer);
                         textoCartaExtraido = pdfCartaParsed.text;
-                    } else if (cartaContentType.includes('
+                    } else if (cartaContentType.includes('wordprocessingml') || nombreArchivoCarta.endsWith('.docx')) {
+                        const wordCartaResult = await mammoth.extractRawText({ buffer: cartaFile.buffer });
+                        textoCartaExtraido = wordCartaResult.value;
+                    }
+                } catch (err) {
+                    console.error('Aviso: extracción de texto auxiliar de Carta omitida:', err.message);
+                }
+            }
+        }
+
+        const resultadoGemini = await fusionarYOptimizarCVConGemini({
+            cvBuffer,
+            cvMimeType: cvContentType,
+            textoPlanoExtraido,
+            cartaBuffer,
+            cartaMimeType: cartaContentType,
+            textoCartaExtraido,
+            datosFormulario: { puestoRequerido, disponibilidad, resumen, experiencia, estudios, habilidades }
+        });
+
+        if (resultadoGemini) {
+            if (!puestoRequerido || /general(\s*\/\s*sin especificar)?/i.test(puestoRequerido)) {
+                puestoRequerido = resultadoGemini.puestoSugerido || puestoRequerido;
+            }
+            datosPersonalesExtra = resultadoGemini.datosPersonalesExtra || '';
+            resumen = resultadoGemini.resumen || resumen;
+            experiencia = resultadoGemini.experiencia || experiencia;
+            estudios = resultadoGemini.estudios || estudios;
+            habilidades = resultadoGemini.habilidades || habilidades;
+            habilidadesDuras = resultadoGemini.habilidadesDuras || habilidadesDuras || habilidades;
+            habilidadesBlandas = resultadoGemini.habilidadesBlandas || habilidadesBlandas;
+            if (resultadoGemini.textoCompletoIntegrado) {
+                textoPlanoExtraido = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
+            }
+        }
+
+        const candidatoId = Date.now();
+        const nuevoCandidato = new Candidato({
+            id: candidatoId,
+            empresa: limpiarYCorregirTexto(empresa) || 'Base de Datos General',
+            puestoRequerido: limpiarYCorregirTexto(puestoRequerido) || 'General',
+            nombre: limpiarYCorregirTexto(nombre) || 'Postulante',
+            dni: limpiarYCorregirTexto(dni),
+            email: limpiarYCorregirTexto(email),
+            telefono: limpiarYCorregirTexto(telefono),
+            direccion: limpiarYCorregirTexto(direccion),
+            disponibilidad: limpiarYCorregirTexto(disponibilidad) || 'Inmediata',
+            datosPersonalesExtra: limpiarYCorregirTexto(datosPersonalesExtra),
+            resumen: limpiarYCorregirTexto(resumen),
+            experiencia: limpiarYCorregirTexto(experiencia),
+            estudios: limpiarYCorregirTexto(estudios),
+            habilidades: limpiarYCorregirTexto(habilidades),
+            habilidadesDuras: limpiarYCorregirTexto(habilidadesDuras),
+            habilidadesBlandas: limpiarYCorregirTexto(habilidadesBlandas),
+            cvData, cvContentType, nombreArchivoCV: nombreArchivoOriginal,
+            fotoData, fotoContentType,
+            cartaData, cartaContentType, nombreArchivoCarta,
+            textoExtraidoCV: limpiarYCorregirTexto(textoPlanoExtraido || `${resumen} ${experiencia} ${estudios} ${habilidades}`),
+            fecha: new Date().toLocaleString(),
+            pagado: false
+        });
+
+        await nuevoCandidato.save();
+        enviarAlertaEmail(nuevoCandidato);
+
+        return res.json({ success: true, candidatoId, message: '¡Postulación procesada y estructurada con IA!' });
+    } catch (error) {
+        console.error("Error crítico en postulación:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) return res.status(404).json({ success: false, error: 'Candidato no encontrado' });
+
+        await optimizarCandidatoExistente(candidato);
+
+        return res.json({
+            success: true,
+            nombre: candidato.nombre,
+            datosPersonalesExtra: candidato.datosPersonalesExtra,
+            resumen: candidato.resumen,
+            experiencia: candidato.experiencia,
+            estudios: candidato.estudios,
+            habilidades: candidato.habilidades
+        });
+    } catch (error) {
+        console.error(`Error al optimizar legajo ${req.params.id}:`, error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, resumen, experiencia, estudios, habilidades } = req.body;
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
+
+        if (empresa !== undefined) candidato.empresa = limpiarYCorregirTexto(empresa);
+        if (puestoRequerido !== undefined) candidato.puestoRequerido = limpiarYCorregirTexto(puestoRequerido);
+        if (nombre !== undefined) candidato.nombre = limpiarYCorregirTexto(nombre);
+        if (dni !== undefined) candidato.dni = limpiarYCorregirTexto(dni);
+        if (email !== undefined) candidato.email = limpiarYCorregirTexto(email);
+        if (telefono !== undefined) candidato.telefono = limpiarYCorregirTexto(telefono);
+        if (direccion !== undefined) candidato.direccion = limpiarYCorregirTexto(direccion);
+        if (resumen !== undefined) candidato.resumen = limpiarYCorregirTexto(resumen);
+        if (experiencia !== undefined) candidato.experiencia = limpiarYCorregirTexto(experiencia);
+        if (estudios !== undefined) candidato.estudios = limpiarYCorregirTexto(estudios);
+        if (habilidades !== undefined) candidato.habilidades = limpiarYCorregirTexto(habilidades);
+
+        await candidato.save();
+        return res.json({ success: true, message: 'Legajo editado correctamente.' });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any(), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
+
+        if (req.files && req.files.length > 0) {
+            const cvFile = req.files.find(f => f.fieldname === 'cvFile');
+            const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
+            const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
+
+            if (cvFile) {
+                candidato.cvData = cvFile.buffer.toString('base64');
+                candidato.cvContentType = cvFile.mimetype;
+                candidato.nombreArchivoCV = cvFile.originalname;
+            }
+            if (fotoPerfil) {
+                candidato.fotoData = fotoPerfil.buffer.toString('base64');
+                candidato.fotoContentType = fotoPerfil.mimetype;
+            }
+            if (cartaFile) {
+                candidato.cartaData = cartaFile.buffer.toString('base64');
+                candidato.cartaContentType = cartaFile.mimetype;
+                candidato.nombreArchivoCarta = cartaFile.originalname;
+            }
+            await candidato.save();
+            return res.json({ success: true, message: 'Archivos actualizados con éxito' });
+        }
+        return res.json({ success: false, error: 'No se detectaron archivos' });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/foto/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto no encontrada');
+        const imgBuffer = Buffer.from(candidato.fotoData, 'base64');
+        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
+        return res.send(imgBuffer);
+    } catch (e) {
+        return res.status(500).send('Error al cargar la foto');
+    }
+});
+
+app.get('/api/descargar-foto/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato || !candidato.fotoData) return res.status(404).send('Foto de perfil no disponible.');
+        const fotoBuffer = Buffer.from(candidato.fotoData, 'base64');
+        const ext = candidato.fotoContentType ? (candidato.fotoContentType.split('/')[1] || 'jpg').replace(/[^a-zA-Z0-9]/g, '') : 'jpg';
+        const nombreSeguro = limpiarNombreArchivo(`Foto_${candidato.nombre || id}.${ext}`, `Foto_${id}.jpg`);
+        res.setHeader('Content-Type', candidato.fotoContentType || 'image/jpeg');
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
+        return res.send(fotoBuffer);
+    } catch (error) {
+        return res.status(500).send('Error al procesar la descarga de la foto.');
+    }
+});
+
+app.get('/api/descargar-carta/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato || !candidato.cartaData) return res.status(404).send('Carta de recomendación no disponible.');
+        const cartaBuffer = Buffer.from(candidato.cartaData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCarta, `Carta_${candidato.nombre || id}.pdf`);
+        res.setHeader('Content-Type', candidato.cartaContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
+        return res.send(cartaBuffer);
+    } catch (error) {
+        return res.status(500).send('Error al procesar la descarga.');
+    }
+});
+
+app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato) return res.status(404).send('Candidato no encontrado.');
+        const fotoSrc = candidato.fotoData ? `/api/foto/${candidato.id}` : '';
+        const htmlCV = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>CV Corporativo - ${candidato.nombre}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 40px auto; }
+                .header { display: flex; align-items: center; gap: 25px; border-bottom: 2px solid #0056b3; padding-bottom: 20px; margin-bottom: 20px; }
+                .foto { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0056b3; }
+                .info h1 { margin: 0 0 6px 0; color: #0056b3; font-size: 24px; text-transform: uppercase; }
+                .info p { margin: 4px 0; font-size: 14px; }
+                .section { margin-bottom: 20px; }
+                .section h3 { border-bottom: 1px solid #ddd; padding-bottom: 5px; color: #333; font-size: 15px; text-transform: uppercase; }
+                .btn-print { margin-top: 30px; padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; display: block; margin: 30px auto; }
+                @media print { .btn-print { display: none; } }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                ${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto de perfil">` : ''}
+                <div class="info">
+                    <h1>${candidato.nombre}</h1>
+                    <p>📍 ${candidato.direccion || 'No especificada'} | 📞 ${candidato.telefono || 'S/D'} | 📧 ${candidato.email || 'S/D'} | <strong>DNI:</strong> ${candidato.dni || 'S/D'}</p>
+                    ${candidato.datosPersonalesExtra ? `<p>${candidato.datosPersonalesExtra}</p>` : ''}
+                    <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p>
+                </div>
+            </div>
+            <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
+            <div class="section"><h3>Experiencia Laboral</h3><p style="white-space: pre-line;">${candidato.experiencia || 'No especificada'}</p></div>
+            <div class="section"><h3>Estudios y Formación</h3><p style="white-space: pre-line;">${candidato.estudios || 'No especificados'}</p></div>
+            <div class="section"><h3>Habilidades Técnicas (Duras)</h3><p>${candidato.habilidadesDuras || candidato.habilidades || 'No especificadas'}</p></div>
+            <div class="section"><h3>Habilidades y Competencias (Blandas)</h3><p>${candidato.habilidadesBlandas || 'No especificadas'}</p></div>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+        </body>
+        </html>`;
+        return res.send(htmlCV);
+    } catch (error) {
+        return res.status(500).send('Error al generar el CV corporativo.');
+    }
+});
+
+app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const candidato = await Candidato.findOne({ id: id });
+        if (!candidato || !candidato.cvData) return res.status(404).send('Archivo de CV no disponible.');
+        const cvBuffer = Buffer.from(candidato.cvData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(candidato.nombreArchivoCV, `CV_${candidato.nombre || id}.pdf`);
+        res.setHeader('Content-Type', candidato.cvContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
+        return res.send(cvBuffer);
+    } catch (error) {
+        console.error('Error al descargar CV:', error);
+        return res.status(500).send('Error al procesar la descarga.');
+    }
+});
+
+// 📂 RUTAS CRUD EN MONGODB PARA CARPETAS DE EMPRESAS Y SUBCARPETAS DE PUESTOS
+app.get('/api/busquedas', authMiddleware, async (req, res) => {
+    try {
+        const rawBusquedas = await Busqueda.find({}, {
+            id: 1, empresa: 1, titulo: 1, keywords: 1, textoAviso: 1,
+            archivoContentType: 1, nombreArchivo: 1, fechaCreacion: 1,
+            tieneArchivo: { $gt: [{ $strLenCP: { $ifNull: ["$archivoData", ""] } }, 0] }
+        }).lean();
+
+        const busquedas = rawBusquedas.map(b => ({
+            ...b,
+            archivoData: b.tieneArchivo ? 'disponible' : ''
+        })).sort((a, b) => b.id - a.id);
+
+        return res.json({ success: true, busquedas });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/busquedas', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
+    try {
+        const { id, empresa, titulo, keywords, textoAviso } = req.body;
+        const nuevoId = Number(id) || Date.now();
+        const existente = await Busqueda.findOne({ id: nuevoId });
+        if (existente) return res.json({ success: true, busqueda: existente });
+
+        let archivoData = '', archivoContentType = '', nombreArchivo = '';
+        if (req.file) {
+            archivoData = req.file.buffer.toString('base64');
+            archivoContentType = req.file.mimetype;
+            nombreArchivo = req.file.originalname;
+        }
+
+        const nueva = new Busqueda({
+            id: nuevoId,
+            empresa: limpiarYCorregirTexto(empresa) || 'Empresas Generales',
+            titulo: limpiarYCorregirTexto(titulo) || 'Vacante General',
+            keywords: limpiarYCorregirTexto(keywords || ''),
+            textoAviso: limpiarYCorregirTexto(textoAviso || ''),
+            archivoData,
+            archivoContentType,
+            nombreArchivo,
+            fechaCreacion: new Date().toLocaleDateString()
+        });
+        await nueva.save();
+
+        const respuestaLimpia = {
+            ...nueva.toObject(),
+            archivoData: archivoData ? 'disponible' : ''
+        };
+        return res.json({ success: true, busqueda: respuestaLimpia });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/busquedas/editar/:id', authMiddleware, upload.single('archivoAviso'), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { empresa, titulo, keywords, textoAviso } = req.body;
+        const b = await Busqueda.findOne({ id });
+        if (!b) return res.status(404).json({ success: false, error: 'Subcarpeta no encontrada' });
+
+        if (empresa !== undefined) b.empresa = limpiarYCorregirTexto(empresa);
+        if (titulo !== undefined) b.titulo = limpiarYCorregirTexto(titulo);
+        if (keywords !== undefined) b.keywords = limpiarYCorregirTexto(keywords);
+        if (textoAviso !== undefined) b.textoAviso = limpiarYCorregirTexto(textoAviso);
+
+        if (req.file) {
+            b.archivoData = req.file.buffer.toString('base64');
+            b.archivoContentType = req.file.mimetype;
+            b.nombreArchivo = req.file.originalname;
+        }
+
+        await b.save();
+        const respuestaLimpia = {
+            ...b.toObject(),
+            archivoData: b.archivoData ? 'disponible' : ''
+        };
+        return res.json({ success: true, busqueda: respuestaLimpia });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/busquedas/archivo/:id', authMiddleware, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const b = await Busqueda.findOne({ id });
+        if (!b || !b.archivoData) return res.status(404).send('Archivo no disponible en esta subcarpeta.');
+        const buffer = Buffer.from(b.archivoData, 'base64');
+        const nombreSeguro = limpiarNombreArchivo(b.nombreArchivo, `Aviso_${b.empresa}_${b.titulo}.pdf`);
+        res.setHeader('Content-Type', b.archivoContentType || 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${nombreSeguro}"`);
+        return res.send(buffer);
+    } catch (error) {
+        return res.status(500).send('Error al abrir el archivo de la vacante.');
+    }
+});
+
+app.delete('/api/busquedas/:id', authMiddleware, async (req, res) => {
+    try {
+        await Busqueda.deleteOne({ id: Number(req.params.id) });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+function extraerRequisitosLocalmente(texto, puestoContexto = '') {
+    const limpio = limpiarYCorregirTexto(`${puestoContexto} ${texto || ''}`);
+    const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
+
+    let empresa = '';
+    let titulo = puestoContexto || '';
+
+    for (const l of lineas) {
+        if (!empresa && /^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]/i.test(l)) {
+            empresa = l.replace(/^(empresa|cliente|organización|comercio|restaurante|hotel|planta|fábrica)\s*[:.-]\s*/i, '').trim();
+        }
+        if (!titulo && /^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]/i.test(l)) {
+            titulo = l.replace(/^(puesto|vacante|búsqueda|busca|buscamos|cargo|perfil|se solicita|solicitamos)\s*[:.-]\s*/i, '').trim();
+        }
+    }
+
+    if (!titulo && lineas.length > 0) {
+        titulo = lineas[0].substring(0, 60);
+    }
+
+    const stopWords = new Set(['para', 'con', 'los', 'las', 'del', 'una', 'por', 'que', 'mas', 'más', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'todo', 'toda', 'todos', 'todas', 'otro', 'otra', 'otros', 'otras', 'mismo', 'misma', 'importante', 'empresa', 'busca', 'buscamos', 'incorporar', 'personal', 'puesto', 'vacante', 'requisitos', 'excluyente', 'deseable', 'experiencia', 'años', 'año', 'zona', 'horario', 'enviar', 'correo', 'asunto', 'disponibilidad', 'inmediata', 'trabajo', 'laboral', 'minima', 'mínima', 'comprobable', 'tierra', 'fuego', 'grande', 'ushuaia', 'hola', 'buenas', 'dias', 'tardes']);
+
+    const palabras = limpio
+        .toLowerCase()
+        .replace(/[^\wáéíóúñü\s]/g, ' ')
+        .split(/\s+/)
+        .filter(p => p.length > 3 && !stopWords.has(p) && !/^\d+$/.test(p));
+
+    const unicas = [];
+    if (puestoContexto && puestoContexto.trim().includes(' ')) {
+        unicas.push(puestoContexto.trim().toLowerCase().replace(/\s+/g, '_'));
+    }
+    for (const p of palabras) {
+        if (!unicas.includes(p) && unicas.length < 15) unicas.push(p);
+    }
+
+    return {
+        empresa: empresa || 'Empresas Generales',
+        titulo: titulo || 'Vacante General',
+        keywords: unicas.join(' ')
+    };
+}
+
+app.post('/api/analizar-requisitos', authMiddleware, upload.single('archivoRequisitos'), async (req, res) => {
+    try {
+        const textoDirecto = req.body.textoRequisitos ? req.body.textoRequisitos.trim() : '';
+        const puestoContexto = req.body.puestoContexto ? req.body.puestoContexto.trim() : '';
+        const empresaContexto = req.body.empresaContexto ? req.body.empresaContexto.trim() : '';
+
+        if (!req.file && !textoDirecto && !puestoContexto) {
+            return res.json({ success: false, error: 'Subí un archivo (PDF, Word o Imagen) o pegá el texto de la búsqueda.' });
+        }
+
+        let textoPlano = textoDirecto;
+        if (req.file) {
+            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+                try {
+                    const pdfData = await pdfParse(req.file.buffer);
+                    textoPlano = `${textoPlano}\n${pdfData.text || ''}`.trim();
+                } catch (e) {}
+            } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+                try {
+                    const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+                    textoPlano = `${textoPlano}\n${wordResult.value || ''}`.trim();
+                } catch (e) {}
+            }
+        }
+
+        const prompt = `Analiza la siguiente búsqueda laboral para la empresa "${empresaContexto || 'Cliente'}" y el puesto "${puestoContexto || 'Vacante'}".
+Extrae las palabras clave técnicas, oficios, herramientas, funciones, licencias y competencias más importantes para filtrar CVs en un motor ATS, separadas por espacio.
+Para el nombre del puesto o términos compuestos usa guion bajo (ej: "jefe_de_cocina", "pastelero", "panaderia", "reposteria", "manipulacion_de_alimentos") además de las palabras sueltas clave. Si el aviso aclara algo excluyente que NO quieren, agrégalo con signo menos delante.
+
+Responde ESTRICTAMENTE en formato JSON puro:
+{
+  "empresa": "${empresaContexto || 'Nombre de la Empresa'}",
+  "titulo": "${puestoContexto || 'Título del puesto'}",
+  "keywords": "palabra1 palabra2 frase_compuesta...",
+  "textoExtraido": "Resumen claro de los requisitos leídos del archivo o imagen"
+}
+${textoPlano ? `\nTexto del pedido:\n${textoPlano}` : ''}`;
+
+        const parts = [prompt];
+        if (req.file) {
+            if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
+            } else if (req.file.mimetype && req.file.mimetype.startsWith('image/')) {
+                parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
+            }
+        }
+
+        try {
+            const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 40));
+            if (datos && datos.keywords) {
+                return res.json({ success: true, datos });
+            }
+        } catch (errIA) {
+            console.warn("Usando extractor local de requisitos:", errIA.message);
+        }
+
+        const datosRespaldo = extraerRequisitosLocalmente(textoPlano, puestoContexto);
+        return res.json({ success: true, datos: datosRespaldo });
+    } catch (error) {
+        console.error("Error al analizar requisitos:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
+    try {
+        if (!req.file) return res.json({ success: false, error: 'No se subió archivo' });
+        let textoPlano = '';
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+            try {
+                const pdfData = await pdfParse(req.file.buffer);
+                textoPlano = pdfData.text;
+            } catch (e) {}
+        } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
+            const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+            textoPlano = wordResult.value;
+        }
+
+        const prompt = `Analiza este CV completo (incluso si tiene diseño en columnas, tablas o recuadros) y extrae toda la información estructurada de forma lineal para un sistema ATS en formato JSON puro. Si no encuentras un dato personal, déjalo vacío ("").
+        {
+          "nombre": "Nombre y apellido completo",
+          "dni": "Documento DNI (solo números, sin puntos)",
+          "email": "Correo electrónico",
+          "telefono": "Número de teléfono",
+          "direccion": "Domicilio y localidad",
+          "resumen": "Resumen ejecutivo sintético de 4 líneas (sin copiar las experiencias palabra por palabra)",
+          "experiencia": "Todas las experiencias laborales detalladas en renglones separados con viñetas (•), una viñeta por empresa",
+          "estudios": "Todos los estudios, cursos realizados, capacitaciones técnicas y carnets en renglones separados con viñetas (•)",
+          "habilidades": "Lista completa de habilidades técnicas, conocimientos, licencias y aptitudes separadas por ' • '"
+        }
+        ${textoPlano ? `Texto auxiliar del CV: ${textoPlano}` : ''}`;
+
+        const parts = [prompt];
+        if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
+            parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: 'application/pdf' } });
+        }
+
+        const datos = await generarConGeminiSeguro(parts, prompt, Boolean(textoPlano && textoPlano.length > 100));
+        return res.json({ success: true, datos });
+    } catch (error) {
+        console.error("Error en autocompletado:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/candidatos', authMiddleware, async (req, res) => {
+    try {
+        const rawCandidatos = await Candidato.find({}, {
+            id: 1, empresa: 1, puestoRequerido: 1, nombre: 1, dni: 1, email: 1,
+            telefono: 1, direccion: 1, disponibilidad: 1, datosPersonalesExtra: 1,
+            resumen: 1, experiencia: 1, estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
+            cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
+            cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado:

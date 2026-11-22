@@ -47,6 +47,7 @@ const candidatoSchema = new mongoose.Schema({
     telefono: String,
     direccion: String,
     disponibilidad: String,
+    disponibilidadViajar: String,
     datosPersonalesExtra: String,
     resumen: String,
     experiencia: String,
@@ -106,7 +107,7 @@ async function enviarAlertaEmail(candidato) {
                 from: 'Mi Trabajo TDF <onboarding@resend.dev>',
                 to: ['mitrabajotdf@gmail.com'],
                 subject: `🔔 ¡Nuevo CV Cargado: ${candidato.nombre} (${candidato.puestoRequerido})!`,
-                html: `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>¡Nuevo Postulante Registrado! 🚀</h2><p><strong>👤 Nombre:</strong> ${candidato.nombre}</p><p><strong>💼 Puesto:</strong> ${candidato.puestoRequerido}</p></div>`
+                html: `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>¡Nuevo Postulante Registrado! 🚀</h2><p><strong>👤 Nombre:</strong> ${candidato.nombre}</p><p><strong>💼 Puesto:</strong> ${candidato.puestoRequerido}</p><p><strong>✈️ Disponibilidad para viajar:</strong> ${candidato.disponibilidadViajar || 'No especificada'}</p></div>`
             })
         }, 8000);
     } catch (error) {
@@ -451,15 +452,17 @@ Debes generar el CV ATS Optimizado del candidato combinando:
 
 REGLAS OBLIGATORIAS:
 1) "puestoSugerido": Si la vacante declarada está vacía o dice "General", redacta un objetivo corto acorde a su perfil real. Si ya tenía un puesto claro, mantenlo.
-2) "datosPersonalesExtra": Únicamente datos personales adicionales del CV (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay, devuelve "".
-3) "resumen": Redacta un Resumen Profesional ejecutivo y fluido de 4 a 5 líneas (70 a 100 palabras). Sintetiza su perfil, años/solidez de experiencia, rubros principales, cursos más relevantes y fortalezas clave. PROHIBIDO copiar listas de tareas o cortar abreviaturas como "Escuela Dr.".
-4) "experiencia": CADA puesto/empresa en una viñeta "• " separada por salto de línea (\\n). NUNCA juntes dos empresas distintas en la misma viñeta.
-5) "estudios": CADA estudio o curso en su propia viñeta "• " separada por salto de línea (\\n), incluyendo todo lo del Panel y lo del CV original.
-6) "habilidades": Lista limpia de competencias técnicas y blandas separadas por " • ".
+2) "datosPersonalesExtra": Únicamente datos personales adicionales del CV (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay, devuelve "". (NO pongas aquí la disponibilidad para viajar porque ya tiene su campo propio).
+3) "disponibilidadViajarDetectada": Si en el CV menciona explícitamente disponibilidad para viajar o radicarse en otro lugar devuelve "Sí", si aclara que no puede viajar devuelve "No", si no menciona nada devuelve "".
+4) "resumen": Redacta un Resumen Profesional ejecutivo y fluido de 4 a 5 líneas (70 a 100 palabras). Sintetiza su perfil, años/solidez de experiencia, rubros principales, cursos más relevantes y fortalezas clave. PROHIBIDO copiar listas de tareas o cortar abreviaturas como "Escuela Dr.".
+5) "experiencia": CADA puesto/empresa en una viñeta "• " separada por salto de línea (\\n). NUNCA juntes dos empresas distintas en la misma viñeta.
+6) "estudios": CADA estudio o curso en su propia viñeta "• " separada por salto de línea (\\n), incluyendo todo lo del Panel y lo del CV original.
+7) "habilidades": Lista limpia de competencias técnicas y blandas separadas por " • ".
 
 DATOS DEL PANEL / FORMULARIO:
 - Vacante declarada: ${puestoDeclarado || 'Deducir según perfil'}
-- Disponibilidad: ${datosFormulario.disponibilidad || 'Inmediata'}
+- Disponibilidad horaria: ${datosFormulario.disponibilidad || 'Inmediata'}
+- Disponibilidad para viajar: ${datosFormulario.disponibilidadViajar || 'No especificada'}
 - Resumen en Panel: ${resLimpio}
 - Experiencia en Panel: ${expLimpia}
 - Estudios en Panel: ${estLimpio}
@@ -472,6 +475,7 @@ Devuelve ESTRICTAMENTE este JSON puro:
 {
   "puestoSugerido": "",
   "datosPersonalesExtra": "",
+  "disponibilidadViajarDetectada": "",
   "resumen": "",
   "experiencia": "",
   "estudios": "",
@@ -558,6 +562,7 @@ async function optimizarCandidatoExistente(candidato) {
         datosFormulario: {
             puestoRequerido: candidato.puestoRequerido,
             disponibilidad: candidato.disponibilidad,
+            disponibilidadViajar: candidato.disponibilidadViajar,
             resumen: candidato.resumen,
             experiencia: candidato.experiencia,
             estudios: candidato.estudios,
@@ -568,6 +573,9 @@ async function optimizarCandidatoExistente(candidato) {
     if (resultadoGemini) {
         if (!candidato.puestoRequerido || /general(\s*\/\s*sin especificar)?/i.test(candidato.puestoRequerido)) {
             if (resultadoGemini.puestoSugerido) candidato.puestoRequerido = limpiarYCorregirTexto(resultadoGemini.puestoSugerido);
+        }
+        if (!candidato.disponibilidadViajar && resultadoGemini.disponibilidadViajarDetectada) {
+            candidato.disponibilidadViajar = limpiarYCorregirTexto(resultadoGemini.disponibilidadViajarDetectada);
         }
         candidato.datosPersonalesExtra = limpiarYCorregirTexto(resultadoGemini.datosPersonalesExtra || '');
         candidato.resumen = limpiarYCorregirTexto(resultadoGemini.resumen || candidato.resumen);
@@ -587,7 +595,7 @@ async function optimizarCandidatoExistente(candidato) {
 
 app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
     try {
-        let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
+        let { empresa, puestoRequerido, nombre, dni, email, telefono, direccion, disponibilidad, disponibilidadViajar, resumen, experiencia, estudios, habilidades, habilidadesDuras, habilidadesBlandas } = req.body;
         let datosPersonalesExtra = '', cvData = '', cvContentType = '', nombreArchivoOriginal = '', cvBuffer = null;
         let fotoData = '', fotoContentType = '', cartaData = '', cartaContentType = '', nombreArchivoCarta = '', cartaBuffer = null;
         let textoPlanoExtraido = '', textoCartaExtraido = '';
@@ -632,12 +640,15 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         const resultadoGemini = await fusionarYOptimizarCVConGemini({
             cvBuffer, cvMimeType: cvContentType, textoPlanoExtraido,
             cartaBuffer, cartaMimeType: cartaContentType, textoCartaExtraido,
-            datosFormulario: { puestoRequerido, disponibilidad, resumen, experiencia, estudios, habilidades }
+            datosFormulario: { puestoRequerido, disponibilidad, disponibilidadViajar, resumen, experiencia, estudios, habilidades }
         });
 
         if (resultadoGemini) {
             if (!puestoRequerido || /general(\s*\/\s*sin especificar)?/i.test(puestoRequerido)) {
                 puestoRequerido = resultadoGemini.puestoSugerido || puestoRequerido;
+            }
+            if (!disponibilidadViajar && resultadoGemini.disponibilidadViajarDetectada) {
+                disponibilidadViajar = resultadoGemini.disponibilidadViajarDetectada;
             }
             datosPersonalesExtra = resultadoGemini.datosPersonalesExtra || '';
             resumen = resultadoGemini.resumen || resumen;
@@ -662,6 +673,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             telefono: limpiarYCorregirTexto(telefono),
             direccion: limpiarYCorregirTexto(direccion),
             disponibilidad: limpiarYCorregirTexto(disponibilidad) || 'Inmediata',
+            disponibilidadViajar: limpiarYCorregirTexto(disponibilidadViajar) || 'No especificada',
             datosPersonalesExtra: limpiarYCorregirTexto(datosPersonalesExtra),
             resumen: limpiarYCorregirTexto(resumen),
             experiencia: limpiarYCorregirTexto(experiencia),
@@ -693,6 +705,7 @@ app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) =>
         return res.json({
             success: true,
             nombre: candidato.nombre,
+            disponibilidadViajar: candidato.disponibilidadViajar,
             datosPersonalesExtra: candidato.datosPersonalesExtra,
             resumen: candidato.resumen,
             experiencia: candidato.experiencia,
@@ -708,7 +721,7 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
         const candidato = await Candidato.findOne({ id: Number(req.params.id) });
         if (!candidato) return res.json({ success: false, error: 'Candidato no encontrado' });
-        const campos = ['empresa', 'puestoRequerido', 'nombre', 'dni', 'email', 'telefono', 'direccion', 'resumen', 'experiencia', 'estudios', 'habilidades'];
+        const campos = ['empresa', 'puestoRequerido', 'nombre', 'dni', 'email', 'telefono', 'direccion', 'disponibilidad', 'disponibilidadViajar', 'resumen', 'experiencia', 'estudios', 'habilidades'];
         for (const c of campos) {
             if (req.body[c] !== undefined) candidato[c] = limpiarYCorregirTexto(req.body[c]);
         }
@@ -789,7 +802,7 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
         <body><div class="header">${fotoSrc ? `<img src="${fotoSrc}" class="foto" alt="Foto">` : ''}<div class="info"><h1>${candidato.nombre}</h1>
         <p>📍 ${candidato.direccion || 'No especificada'} | 📞 ${candidato.telefono || 'S/D'} | 📧 ${candidato.email || 'S/D'} | <strong>DNI:</strong> ${candidato.dni || 'S/D'}</p>
         ${candidato.datosPersonalesExtra ? `<p>${candidato.datosPersonalesExtra}</p>` : ''}
-        <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad}</p></div></div>
+        <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad || 'Inmediata'} | <strong>Disponibilidad para viajar:</strong> ${candidato.disponibilidadViajar || 'No especificada'}</p></div></div>
         <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
         <div class="section"><h3>Experiencia Laboral</h3><p style="white-space:pre-line">${candidato.experiencia || 'No especificada'}</p></div>
         <div class="section"><h3>Estudios y Formación</h3><p style="white-space:pre-line">${candidato.estudios || 'No especificados'}</p></div>
@@ -964,8 +977,8 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
         } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
             textoPlano = (await mammoth.extractRawText({ buffer: req.file.buffer })).value;
         }
-        const prompt = `Extrae toda la información de este CV para un sistema ATS en JSON puro:
-{"nombre":"","dni":"","email":"","telefono":"","direccion":"","resumen":"","experiencia":"","estudios":"","habilidades":""}
+        const prompt = `Extrae toda la información de este CV para un sistema ATS en JSON puro (en disponibilidadViajar coloca "Sí", "No" o "" si no lo menciona):
+{"nombre":"","dni":"","email":"","telefono":"","direccion":"","disponibilidadViajar":"","resumen":"","experiencia":"","estudios":"","habilidades":""}
 ${textoPlano ? `Texto auxiliar: ${textoPlano}` : ''}`;
         const parts = [prompt];
         if (esBufferPDF(req.file.buffer) || req.file.mimetype === 'application/pdf') {
@@ -982,7 +995,7 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
     try {
         const rawCandidatos = await Candidato.find({}, {
             id: 1, empresa: 1, puestoRequerido: 1, nombre: 1, dni: 1, email: 1,
-            telefono: 1, direccion: 1, disponibilidad: 1, datosPersonalesExtra: 1,
+            telefono: 1, direccion: 1, disponibilidad: 1, disponibilidadViajar: 1, datosPersonalesExtra: 1,
             resumen: 1, experiencia: 1, estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
             cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
             cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,

@@ -116,9 +116,10 @@
             box-sizing: border-box;
             outline: none;
             transition: border-color 0.2s;
+            background-color: white;
         }
 
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             border-color: var(--secondary);
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
@@ -242,7 +243,7 @@
                 • <strong>Lunes a Viernes:</strong> de 13:00 a 20:00 hs.<br>
                 • <strong>Sábados:</strong> de 09:00 a 13:00 hs.<br><br>
                 🤖 <strong>Compatible con Filtros ATS:</strong> Los sistemas automáticos leen de forma lineal y suelen descartar diseños en columnas o gráficos. Por favor, <strong>escribí o copiá tu texto de manera directa y ordenada</strong>.<br><br>
-                💡 <strong>Importante para tu Entrevista:</strong> En <em>Mi Trabajo TDF</em> mejoramos y reestructuramos tu CV con formato ATS. Es fundamental que **revises tu nuevo formato optimizado** para conocer al detalle cada sección; si una empresa te llama o te hace preguntas sobre tu trayectoria, debés estar preparado y seguro para responder en la entrevista.
+                💡 <strong>Importante para tu Entrevista:</strong> En <em>Mi Trabajo TDF</em> mejoramos y reestructuramos tu CV con formato ATS. Es fundamental que <strong>revises tu nuevo formato optimizado</strong> para conocer al detalle cada sección; si una empresa te llama o te hace preguntas sobre tu trayectoria, debés estar preparado y seguro para responder en la entrevista.
             </div>
 
             <div class="form-group">
@@ -293,6 +294,15 @@
             <div class="form-group">
                 <label>Disponibilidad Horaria <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
                 <input type="text" id="disponibilidad" name="disponibilidad" required placeholder="Ej: Inmediata, Part-time, Full-time">
+            </div>
+            <div class="form-group">
+                <label>Disponibilidad para Viajar <span style="color: #ef4444; font-weight: bold;">*</span>:</label>
+                <select id="disponibilidadViajar" name="disponibilidadViajar" required>
+                    <option value="" disabled selected>Seleccioná una opción...</option>
+                    <option value="Sí">Sí</option>
+                    <option value="No">No</option>
+                    <option value="A convenir / Eventual">A convenir / Eventual</option>
+                </select>
             </div>
 
             <h3>Información Profesional (Formato Lineal ATS)</h3>
@@ -382,13 +392,20 @@
                 if (data.datos.email) document.querySelector('[name="email"]').value = data.datos.email;
                 if (data.datos.telefono) document.querySelector('[name="telefono"]').value = data.datos.telefono;
                 if (data.datos.direccion) document.querySelector('[name="direccion"]').value = data.datos.direccion;
+                if (data.datos.disponibilidadViajar) {
+                    const valViaje = data.datos.disponibilidadViajar.toLowerCase();
+                    const selectViaje = document.querySelector('[name="disponibilidadViajar"]');
+                    if (valViaje.includes('si') || valViaje.includes('sí')) selectViaje.value = 'Sí';
+                    else if (valViaje.includes('no')) selectViaje.value = 'No';
+                    else if (valViaje.includes('convenir') || valViaje.includes('eventual')) selectViaje.value = 'A convenir / Eventual';
+                }
                 if (data.datos.resumen) document.querySelector('[name="resumen"]').value = data.datos.resumen;
                 if (data.datos.experiencia) document.querySelector('[name="experiencia"]').value = data.datos.experiencia;
                 if (data.datos.estudios) document.querySelector('[name="estudios"]').value = data.datos.estudios;
                 if (data.datos.habilidades) document.querySelector('[name="habilidades"]').value = data.datos.habilidades;
                 
                 msg.style.color = '#10b981';
-                msg.textContent = '✅ ¡Formulario autocompletado! Revisá los datos y hacé clic en "Enviar Postulación Final".';
+                msg.textContent = '✅ ¡Formulario autocompletado! Revisá los datos (incluyendo Disponibilidad para Viajar) y hacé clic en "Enviar Postulación Final".';
             } else {
                 msg.style.color = '#ef4444';
                 msg.textContent = '❌ No se pudo extraer texto del archivo. Por favor, completá los datos manualmente.';

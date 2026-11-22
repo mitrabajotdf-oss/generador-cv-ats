@@ -100,14 +100,19 @@ function normalizarTextoATS(str) {
         .trim();
 }
 
+function buscarCandidatoPorId(id) {
+    return todosLosCandidatos.find(x => String(x.id) === String(id) || String(x._id) === String(id));
+}
+
 if (listaCandidatosDiv) {
     async function inicializarPanel() {
         try {
             listaCandidatosDiv.innerHTML = '<p style="text-align:center; padding: 20px; color:#64748b;">Cargando directorios y vacantes desde MongoDB...</p>';
 
+            const ts = Date.now();
             const [resCand, resBusq] = await Promise.all([
-                fetch('/api/candidatos', { credentials: 'include' }),
-                fetch('/api/busquedas', { credentials: 'include' })
+                fetch(`/api/candidatos?t=${ts}`, { credentials: 'include', cache: 'no-store' }),
+                fetch(`/api/busquedas?t=${ts}`, { credentials: 'include', cache: 'no-store' })
             ]);
 
             if (!resCand.ok) throw new Error(`Error HTTP: ${resCand.status}`);
@@ -289,9 +294,10 @@ async function optimizarUnLegajoIA(idCandidato, botonElemento) {
         botonElemento.textContent = '⏳ Leyendo PDF con IA...';
     }
     try {
-        const res = await fetch(`/api/candidatos/optimizar-ia/${idCandidato}`, {
+        const res = await fetch(`/api/candidatos/optimizar-ia/${encodeURIComponent(idCandidato)}`, {
             method: 'POST',
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
         const data = await res.json();
         if (data.success) {
@@ -326,14 +332,16 @@ async function ejecutarMigracionIA() {
         const cand = todosLosCandidatos[i];
         if (!cand.cvData && !cand.cartaData) continue;
 
+        const idUsar = cand.id || cand._id;
         if (btn) {
             btn.textContent = `⏳ Procesando (${i + 1}/${todosLosCandidatos.length}): ${cand.nombre}...`;
         }
 
         try {
-            const res = await fetch(`/api/candidatos/optimizar-ia/${cand.id}`, {
+            const res = await fetch(`/api/candidatos/optimizar-ia/${encodeURIComponent(idUsar)}`, {
                 method: 'POST',
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store'
             });
             const data = await res.json();
             if (data.success) {
@@ -388,34 +396,36 @@ function construirGrillaTarjetasHTML(listaFiltrada) {
     let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">';
 
     listaFiltrada.forEach(c => {
+        const idSeguro = String(c.id || c._id);
+
         let badgeColor = '#64748b';
         if (c.porcentaje >= 75) badgeColor = '#16a34a';
         else if (c.porcentaje >= 40) badgeColor = '#d97706';
 
         let avatarHtml = '<div style="width: 50px; height: 50px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid #cbd5e1;">Sin foto</div>';
         if (c.fotoData) {
-            avatarHtml = `<img src="/api/foto/${c.id}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
+            avatarHtml = `<img src="/api/foto/${encodeURIComponent(idSeguro)}" alt="Foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db;">`;
         }
 
         const nombreArchivoCV = c.nombreArchivoCV || 'Documento CV';
         const linkCvOriginal = c.cvData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${nombreArchivoCV}">📄 ${nombreArchivoCV}</span>
-                   <a href="/api/descargar-cv/${c.id}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📄 ${nombreArchivoCV}</span>
+                   <a href="/api/descargar-cv/${encodeURIComponent(idSeguro)}" style="background:#0284c7; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>` 
             : '<div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">📂 Sin archivo de CV</div>';
 
         const linkFotoOriginal = c.fotoData
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
                    <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📷 Foto de Perfil</span>
-                   <a href="/api/descargar-foto/${c.id}" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+                   <a href="/api/descargar-foto/${encodeURIComponent(idSeguro)}" style="background:#8b5cf6; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>`
             : '';
 
         const linkCarta = c.cartaData 
             ? `<div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-bottom: 6px; font-size: 12px; display: flex; align-items: center; justify-content: space-between;">
-                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;" title="${c.nombreArchivoCarta}">📜 Carta de Recomendación</span>
-                   <a href="/api/descargar-carta/${c.id}" style="background:#10b981; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
+                   <span style="color: #334155; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">📜 Carta de Recomendación</span>
+                   <a href="/api/descargar-carta/${encodeURIComponent(idSeguro)}" style="background:#10b981; color:white; padding:3px 8px; text-decoration:none; border-radius:4px; font-size:11px; font-weight:500;">📥 Descargar</a>
                </div>` 
             : '';
 
@@ -441,7 +451,7 @@ function construirGrillaTarjetasHTML(listaFiltrada) {
                 ${avatarHtml}
                 <div style="overflow: hidden;">
                     <div style="font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-bottom: 2px;">🏢 EMPRESA: ${c.empresa || 'Base de Datos General'}</div>
-                    <div style="font-size: 15px; font-weight: bold; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.nombre}">${c.nombre}</div>
+                    <div style="font-size: 15px; font-weight: bold; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${c.nombre}</div>
                     <div style="font-size: 11px; color: #64748b;">DNI: ${c.dni || 'S/D'}</div>
                 </div>
             </div>
@@ -463,24 +473,24 @@ function construirGrillaTarjetasHTML(listaFiltrada) {
                     ${linkCarta}
                     
                     <div style="display: flex; gap: 6px; margin-top: 6px;">
-                        <button onclick='abrirModalEdicion(${JSON.stringify(c)})' style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">✏️ Editar Datos</button>
-                        <button onclick="optimizarUnLegajoIA(${c.id}, this)" style="background: #8b5cf6; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">⚡ Optimizar con IA</button>
+                        <button type="button" onclick="abrirModalEdicion('${idSeguro}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">✏️ Editar Datos</button>
+                        <button type="button" onclick="optimizarUnLegajoIA('${idSeguro}', this)" style="background: #8b5cf6; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1;">⚡ Optimizar con IA</button>
                     </div>
                     
                     <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; margin-top: 10px;">
                         <div style="font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 5px;">🔄 Reponer / Subir Archivos:</div>
-                        <input type="file" id="panelCv_${c.id}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;" title="CV">
-                        <input type="file" id="panelFoto_${c.id}" accept="image/*" style="font-size: 11px; margin-bottom: 4px; display:block;" title="Foto">
-                        <input type="file" id="panelCarta_${c.id}" accept=".pdf,.doc,.docx,image/*" style="font-size: 11px; margin-bottom: 6px; display:block;" title="Carta">
-                        <button onclick="subirArchivosDesdePanel(${c.id})" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: 100%;">Guardar Archivos Nuevos</button>
+                        <input type="file" id="panelCv_${idSeguro}" accept=".pdf,.doc,.docx" style="font-size: 11px; margin-bottom: 4px; display:block;" title="CV">
+                        <input type="file" id="panelFoto_${idSeguro}" accept="image/*" style="font-size: 11px; margin-bottom: 4px; display:block;" title="Foto">
+                        <input type="file" id="panelCarta_${idSeguro}" accept=".pdf,.doc,.docx,image/*" style="font-size: 11px; margin-bottom: 6px; display:block;" title="Carta">
+                        <button type="button" onclick="subirArchivosDesdePanel('${idSeguro}')" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: 100%;">Guardar Archivos Nuevos</button>
                     </div>
                 </div>
             </div>
             <div style="background: #f8fafc; padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
-                <button onclick='verCVATS(${JSON.stringify(c)})' style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 CV ATS Optimizado (Sin Foto)</button>
+                <button type="button" onclick="verCVATS('${idSeguro}')" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%;">📄 CV ATS Optimizado (Sin Foto)</button>
                 <div style="display: flex; gap: 6px;">
-                    <a href="/api/cv-empresa/${c.id}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Corporativo</a>
-                    <button onclick="eliminarCandidato(${c.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️</button>
+                    <a href="/api/cv-empresa/${encodeURIComponent(idSeguro)}?t=${Date.now()}" target="_blank" style="background: #3b82f6; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; flex: 1; text-align: center;">🏢 CV Corporativo</a>
+                    <button type="button" onclick="eliminarCandidato('${idSeguro}')" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">🗑️</button>
                 </div>
             </div>
         </div>`;
@@ -542,129 +552,187 @@ function filtrarSubcarpetas(texto) {
     renderizarListaTarjetasPostulantes();
 }
 
-function abrirModalEdicion(c) {
+// ✏️ Modal de Edición 100% inmune a comillas y caracteres especiales
+function abrirModalEdicion(idOCandidato) {
+    const c = (typeof idOCandidato === 'object' && idOCandidato !== null)
+        ? idOCandidato
+        : buscarCandidatoPorId(idOCandidato);
+
+    if (!c) {
+        alert('⚠️ No se encontró el legajo. Presioná CTRL + F5 para recargar el panel.');
+        return;
+    }
+
     let modalExistente = document.getElementById('modalEdicionCandidato');
     if (modalExistente) modalExistente.remove();
 
-    const valorViajarActual = c.disponibilidadViajar || '';
+    const idGuardar = String(c.id || c._id);
 
     const modalHtml = `
-    <div id="modalEdicionCandidato" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
+    <div id="modalEdicionCandidato" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; box-sizing: border-box;">
         <div style="background: white; width: 100%; max-width: 650px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-            <h2 style="margin-top:0; color:#1e293b; font-size: 20px;">✏️ Editar Legajo de ${c.nombre}</h2>
-            <form id="formEditarCandidato" onsubmit="guardarEdicionCandidato(event, ${c.id})">
+            <h2 id="tituloModalEdicion" style="margin-top:0; color:#1e293b; font-size: 20px;">✏️ Editar Legajo</h2>
+            <form id="formEditarCandidato" novalidate>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Empresa a la que postula:</label>
-                        <input type="text" id="editEmpresa" value="${c.empresa || 'Base de Datos General'}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editEmpresa" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Puesto Requerido / Vacante:</label>
-                        <input type="text" id="editPuesto" value="${c.puestoRequerido || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editPuesto" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Nombre Completo:</label>
-                        <input type="text" id="editNombre" value="${c.nombre || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editNombre" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">DNI:</label>
-                        <input type="text" id="editDni" value="${c.dni || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editDni" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Email:</label>
-                        <input type="email" id="editEmail" value="${c.email || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editEmail" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Teléfono:</label>
-                        <input type="text" id="editTelefono" value="${c.telefono || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editTelefono" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Dirección / Localidad:</label>
-                    <input type="text" id="editDireccion" value="${c.direccion || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;" placeholder="Ej: Calle 123, Río Grande">
+                    <input type="text" id="editDireccion" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;" placeholder="Ej: Calle 123, Río Grande">
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Disponibilidad Horaria:</label>
-                        <input type="text" id="editDisponibilidad" value="${c.disponibilidad || 'Inmediata'}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                        <input type="text" id="editDisponibilidad" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold; color: #475569;">Disponibilidad para Viajar:</label>
-                        <select id="editDisponibilidadViajar" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: white;">
-                            <option value="" ${valorViajarActual === '' ? 'selected' : ''}>Sin especificar</option>
-                            <option value="Sí" ${valorViajarActual === 'Sí' ? 'selected' : ''}>Sí</option>
-                            <option value="No" ${valorViajarActual === 'No' ? 'selected' : ''}>No</option>
-                            <option value="A convenir / Eventual" ${valorViajarActual === 'A convenir / Eventual' ? 'selected' : ''}>A convenir / Eventual</option>
+                        <select id="editDisponibilidadViajar" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: white; box-sizing: border-box;">
+                            <option value="">Sin especificar</option>
+                            <option value="Sí">Sí</option>
+                            <option value="No">No</option>
+                            <option value="A convenir / Eventual">A convenir / Eventual</option>
                         </select>
                     </div>
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Resumen Profesional:</label>
-                    <textarea id="editResumen" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.resumen || ''}</textarea>
+                    <textarea id="editResumen" rows="4" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;"></textarea>
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Experiencia Laboral:</label>
-                    <textarea id="editExperiencia" rows="5" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.experiencia || ''}</textarea>
+                    <textarea id="editExperiencia" rows="6" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;"></textarea>
                 </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Estudios y Formación:</label>
-                    <textarea id="editEstudios" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.estudios || ''}</textarea>
+                    <textarea id="editEstudios" rows="4" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;"></textarea>
                 </div>
                 <div style="margin-bottom: 20px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Habilidades:</label>
-                    <input type="text" id="editHabilidades" value="${c.habilidades || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    <textarea id="editHabilidades" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box;"></textarea>
                 </div>
                 
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" onclick="document.getElementById('modalEdicionCandidato').remove()" style="background: #cbd5e1; color: #334155; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">Cancelar</button>
-                    <button type="submit" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">💾 Guardar Cambios</button>
+                    <button type="submit" id="btnGuardarEdicionModal" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">💾 Guardar Cambios</button>
                 </div>
             </form>
         </div>
     </div>`;
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Cargamos todos los valores por propiedades DOM (evita cortes por comillas o saltos de línea)
+    document.getElementById('tituloModalEdicion').textContent = `✏️ Editar Legajo de ${c.nombre || 'Candidato'}`;
+    document.getElementById('editEmpresa').value = c.empresa || 'Base de Datos General';
+    document.getElementById('editPuesto').value = c.puestoRequerido || '';
+    document.getElementById('editNombre').value = c.nombre || '';
+    document.getElementById('editDni').value = c.dni || '';
+    document.getElementById('editEmail').value = c.email || '';
+    document.getElementById('editTelefono').value = c.telefono || '';
+    document.getElementById('editDireccion').value = c.direccion || '';
+    document.getElementById('editDisponibilidad').value = c.disponibilidad || 'Inmediata';
+    document.getElementById('editDisponibilidadViajar').value = c.disponibilidadViajar || '';
+    document.getElementById('editResumen').value = c.resumen || '';
+    document.getElementById('editExperiencia').value = c.experiencia || '';
+    document.getElementById('editEstudios').value = c.estudios || '';
+    document.getElementById('editHabilidades').value = c.habilidades || '';
+
+    document.getElementById('formEditarCandidato').addEventListener('submit', function(ev) {
+        guardarEdicionCandidato(ev, idGuardar);
+    });
 }
 
 async function guardarEdicionCandidato(event, idCandidato) {
     event.preventDefault();
+
+    const btnSubmit = document.getElementById('btnGuardarEdicionModal');
+    if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = '⏳ Guardando...';
+    }
+
     const datosEditados = {
-        empresa: document.getElementById('editEmpresa').value,
-        puestoRequerido: document.getElementById('editPuesto').value,
-        nombre: document.getElementById('editNombre').value,
-        dni: document.getElementById('editDni').value,
-        email: document.getElementById('editEmail').value,
-        telefono: document.getElementById('editTelefono').value,
-        direccion: document.getElementById('editDireccion').value,
-        disponibilidad: document.getElementById('editDisponibilidad').value,
+        empresa: document.getElementById('editEmpresa').value.trim(),
+        puestoRequerido: document.getElementById('editPuesto').value.trim(),
+        nombre: document.getElementById('editNombre').value.trim(),
+        dni: document.getElementById('editDni').value.trim(),
+        email: document.getElementById('editEmail').value.trim(),
+        telefono: document.getElementById('editTelefono').value.trim(),
+        direccion: document.getElementById('editDireccion').value.trim(),
+        disponibilidad: document.getElementById('editDisponibilidad').value.trim(),
         disponibilidadViajar: document.getElementById('editDisponibilidadViajar').value,
-        resumen: document.getElementById('editResumen').value,
-        experiencia: document.getElementById('editExperiencia').value,
-        estudios: document.getElementById('editEstudios').value,
-        habilidades: document.getElementById('editHabilidades').value
+        resumen: document.getElementById('editResumen').value.trim(),
+        experiencia: document.getElementById('editExperiencia').value.trim(),
+        estudios: document.getElementById('editEstudios').value.trim(),
+        habilidades: document.getElementById('editHabilidades').value.trim()
     };
 
     try {
-        const res = await fetch(`/api/candidatos/editar/${idCandidato}`, {
+        const res = await fetch(`/api/candidatos/editar/${encodeURIComponent(idCandidato)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(datosEditados),
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
         const data = await res.json();
         if (data.success) {
-            alert('¡Legajo actualizado con éxito!');
-            document.getElementById('modalEdicionCandidato').remove();
-            location.reload();
+            // Actualizamos en memoria en el acto para ver los cambios de inmediato sin depender del caché
+            const idx = todosLosCandidatos.findIndex(x => String(x.id) === String(idCandidato) || String(x._id) === String(idCandidato));
+            if (idx !== -1) {
+                todosLosCandidatos[idx] = {
+                    ...todosLosCandidatos[idx],
+                    ...datosEditados,
+                    habilidadesDuras: datosEditados.habilidades,
+                    ...(data.candidato || {})
+                };
+            }
+            const modal = document.getElementById('modalEdicionCandidato');
+            if (modal) modal.remove();
+            renderizarExploradorCarpetas();
+            alert('✅ ¡Legajo guardado con éxito! Ya podés abrir el CV ATS o el CV Corporativo con tus cambios.');
         } else {
-            alert('Error al actualizar.');
+            alert('⚠️ Error al actualizar: ' + (data.error || 'No se pudo guardar en MongoDB'));
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = '💾 Guardar Cambios';
+            }
         }
     } catch (e) {
-        alert('Error de conexión.');
+        console.error('Error al editar:', e);
+        alert('⚠️ Error de conexión con el servidor al guardar.');
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = '💾 Guardar Cambios';
+        }
     }
 }
 
@@ -684,7 +752,7 @@ async function subirArchivosDesdePanel(idCandidato) {
     }
 
     try {
-        const res = await fetch(`/api/candidatos/actualizar-archivos/${idCandidato}`, {
+        const res = await fetch(`/api/candidatos/actualizar-archivos/${encodeURIComponent(idCandidato)}`, {
             method: 'POST',
             body: formData,
             credentials: 'include'
@@ -811,7 +879,7 @@ function renderizarSubcarpetasBusquedas() {
 
                 <div style="display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
                     <button onclick="abrirSubcarpetaPuesto(${b.id})" style="background: #16a34a; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; flex: 1;">📂 Abrir / Cargar Aviso</button>
-                    ${b.keywords ? `<button onclick='evaluarSubcarpetaBusqueda(${JSON.stringify(b.keywords)}, ${JSON.stringify(empresaCarpetaAbierta + " - " + b.titulo)}, ${JSON.stringify(b.empresa)})' style="background: #0284c7; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; flex: 1;">🔍 Filtrar CVs (${compatibles})</button>` : ''}
+                    ${b.keywords ? `<button onclick="evaluarSubcarpetaPorId(${b.id})" style="background: #0284c7; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; flex: 1;">🔍 Filtrar CVs (${compatibles})</button>` : ''}
                     <button onclick="eliminarSubcarpetaBusqueda(${b.id})" style="background: #fee2e2; color: #dc2626; border: none; padding: 8px 10px; border-radius: 6px; font-weight: 600; cursor: pointer;" title="Eliminar subcarpeta">🗑️</button>
                 </div>
             </div>`;
@@ -839,7 +907,7 @@ function renderizarSubcarpetasBusquedas() {
                     <h3 style="margin: 2px 0 0 0; font-size: 20px; color: #0f172a;">📂 Subcarpeta de Puesto: ${subActual.titulo}</h3>
                 </div>
                 ${subActual.keywords ? `
-                <button onclick='evaluarSubcarpetaBusqueda(${JSON.stringify(subActual.keywords)}, ${JSON.stringify(subActual.empresa + " - " + subActual.titulo)}, ${JSON.stringify(subActual.empresa)})' style="background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
+                <button onclick="evaluarSubcarpetaPorId(${subActual.id})" style="background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
                     🔍 Ver Candidatos Compatibles (${compatiblesAhora})
                 </button>` : ''}
             </div>
@@ -901,6 +969,12 @@ function renderizarSubcarpetasBusquedas() {
     </div>`;
 
     return html;
+}
+
+function evaluarSubcarpetaPorId(idSub) {
+    const sub = carpetasBusquedas.find(x => x.id === Number(idSub));
+    if (!sub) return;
+    evaluarSubcarpetaBusqueda(sub.keywords, `${sub.empresa} - ${sub.titulo}`, sub.empresa);
 }
 
 function navegarRaizEmpresas() {
@@ -1046,7 +1120,8 @@ async function guardarCambiosSubcarpeta(idSubcarpeta, silencioso = false) {
         const res = await fetch(`/api/busquedas/editar/${idSubcarpeta}`, {
             method: 'POST',
             credentials: 'include',
-            body: formData
+            body: formData,
+            cache: 'no-store'
         });
         const data = await res.json();
         if (data.success && data.busqueda) {
@@ -1102,7 +1177,16 @@ function evaluarSubcarpetaBusqueda(keywords, tituloCompleto = '', empresaNombre 
     renderizarExploradorCarpetas();
 }
 
-function verCVATS(c) {
+function verCVATS(idOCandidato) {
+    const c = (typeof idOCandidato === 'object' && idOCandidato !== null)
+        ? idOCandidato
+        : buscarCandidatoPorId(idOCandidato);
+
+    if (!c) {
+        alert('⚠️ No se encontró el legajo.');
+        return;
+    }
+
     const habilidadesFinales = c.habilidades || 'Administración • Gestión • Trabajo en Equipo';
     let experienciaFinal = c.experiencia || '';
 
@@ -1159,7 +1243,7 @@ function verCVATS(c) {
 async function eliminarCandidato(id) {
     if (!confirm('¿Estás seguro de eliminar este legajo?')) return;
     try {
-        const res = await fetch(`/api/candidatos/${id}`, { method: 'DELETE', credentials: 'include' });
+        const res = await fetch(`/api/candidatos/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' });
         const data = await res.json();
         if (data.success) location.reload();
         else alert('No se pudo eliminar.');

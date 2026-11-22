@@ -177,6 +177,8 @@ function evaluarAfinidadDetallada(candidato, textoBusqueda, empresaSolicitante =
     const palabrasPositivas = terminosCrudos.filter(p => !p.startsWith('-'));
     const palabrasNegativas = terminosCrudos.filter(p => p.startsWith('-')).map(p => p.substring(1));
 
+    const etiquetaViajeATS = candidato.disponibilidadViajar === 'Sí' ? 'disponibilidad para viajar viaje' : (candidato.disponibilidadViajar || '');
+
     const textoCompletoNormalizado = normalizarTextoATS(`
         ${candidato.nombre || ''}
         ${candidato.dni || ''}
@@ -184,6 +186,7 @@ function evaluarAfinidadDetallada(candidato, textoBusqueda, empresaSolicitante =
         ${candidato.puestoRequerido || ''}
         ${candidato.direccion || ''}
         ${candidato.disponibilidad || ''}
+        ${etiquetaViajeATS}
         ${candidato.datosPersonalesExtra || ''}
         ${candidato.habilidades || ''}
         ${candidato.habilidadesDuras || ''}
@@ -369,7 +372,7 @@ function obtenerCandidatosFiltradosActuales() {
     if (textoBuscadorRapido && textoBuscadorRapido.trim() !== '') {
         const q = normalizarTextoATS(textoBuscadorRapido);
         listaFiltrada = listaFiltrada.filter(c => {
-            const blob = normalizarTextoATS(`${c.nombre} ${c.dni} ${c.puestoRequerido} ${c.empresa} ${c.direccion} ${c.telefono} ${c.email} ${c.habilidades} ${c.experiencia} ${c.estudios}`);
+            const blob = normalizarTextoATS(`${c.nombre} ${c.dni} ${c.puestoRequerido} ${c.empresa} ${c.direccion} ${c.telefono} ${c.email} ${c.disponibilidad} ${c.disponibilidadViajar} ${c.habilidades} ${c.experiencia} ${c.estudios}`);
             return blob.includes(q);
         });
     }
@@ -448,6 +451,7 @@ function construirGrillaTarjetasHTML(listaFiltrada) {
                     <strong>📍 Dirección:</strong> ${c.direccion || 'No especificada'}<br>
                     <strong>📧 Email:</strong> ${c.email || 'No cargado'}<br>
                     <strong>📞 Tel:</strong> ${c.telefono || 'No cargado'}<br>
+                    <strong>🕒 Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'} | <strong>✈️ Viajar:</strong> ${c.disponibilidadViajar || 'No especificada'}<br>
                     <strong>📅 Postulación:</strong> ${c.fecha}
                 </div>
                 ${bloqueAfinidadHTML}
@@ -542,6 +546,8 @@ function abrirModalEdicion(c) {
     let modalExistente = document.getElementById('modalEdicionCandidato');
     if (modalExistente) modalExistente.remove();
 
+    const valorViajarActual = c.disponibilidadViajar || '';
+
     const modalHtml = `
     <div id="modalEdicionCandidato" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
         <div style="background: white; width: 100%; max-width: 650px; border-radius: 12px; padding: 25px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
@@ -581,6 +587,21 @@ function abrirModalEdicion(c) {
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Dirección / Localidad:</label>
                     <input type="text" id="editDireccion" value="${c.direccion || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;" placeholder="Ej: Calle 123, Río Grande">
                 </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Disponibilidad Horaria:</label>
+                        <input type="text" id="editDisponibilidad" value="${c.disponibilidad || 'Inmediata'}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569;">Disponibilidad para Viajar:</label>
+                        <select id="editDisponibilidadViajar" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: white;">
+                            <option value="" ${valorViajarActual === '' ? 'selected' : ''}>Sin especificar</option>
+                            <option value="Sí" ${valorViajarActual === 'Sí' ? 'selected' : ''}>Sí</option>
+                            <option value="No" ${valorViajarActual === 'No' ? 'selected' : ''}>No</option>
+                            <option value="A convenir / Eventual" ${valorViajarActual === 'A convenir / Eventual' ? 'selected' : ''}>A convenir / Eventual</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="margin-bottom: 12px;">
                     <label style="font-size: 12px; font-weight: bold; color: #475569;">Resumen Profesional:</label>
                     <textarea id="editResumen" rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">${c.resumen || ''}</textarea>
@@ -619,6 +640,8 @@ async function guardarEdicionCandidato(event, idCandidato) {
         email: document.getElementById('editEmail').value,
         telefono: document.getElementById('editTelefono').value,
         direccion: document.getElementById('editDireccion').value,
+        disponibilidad: document.getElementById('editDisponibilidad').value,
+        disponibilidadViajar: document.getElementById('editDisponibilidadViajar').value,
         resumen: document.getElementById('editResumen').value,
         experiencia: document.getElementById('editExperiencia').value,
         estudios: document.getElementById('editEstudios').value,
@@ -1116,6 +1139,7 @@ function verCVATS(c) {
                 <br><strong>Empresa de interés:</strong> ${c.empresa || 'Base de Datos General'}
                 ${c.puestoRequerido ? ` | <strong>Objetivo / Vacante:</strong> ${c.puestoRequerido}` : ''}
                 | <strong>Disponibilidad:</strong> ${c.disponibilidad || 'Inmediata'}
+                | <strong>Disponibilidad para viajar:</strong> ${c.disponibilidadViajar || 'No especificada'}
             </div>
             <h2>Resumen Profesional</h2>
             <p>${resumenLimpio}</p>

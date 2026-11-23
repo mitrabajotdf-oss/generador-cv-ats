@@ -67,6 +67,7 @@ const candidatoSchema = new mongoose.Schema({
     nombreArchivoCarta: String,
     textoExtraidoCV: String,
     fecha: String,
+    editadoManualmente: { type: Boolean, default: false },
     pagado: { type: Boolean, default: false }
 });
 
@@ -99,7 +100,7 @@ async function buscarCandidatoDB(paramId) {
     return null;
 }
 
-async function fetchConTimeout(url, options = {}, timeoutMs = 28000) {
+async function fetchConTimeout(url, options = {}, timeoutMs = 30000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -228,7 +229,7 @@ function convertirATextoSeguro(valor, modo = 'lineas') {
         const items = valor.map(item => {
             if (typeof item === 'string') return item.trim();
             if (item && typeof item === 'object') {
-                const partes = [item.cargo || item.puesto || item.titulo, item.empresa || item.institucion, item.periodo || item.fecha, item.descripcion || item.funciones || item.detalle].filter(Boolean);
+                const partes = [item.empresa || item.institucion, item.cargo || item.puesto || item.titulo, item.periodo || item.fecha, item.descripcion || item.funciones || item.detalle].filter(Boolean);
                 return partes.join(' — ');
             }
             return String(item || '').trim();
@@ -261,7 +262,7 @@ function capitalizarPrimeraLetra(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// 🧹 Limpiador de Habilidades (elimina subtítulos intermedios y fusiona equivalentes redundantes)
+// 🧹 Limpiador profundo de Habilidades (elimina subtítulos y fusiona equivalentes/duplicados)
 function limpiarYDeduplicarHabilidades(textoCrudo) {
     const base = convertirATextoSeguro(textoCrudo, 'habilidades');
     if (!base) return '';
@@ -293,23 +294,35 @@ function limpiarYDeduplicarHabilidades(textoCrudo) {
                 descartar = true;
                 break;
             }
-            // Si uno está contenido completamente en otro más específico (ej: "Gestión Documental" dentro de "Gestión Administrativa y Documental", o "Facturación" dentro de "Facturación y Cobranzas"), nos quedamos con el más completo
+            if ((claveNueva.includes('copilot') || claveNueva.includes('inteligencia artificial') || claveNueva.includes('integracion de ia')) &&
+                (claveExistente.includes('copilot') || claveExistente.includes('inteligencia artificial') || claveExistente.includes('integracion de ia'))) {
+                if (item.length > resultado[i].length) resultado[i] = item;
+                descartar = true;
+                break;
+            }
+            if ((claveNueva.includes('atencion al cliente') || claveNueva.includes('atencion a clientes')) &&
+                (claveExistente.includes('atencion al cliente') || claveExistente.includes('atencion a clientes'))) {
+                if (item.length > resultado[i].length) resultado[i] = item;
+                descartar = true;
+                break;
+            }
+            if (claveNueva.includes('control de stock') && claveExistente.includes('control de stock')) {
+                resultado[i] = 'Control de Stock, Inventarios y Proveedores';
+                descartar = true;
+                break;
+            }
+            if ((claveNueva === 'facturacion' && claveExistente.includes('cobranzas')) ||
+                (claveNueva === 'caja y cobranzas' && claveExistente.includes('facturacion'))) {
+                resultado[i] = 'Facturación, Caja y Cobranzas';
+                descartar = true;
+                break;
+            }
             if (claveNueva.length >= 10 && claveExistente.includes(claveNueva)) {
                 descartar = true;
                 break;
             }
             if (claveExistente.length >= 10 && claveNueva.includes(claveExistente)) {
                 resultado[i] = item;
-                descartar = true;
-                break;
-            }
-            if (claveNueva === 'caja y cobranzas' && claveExistente.includes('facturacion y cobranzas')) {
-                resultado[i] = 'Facturación, Caja y Cobranzas';
-                descartar = true;
-                break;
-            }
-            if (claveNueva.includes('integracion de inteligencia artificial') && claveExistente.includes('integracion de ia')) {
-                resultado[i] = 'Integración de IA en Procesos (Copilot y Gemini)';
                 descartar = true;
                 break;
             }
@@ -323,29 +336,89 @@ function limpiarYDeduplicarHabilidades(textoCrudo) {
     return resultado.join(' • ');
 }
 
-// 🧹 Limpiador profundo de Experiencia: separa asteriscos intermedios (* EMPRESA), une tareas sueltas y ordena lo más actual primero
+// 🔪 Separa dos puestos laborales que hayan venido pegados en el mismo renglón (ej. JOW KON + Carga y Descarga LOGÍSTICA FUEGUINA, o STEAL + Ayudante de Albañil)
+function partirPuestosPegadosEnLinea(texto) {
+    if (!texto) return '';
+    let t = texto;
+
+    // Separa si después de un punto seguido arranca un nuevo título de cargo típico seguido de empresa o funciones
+    const patronNuevoCargoDespuesDePunto = /\.\s+(?=(?:Carga y Descarga(?: de Camiones)?|Ayudante de (?:Albañil|Cocina|Taller|Panader[ií]a|Pasteler[ií]a)|Administrativo de|Supervisor de|Operario de|Encargado de|Jefe de|Personal de Limpieza|Seguridad Privada|Vendedor(?:a)? y|Atenci[oó]n al P[uú]blico en)\b)/gi;
+    t = t.replace(patronNuevoCargoDespuesDePunto, '.\n• ');
+
+    // Separa si hay un asterisco intermedio antes de empresa en mayúsculas
+    t = t.replace(/\s+\*\s+(?=[A-ZÁÉÍÓÚÑ0-9])/g, '\n• ')
+         .replace(/^\*\s+/gm, '• ');
+
+    return t;
+}
+
+// 📐 Da formato ejecutivo uniforme ("• EMPRESA — Cargo | Período: Descripción...") a cada renglón de experiencia cuando le faltan guiones o dos puntos
+function estructurarViñetaExperiencia(lineaCruda) {
+    let l = corregirOrtografiaComun(lineaCruda.replace(/^[-•*]\s*/, '').trim());
+    if (!l) return '';
+
+    // Si ya viene bien estructurada con "—" y ":" o "|", solo pulimos espacios
+    if (l.includes('—') && (l.includes(':') || l.includes('|'))) {
+        return l.replace(/\s+/g, ' ').trim();
+    }
+
+    // Caso 1: Empieza con EMPRESA EN MAYÚSCULAS seguida de Cargo y Período (ej: "ESCRIBANÍA BITSH Asistente de Escrituración... Abril 2024 – Actualidad Promoción...")
+    const matchEmpresaPrimero = l.match(/^([A-ZÁÉÍÓÚÑ0-9][A-ZÁÉÍÓÚÑ0-9\s.&'°º-]{2,38}?)\s+((?:Asistente|Auxiliar|Vendedor|Vendedora|Supervisor|Supervisora|Encargado|Encargada|Jefe|Jefa|Operario|Operaria|Administrativo|Administrativa|Emprendedor|Emprendedora|Titular|Fundador|Fundadora|Cocinero|Cocinera|Pastelero|Pastelera|Cajero|Cajera|Recepcionista|Coordinador|Coordinadora|Analista|Técnico|Técnica)[^0-9\n]{2,55}?)\s+((?:Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre|\d{4})[^.\n]{2,28}?(?:Actualidad|Presente|\d{4}))\s*[:.-]?\s*(.+)$/i);
+    if (matchEmpresaPrimero) {
+        const [, emp, cargo, periodo, resto] = matchEmpresaPrimero;
+        if (emp === emp.toUpperCase()) {
+            const desc = resto.replace(/Funciones principales:\s*/gi, '').replace(/\s*Logro destacado:\s*/gi, ' Logro destacado: ').trim();
+            return `${emp.trim()} — ${cargo.trim()} | ${periodo.trim()}: ${capitalizarPrimeraLetra(desc)}`;
+        }
+    }
+
+    // Caso 2: Empieza con Cargo seguido de EMPRESA EN MAYÚSCULAS o Depósito/Institución (ej: "Administrativo de Depósito Fiscal JOW KON LOGÍSTICA S.R.L. Gestión...")
+    const matchCargoEmpresaMayus = l.match(/^((?:Administrativo|Supervisor|Operario|Encargado|Jefe|Ayudante|Personal|Seguridad|Carga y Descarga|Vendedor|Cajero|Auxiliar|Técnico)[a-záéíóúñA-ZÁÉÍÓÚÑ0-9\s°º/]{2,50}?)\s+([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ.]{2,})*(?:\s+S\.R\.L\.|\s+S\.A\.)?)\s+(?=[A-ZÁÉÍÓÚÑ][a-záéíóúñ])(.+)$/);
+    if (matchCargoEmpresaMayus) {
+        const [, cargo, emp, resto] = matchCargoEmpresaMayus;
+        return `${emp.trim()} — ${cargo.trim()}: ${capitalizarPrimeraLetra(resto.trim())}`;
+    }
+
+    // Caso 3: Cargo en Depósito Fiscal N° X + Persona/Despachante o Descripción directa
+    const matchDeposito = l.match(/^((?:Administrativo|Supervisor|Operario)\s+de\s+Depósito\s+Fiscal\s+N[°º.]*\s*\d+)(?:\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3}\s+Despachante de Aduana(?:\s+y\s+ATA)?))?\s+((?:Supervisión|Gestión|Control|Recepción|Coordinación).+)$/i);
+    if (matchDeposito) {
+        const [, cargoDep, empleador, resto] = matchDeposito;
+        const titulo = empleador ? `${empleador.trim()} — ${cargoDep.trim()}` : cargoDep.trim();
+        return `${titulo}: ${capitalizarPrimeraLetra(resto.trim())}`;
+    }
+
+    // Caso 4: Oficio independiente (ej: "Ayudante de Albañil Apoyo en tareas generales...")
+    const matchOficio = l.match(/^((?:Ayudante de Albañil|Ayudante de Cocina|Servicio Doméstico| Emprendedor Independiente))\s+((?:Apoyo|Asistencia|Preparación|Atención|Gestión|Realización).+)$/i);
+    if (matchOficio) {
+        return `${matchOficio[1].trim()}: ${capitalizarPrimeraLetra(matchOficio[2].trim())}`;
+    }
+
+    return capitalizarPrimeraLetra(l);
+}
+
 function limpiarYOrdenarExperiencia(textoCrudo) {
     const base = convertirATextoSeguro(textoCrudo, 'lineas');
     if (!base) return '';
 
-    // 1. Si hay un "* " en medio de un renglón (ej. "* DESPENSA LA MORENITA" o "* DOLCE CAPRICCIO"), lo abrimos en un renglón nuevo
-    let pre = base
-        .replace(/\s+\*\s+(?=[A-ZÁÉÍÓÚÑ0-9])/g, '\n• ')
-        .replace(/^\*\s+/gm, '• ');
-
+    const pre = partirPuestosPegadosEnLinea(base);
     const lineas = pre.split('\n')
         .map(l => limpiarSimbolosDecorativos(l).replace(/^[-•*]\s*/, '').trim())
         .filter(Boolean);
 
-    // 2. Unimos renglones de tareas sueltas que hayan quedado cortadas debajo de su empresa
     const consolidadas = [];
     for (const l of lineas) {
         if (/^(EXPERIENCIA(\s+LABORAL)?|ANTECEDENTES(\s+LABORALES)?|ESTUDIOS(\s+Y\s+FORMACI[OÓ]N)?|FORMACI[OÓ]N\s+ACAD[EÉ]MICA|CURSOS(\s+Y\s+CAPACITACIONES)?|HABILIDADES.*)$/i.test(l)) {
             continue;
         }
 
-        const tieneAnioOEmpresa = /\b(19\d{2}|20\d{2}|Actualidad|Presente|S\.R\.L\.|S\.A\.)\b/i.test(l) || /^[A-ZÁÉÍÓÚÑ0-9\s.&'-]{4,35}\s*[—–-]/.test(l) || /^[A-ZÁÉÍÓÚÑ]{4,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+/.test(l);
-        const pareceTareaSuelta = !tieneAnioOEmpresa && consolidadas.length > 0 && /^(Facturaci[oó]n|Manejo de|Implementaci[oó]n|Coordinaci[oó]n|Atenci[oó]n|Control de|Gesti[oó]n de|Preparaci[oó]n|Solicitud|Seguimiento|Organizaci[oó]n|Apertura|Administraci[oó]n|Promoci[oó]n|Recepci[oó]n|Carga y|Cumplimiento|Logro destacado)/i.test(l);
+        const esInicioPuestoClaro =
+            /\b(19\d{2}|20\d{2}|Actualidad|Presente|S\.R\.L\.|S\.A\.)\b/i.test(l) ||
+            /^[A-ZÁÉÍÓÚÑ0-9\s.&'-]{4,35}\s*[—–-]/.test(l) ||
+            /^(Administrativo|Supervisor|Operario|Carga y Descarga|Seguridad Privada|Personal de Limpieza|Ayudante de)\b/i.test(l) ||
+            /^[A-ZÁÉÍÓÚÑ]{4,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+/.test(l);
+
+        const pareceTareaSuelta = !esInicioPuestoClaro && consolidadas.length > 0 &&
+            /^(Facturaci[oó]n|Manejo de|Implementaci[oó]n|Coordinaci[oó]n|Atenci[oó]n|Control de|Gesti[oó]n de|Preparaci[oó]n|Solicitud|Seguimiento|Organizaci[oó]n|Apertura|Administraci[oó]n|Promoci[oó]n|Recepci[oó]n|Cumplimiento|Logro destacado)/i.test(l);
 
         if (pareceTareaSuelta) {
             const ant = consolidadas[consolidadas.length - 1].replace(/\.*$/, '');
@@ -355,37 +428,56 @@ function limpiarYOrdenarExperiencia(textoCrudo) {
         }
     }
 
-    // 3. Deduplicamos y ordenamos poniendo "Actualidad" / años más recientes primero
-    const unicas = [];
+    const estructuradas = [];
     const vistas = new Set();
     for (const item of consolidadas) {
-        const limpio = corregirOrtografiaComun(capitalizarPrimeraLetra(item));
-        const clave = normalizarClaveComparacion(limpio).substring(0, 35);
+        const formateado = estructurarViñetaExperiencia(item);
+        const clave = normalizarClaveComparacion(formateado).substring(0, 38);
         if (clave && !vistas.has(clave)) {
             vistas.add(clave);
-            unicas.push(limpio);
+            estructuradas.push(formateado);
         }
     }
 
-    unicas.sort((a, b) => {
-        const score = (txt) => {
-            const tieneAct = /\b(actualidad|presente|en curso)\b/i.test(txt) ? 10000 : 0;
-            const anios = (txt.match(/\b(19\d{2}|20\d{2})\b/g) || []).map(Number);
-            const maxAnio = anios.length > 0 ? Math.max(...anios) : 0;
-            return tieneAct + maxAnio;
-        };
-        return score(b) - score(a);
-    });
+    // Ordena cronológicamente si tienen fechas; si ninguno tiene años (como un CV funcional), conserva el orden natural
+    const algunoTieneFecha = estructuradas.some(t => /\b(actualidad|presente|19\d{2}|20\d{2})\b/i.test(t));
+    if (algunoTieneFecha) {
+        estructuradas.sort((a, b) => {
+            const score = (txt) => {
+                const tieneAct = /\b(actualidad|presente|en curso)\b/i.test(txt) ? 10000 : 0;
+                const anios = (txt.match(/\b(19\d{2}|20\d{2})\b/g) || []).map(Number);
+                const maxAnio = anios.length > 0 ? Math.max(...anios) : 0;
+                return tieneAct + maxAnio;
+            };
+            return score(b) - score(a);
+        });
+    }
 
-    return unicas.map(u => `• ${u}`).join('\n');
+    return estructuradas.map(u => `• ${u}`).join('\n');
 }
 
-// 🧹 Limpiador profundo de Estudios y Formación: elimina rótulos "FORMACIÓN ACADÉMICA" / "CURSOS Y CAPACITACIONES" y separa cada estudio en su propia viñeta limpia
+// 📐 Formatea cada estudio separando claramente Título — Institución (Detalle/Año)
+function estructurarViñetaEstudio(lineaCruda) {
+    let l = corregirOrtografiaComun(lineaCruda.replace(/^[-•*:]+\s*/, '').trim())
+        .replace(/\bCURSOS Y\s*$/i, '')
+        .replace(/^CAPACITACIONES\s*/i, '')
+        .trim();
+
+    if (!l) return '';
+    if (l.includes('—')) return l;
+
+    // Separa instituciones conocidas cuando quedaron pegadas sin guión
+    l = l.replace(/\s+(Colegio Provincial|Escuela|Instituto|Universidad|Centro de Formación|FATSA FORMAR|NNEMELS)\b/i, ' — $1')
+         .replace(/\s*–\s*(Modalidad Virtual)\s+([A-ZÁÉÍÓÚÑ]{2,})$/i, ' — $2 ($1)')
+         .replace(/\.\s+(Instituto\b)/i, ' — $1');
+
+    return capitalizarPrimeraLetra(l);
+}
+
 function limpiarEstudiosYFormacion(textoCrudo) {
     const base = convertirATextoSeguro(textoCrudo, 'lineas');
     if (!base) return '';
 
-    // 1. Quitamos sub-encabezados internos pegados al principio, al medio o al final de los renglones
     let pre = base
         .replace(/\b(FORMACI[OÓ]N\s+ACAD[EÉ]MICA|CURSOS\s+Y\s+CAPACITACIONES|ESTUDIOS\s+Y\s+FORMACI[OÓ]N|EDUCACI[OÓ]N\s+Y\s+FORMACI[OÓ]N|CURSOS\s+REALIZADOS)\b\s*[:*-]*/gi, '\n')
         .replace(/\bCURSOS\s+Y\s*$/gim, '')
@@ -410,11 +502,7 @@ function limpiarEstudiosYFormacion(textoCrudo) {
     const unicas = [];
     const vistas = new Set();
     for (const item of expandidas) {
-        const limpio = corregirOrtografiaComun(capitalizarPrimeraLetra(item))
-            .replace(/\bCURSOS Y\s*$/i, '')
-            .replace(/^CAPACITACIONES\s*/i, '')
-            .trim();
-
+        const limpio = estructurarViñetaEstudio(item);
         if (limpio.length < 4) continue;
         if (/^(ESTUDIOS|FORMACI[OÓ]N|CAPACITACIONES|CURSOS|HABILIDADES|EXPERIENCIA)$/i.test(limpio)) continue;
 
@@ -456,6 +544,7 @@ function limpiarTextoPrevioFormulario(texto) {
     return t
         .replace(/^Perfil versátil con sólida experiencia en[\s\S]*$/gi, '')
         .replace(/^Perfil profesional especializado en [^.]+\. (?:Ha desarrollado funciones|Cuenta con experiencia)[\s\S]*$/gi, '')
+        .replace(/^Cuenta con trayectoria comprobable desempeñándose en[\s\S]*$/gi, '')
         .replace(/^Perfil postulado para [^.]+\.\s*/gi, '')
         .replace(/^Postulante para [^.]+\.\s*/gi, '')
         .replace(/^Perfil profesional orientado al área de [^.]+\.\s*/gi, '')
@@ -522,8 +611,7 @@ async function obtenerModelosActivos() {
             const soportados = data.models
                 .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
                 .map(m => m.name.replace('models/', ''));
-            // Ponemos gemini-2.5-flash-lite y gemini-2.0-flash primero porque responden en 2-3s sin latencia de thinking ni error 400
-            const preferidos = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+            const preferidos = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-1.5-flash'];
             const ordenados = preferidos.filter(p => soportados.includes(p));
             const otros = soportados.filter(s => s.includes('flash') && !ordenados.includes(s));
             modelosDisponiblesCache = [...ordenados, ...otros];
@@ -532,17 +620,16 @@ async function obtenerModelosActivos() {
     } catch (e) {
         console.warn('Aviso al listar modelos:', e.message);
     }
-    return ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    return ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
 }
 
-// 🚀 Conexión estándar compatible con todos los modelos Gemini (sin thinkingConfig que provoque error 400)
 async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
     const apiKey = (process.env.GEMINI_API_KEY || '').replace(/["'\s]/g, '');
     if (!apiKey) throw new Error('Falta configurar GEMINI_API_KEY en Render');
 
     const modelos = await obtenerModelosActivos();
     const baseApi = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
-    const generationConfig = { temperature: 0.2, responseMimeType: 'application/json' };
+    const generationConfig = { temperature: 0.25, responseMimeType: 'application/json' };
     let ultimoError = null;
 
     const partsREST = partsConArchivos.map(p => {
@@ -551,7 +638,7 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
         return p;
     });
 
-    for (const modelo of modelos.slice(0, 3)) {
+    for (const modelo of modelos.slice(0, 4)) {
         const url = baseApi + '/' + modelo + ':generateContent?key=' + apiKey;
 
         try {
@@ -559,7 +646,7 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contents: [{ parts: partsREST }], generationConfig })
-            }, 28000);
+            }, 32000);
             const data = await resp.json();
             if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
                 console.log(`✅ Optimización IA exitosa con ${modelo}`);
@@ -580,7 +667,7 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: promptSoloTexto }] }], generationConfig })
-                }, 22000);
+                }, 24000);
                 const dataTexto = await respTexto.json();
                 if (dataTexto.candidates && dataTexto.candidates[0]?.content?.parts?.[0]?.text) {
                     console.log(`✅ Optimización IA exitosa (modo texto) con ${modelo}`);
@@ -594,19 +681,65 @@ async function generarConGeminiSeguro(partsConArchivos, promptSoloTexto) {
     throw ultimoError || new Error('Tiempo de espera agotado con Gemini');
 }
 
-function resumirTitularExperiencia(lineaExp) {
-    const limpia = lineaExp.replace(/^[-•*]\s*/, '').trim();
-    const protegida = limpia
-        .replace(/\b(Dr|Sr|Sra|Lic|Ing|Prof|Tec)\./gi, '$1_PUNTO_')
-        .replace(/S\.R\.L\./gi, 'SRL_PUNTO_')
-        .replace(/S\.A\./gi, 'SA_PUNTO_');
+// ✍️ Redactor ejecutivo completo de respaldo (genera un Resumen Profesional rico de 5 a 6 líneas reales sin truncar nombres de empresas)
+function redactarResumenEjecutivoLocal({ expFinal, estFinal, habFinal, disponibilidad, disponibilidadViajar }) {
+    const textoTotal = `${expFinal}\n${estFinal}\n${habFinal}`.toLowerCase();
 
-    const primerBloque = protegida.split(/\.\s+|:\s+/)[0].replace(/_PUNTO_/g, '.');
-    if (primerBloque.length <= 75) return primerBloque.replace(/[.;:,]+$/, '').trim();
-    return limpia.substring(0, 68).replace(/\s+\S*$/, '').replace(/[.;:,]+$/, '').trim();
+    // 1. Detectamos especialidades reales para abrir con fuerza profesional
+    const especialidades = [];
+    if (/dep[oó]sito fiscal|aduana|aduaner|despachante|comercio exterior/.test(textoTotal)) especialidades.push('Operatoria en Depósitos Fiscales y Gestión Aduanera');
+    if (/log[ií]stica|stock|inventario|recepci[oó]n y despacho|cargas/.test(textoTotal)) especialidades.push('Logística Operativa y Control de Inventarios');
+    if (/supervis|conducci[oó]n de equipos|jefe|encargad/.test(textoTotal)) especialidades.push('Supervisión de Equipos de Trabajo');
+    if (/escriban[ií]a|notarial|registral/.test(textoTotal)) especialidades.push('Gestión Notarial y Documental');
+    if (/administraci[oó]n|administrativ|facturaci[oó]n|tango/.test(textoTotal)) especialidades.push('Gestión Administrativa');
+    if (/reclutamiento|selecci[oó]n|ats/.test(textoTotal)) especialidades.push('Reclutamiento Digital');
+    if (/pasteler|panader|reposter|cocina|gastronom/.test(textoTotal)) especialidades.push('Producción Gastronómica y Pastelería');
+    if (/seguridad privada|vigilancia|control de accesos/.test(textoTotal)) especialidades.push('Seguridad Patrimonial');
+    if (/mantenimiento|refrigeraci[oó]n|construcci[oó]n|alba[ñn]il/.test(textoTotal)) especialidades.push('Mantenimiento Técnico y Servicios Operativos');
+    if (/ventas|vendedor|comercial|caja/.test(textoTotal)) especialidades.push('Atención Comercial y Gestión de Caja');
+
+    const aperturaAreas = especialidades.length > 0
+        ? especialidades.slice(0, 3).join(', ')
+        : 'Gestión Operativa, Administrativa y Atención al Cliente';
+
+    // 2. Extraemos los encabezados limpios ("Empresa — Cargo") de sus experiencias ya estructuradas
+    const cabecerasPuestos = expFinal
+        .split('\n')
+        .map(l => l.replace(/^•\s*/, '').split(':')[0].split('|')[0].trim())
+        .filter(c => c.length > 4 && c.length <= 85);
+
+    const oracionTrayectoria = cabecerasPuestos.length > 0
+        ? `Cuenta con sólida trayectoria laboral comprobable habiéndose desempeñado en ${cabecerasPuestos.slice(0, 4).join('; ')}, donde desarrolló solvencia en el seguimiento de procesos, control documental, coordinación operativa y cumplimiento estricto de normativas de calidad y seguridad.`
+        : `Cuenta con sólida trayectoria práctica comprobable en entornos dinámicos, garantizando orden operativo, cumplimiento de procedimientos y orientación a resultados.`;
+
+    // 3. Mencionamos cursos técnicos o formación superior relevante (evitando mencionar "Primario" o "Incompleto" en el resumen)
+    const cursosRelevantes = estFinal
+        .split('\n')
+        .map(l => l.replace(/^•\s*/, '').trim())
+        .filter(e => e.length > 5 && !/\b(primario|incompleto)\b/i.test(e));
+
+    const oracionFormacion = cursosRelevantes.length > 0
+        ? `Complementa su experiencia con capacitación específica en ${cursosRelevantes.slice(0, 2).join(' y ')}, fortaleciendo su perfil técnico para el puesto.`
+        : '';
+
+    // 4. Competencias destacadas + disponibilidad
+    const skills = habFinal.split(' • ').map(s => s.trim()).filter(s => s.length > 3 && s.length <= 48).slice(0, 5);
+    const dispTexto = corregirOrtografiaComun(disponibilidad || 'Full-time');
+    const viajeTexto = disponibilidadViajar === 'Sí' ? ' y disponibilidad para viajar' : '';
+
+    const oracionCierre = skills.length > 0
+        ? `Se destaca por su dominio en ${skills.join(', ')}, aportando responsabilidad, rápida adaptación al trabajo en equipo, disponibilidad ${dispTexto}${viajeTexto}.`
+        : `Se destaca por su compromiso, capacidad resolutiva, trabajo colaborativo y disponibilidad ${dispTexto}${viajeTexto}.`;
+
+    return [
+        `Perfil profesional con amplia experiencia en ${aperturaAreas}.`,
+        oracionTrayectoria,
+        oracionFormacion,
+        oracionCierre
+    ].filter(Boolean).join(' ');
 }
 
-function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario }) {
+function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario, respetarEdicionManual = false }) {
     const textoPreprocesado = (textoPlanoExtraido || '')
         .replace(/\s+(ESTUDIOS Y FORMACI[OÓ]N|EDUCACI[OÓ]N Y FORMACI[OÓ]N|FORMACI[OÓ]N ACAD[EÉ]MICA|CURSOS Y CAPACITACIONES|HABILIDADES Y COMPETENCIAS(?:\s+CLAVE)?|EXPERIENCIA LABORAL|ANTECEDENTES LABORALES|RESUMEN PROFESIONAL)\b/gi, '\n$1\n')
         .replace(/\s+\*\s+(?=[A-ZÁÉÍÓÚÑ0-9])/g, '\n• ');
@@ -651,34 +784,32 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
     const formHabRaw = limpiarTextoPrevioFormulario(datosFormulario.habilidades || '');
     const formResRaw = limpiarTextoPrevioFormulario(datosFormulario.resumen || '');
 
-    const expCombinada = `${formExpRaw}\n${expUnidaPDF.join('\n')}${textoCartaExtraido ? `\nReferencia / Carta de Recomendación adjunta: ${limpiarYCorregirTexto(limpiarSimbolosDecorativos(textoCartaExtraido))}` : ''}`;
-    const expFinal = limpiarYOrdenarExperiencia(expCombinada);
+    // Si el legajo fue editado manualmente en el Panel, respetamos las listas depuradas (sin volver a meter cursos abandonados del PDF)
+    const fuenteExp = (respetarEdicionManual && formExpRaw.trim().length > 15)
+        ? formExpRaw
+        : `${formExpRaw}\n${expUnidaPDF.join('\n')}${textoCartaExtraido ? `\nReferencia / Carta de Recomendación adjunta: ${limpiarYCorregirTexto(limpiarSimbolosDecorativos(textoCartaExtraido))}` : ''}`;
 
-    const estCombinados = `${formEstRaw}\n${estUnidaPDF.join('\n')}`;
-    const estFinal = limpiarEstudiosYFormacion(estCombinados);
+    const fuenteEst = (respetarEdicionManual && formEstRaw.trim().length > 5)
+        ? formEstRaw
+        : `${formEstRaw}\n${estUnidaPDF.join('\n')}`;
 
-    const habFinal = limpiarYDeduplicarHabilidades(`${habUnidaPDF.join(' • ')} • ${formHabRaw}`);
-    const listaHab = habFinal.split(' • ').filter(Boolean);
+    const fuenteHab = (respetarEdicionManual && formHabRaw.trim().length > 10)
+        ? formHabRaw
+        : `${habUnidaPDF.join(' • ')} • ${formHabRaw}`;
 
-    let resumenFinal = '';
-    if (formResRaw && formResRaw.length > 75) {
-        resumenFinal = corregirOrtografiaComun(formResRaw);
-    } else {
-        const lineasExpLimpias = expFinal.split('\n').map(x => x.replace(/^•\s*/, ''));
-        const titularesCortos = lineasExpLimpias.map(resumirTitularExperiencia).filter(t => t.length > 4);
-        const mencionCargos = titularesCortos.length > 0
-            ? `Cuenta con trayectoria comprobable desempeñándose en ${titularesCortos.slice(0, 3).join(', ')}, garantizando precisión operativa, orden administrativo y cumplimiento de objetivos.`
-            : `Aporta sólida experiencia práctica comprobable, adaptándose con eficiencia a estándares de calidad y trabajo colaborativo.`;
+    const expFinal = limpiarYOrdenarExperiencia(fuenteExp);
+    const estFinal = limpiarEstudiosYFormacion(fuenteEst);
+    const habFinal = limpiarYDeduplicarHabilidades(fuenteHab);
 
-        const skillsDestacadas = listaHab.filter(s => s.length < 42).slice(0, 5);
-        const dispLimpia = corregirOrtografiaComun(datosFormulario.disponibilidad || 'inmediata');
-        resumenFinal = [
-            mencionCargos,
-            skillsDestacadas.length > 0
-                ? `Destaca por sus competencias en ${skillsDestacadas.join(', ')}, con compromiso, capacidad resolutiva y disponibilidad ${dispLimpia}.`
-                : `Posee alta capacidad resolutiva, responsabilidad y disponibilidad ${dispLimpia}.`
-        ].join(' ');
-    }
+    const resumenFinal = (formResRaw && formResRaw.length > 160)
+        ? corregirOrtografiaComun(formResRaw)
+        : redactarResumenEjecutivoLocal({
+            expFinal,
+            estFinal,
+            habFinal,
+            disponibilidad: datosFormulario.disponibilidad,
+            disponibilidadViajar: datosFormulario.disponibilidadViajar
+        });
 
     return {
         datosPersonalesExtra: corregirOrtografiaComun(datosExtra.join(' | ')),
@@ -694,7 +825,10 @@ function clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosF
 
 function postProcesarResultadoCV(raw, respaldoLocal) {
     const datosPersonalesExtra = corregirOrtografiaComun(limpiarSimbolosDecorativos(raw.datosPersonalesExtra || respaldoLocal.datosPersonalesExtra));
-    const resumen = limpiarYCorregirTexto(limpiarSimbolosDecorativos(raw.resumen || respaldoLocal.resumen));
+    let resumen = limpiarYCorregirTexto(limpiarSimbolosDecorativos(raw.resumen || respaldoLocal.resumen));
+    if (!resumen || resumen.length < 120) {
+        resumen = respaldoLocal.resumen;
+    }
     const experiencia = limpiarYOrdenarExperiencia(raw.experiencia || respaldoLocal.experiencia) || respaldoLocal.experiencia;
     const estudios = limpiarEstudiosYFormacion(raw.estudios || respaldoLocal.estudios) || respaldoLocal.estudios;
     const habilidades = limpiarYDeduplicarHabilidades(raw.habilidades || respaldoLocal.habilidades) || respaldoLocal.habilidades;
@@ -714,54 +848,64 @@ function postProcesarResultadoCV(raw, respaldoLocal) {
     };
 }
 
-async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario }) {
+async function fusionarYOptimizarCVConGemini({ cvBuffer, cvMimeType, textoPlanoExtraido, cartaBuffer, cartaMimeType, textoCartaExtraido, datosFormulario, respetarEdicionManual = false }) {
     const expLimpia = limpiarTextoPrevioFormulario(datosFormulario.experiencia);
     const resLimpio = limpiarTextoPrevioFormulario(datosFormulario.resumen);
     const estLimpio = limpiarTextoPrevioFormulario(datosFormulario.estudios);
     const habLimpia = limpiarTextoPrevioFormulario(datosFormulario.habilidades);
 
-    const prompt = `Eres un Consultor Senior en Recursos Humanos, Corrección Editorial y Sistemas ATS en Argentina.
-Tu misión es LEER el archivo PDF/DOCX de CV original subido por el candidato Y los datos cargados en el Formulario/Panel, FUSIONAR toda la información real sin omitir nada, CORREGIR la ortografía y redacción, y estructurar un CV ATS 100% LINEAL e IMPECABLE.
+    const reglaPrioridadEdicion = respetarEdicionManual
+        ? `ATENCIÓN CRÍTICA — LEGAJO DEPURADO POR EL RECLUTADOR EN EL PANEL:
+- El reclutador ya editó manualmente este legajo en el Panel para quitar cursos abandonados o habilidades incorrectas.
+- Por lo tanto, en "estudios", "experiencia" y "habilidades" incluye ÚNICAMENTE los ítems que están en "DATOS CARGADOS EN EL PANEL" (puedes usar el PDF solo para enriquecer detalles de funciones o fechas de ESOS MISMOS puestos, pero PROHIBIDO volver a agregar estudios, carreras abandonadas o habilidades del PDF que hayan sido quitados del Panel).`
+        : `FUSIÓN COMPLETA DE POSTULACIÓN:
+- Lee íntegramente el archivo PDF/DOCX de CV subido y lo completado en el Formulario, unificando toda su experiencia, estudios y habilidades reales sin omitir ningún antecedente.`;
 
-REGLAS ESTRICTAS E INQUEBRANTABLES:
-1) ORTOGRAFÍA Y ESTILO IMPECABLES: Corrige tildes, puntuación, mayúsculas en nombres de instituciones, cargos y empresas.
-2) "datosPersonalesExtra": Únicamente datos filiatorios adicionales que estén en el PDF (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay, devuelve "".
-3) "resumen": Redacta un Resumen Profesional ejecutivo, fluido y articulado de 4 a 5 líneas (75 a 105 palabras) que integre su perfil real completo (incluyendo experiencias actuales cargadas en el Panel y en el PDF). Si en el Panel ya hay un buen resumen redactado, púlelo manteniendo todas sus ideas principales.
-4) "experiencia": Ordena CRONOLÓGICAMENTE DE LO MÁS ACTUAL A LO MÁS ANTIGUO (los puestos con "Actualidad" o 2026 van arriba de todo).
-   - Coloca CADA empresa/emprendimiento en UNA SOLA viñeta "• " separada por salto de línea (\\n).
-   - Formato obligatorio de cada viñeta: "• EMPRESA — Cargo | Período: Descripción fluida y bien redactada de todas las funciones y logros en ese puesto."
-   - PROHIBIDO partir las tareas de una misma empresa en varias viñetas sueltas y PROHIBIDO dejar asteriscos "*" en medio del texto.
-5) "estudios": Coloca CADA título académico, tecnicatura, secundario/polimodal o curso de capacitación en su PROPIA viñeta "• " separada por salto de línea (\\n).
-   - Formato limpio de cada viñeta: "• Título o Curso — Institución (Estado o Modalidad)."
-   - PROHIBIDO escribir subtítulos como "FORMACIÓN ACADÉMICA", "CURSOS Y CAPACITACIONES" o dejar asteriscos "*". Solo los estudios y cursos reales, uno por renglón.
-6) "habilidades": Cadena lineal separada ÚNICAMENTE por " • ", sin categorías ni habilidades repetidas o redundantes.
+    const prompt = `Eres un Consultor Senior en Selección de Personal, Redacción Ejecutiva y Sistemas ATS en Argentina.
+${reglaPrioridadEdicion}
+
+REGLAS DE REDACCIÓN Y ESTRUCTURA LINEAL ATS:
+1) ORTOGRAFÍA PERFECTA: Corrige tildes, puntuación, mayúsculas de empresas, cargos e instituciones.
+2) "datosPersonalesExtra": Solo datos filiatorios extra del PDF (Fecha de nacimiento, Edad, CUIL, Estado civil, Teléfono alternativo) separados por " | ". Si no hay, devuelve "".
+3) "resumen": Redacta un RESUMEN PROFESIONAL COMPLETO, SÓLIDO Y EJECUTIVO de 5 a 6 líneas (entre 95 y 135 palabras).
+   - Debe tener redacción fluida y profesional: presentar sus especialidades reales, mencionar las principales empresas y cargos donde se desempeñó, destacar sus responsabilidades de mayor valor (supervisión, gestión aduanera, depósitos fiscales, escrituración, administración, gastronomía, etc.), su capacitación vigente y sus competencias clave.
+   - PROHIBIDO hacer resúmenes cortos o pobres de 2 renglones y PROHIBIDO cortar nombres de empresas.
+4) "experiencia": Separa CADA puesto o empresa en su PROPIA viñeta "• " en un renglón aparte (\\n).
+   - JAMÁS dejes dos cargos o empresas pegados en la misma viñeta (por ejemplo, si aparecen JOW KON LOGÍSTICA y Carga y Descarga LOGÍSTICA FUEGUINA, o STEAL y Ayudante de Albañil, van en viñetas separadas).
+   - Formato obligatorio de cada viñeta para que quede súper ordenado:
+     "• EMPRESA — Cargo | Período (si figura): Redacción profesional y completa de las responsabilidades, operatoria y logros."
+   - Ordena de lo más reciente ("Actualidad") a lo más antiguo.
+5) "estudios": Cada estudio o capacitación vigente va en su PROPIA viñeta "• " separada por salto de línea (\\n), con formato limpio:
+   "• Título o Curso — Institución (Detalle / Año)."
+   Sin subtítulos como "FORMACIÓN ACADÉMICA" ni asteriscos.
+6) "habilidades": Competencias técnicas y blandas reales del perfil separadas ÚNICAMENTE por " • ", sin repetidos ni subtítulos.
 
 DATOS CARGADOS EN EL PANEL / FORMULARIO:
 - Vacante declarada: ${datosFormulario.puestoRequerido || 'Sin especificar'}
-- Disponibilidad horaria: ${datosFormulario.disponibilidad || 'Inmediata'}
+- Disponibilidad horaria: ${datosFormulario.disponibilidad || 'Full-time'}
 - Disponibilidad para viajar: ${datosFormulario.disponibilidadViajar || 'No especificada'}
-- Resumen cargado: ${resLimpio}
-- Experiencia cargada: ${expLimpia}
-- Estudios cargados: ${estLimpio}
-- Habilidades cargadas: ${habLimpia}
+- Resumen en Panel: ${resLimpio}
+- Experiencia en Panel: ${expLimpia}
+- Estudios en Panel: ${estLimpio}
+- Habilidades en Panel: ${habLimpia}
 
-${textoPlanoExtraido ? `TEXTO EXTRAÍDO DEL ARCHIVO PDF/DOCX SUBIDO:\n${textoPlanoExtraido}\n` : ''}
+${textoPlanoExtraido ? `TEXTO DE REFERENCIA DEL ARCHIVO PDF/DOCX:\n${textoPlanoExtraido}\n` : ''}
 ${textoCartaExtraido ? `TEXTO DE CARTA DE RECOMENDACIÓN:\n${textoCartaExtraido}\n` : ''}
 
-Devuelve ESTRICTAMENTE este JSON puro (todos los campos como texto String):
+Devuelve ESTRICTAMENTE este JSON puro (todos los valores como String):
 {
   "datosPersonalesExtra": "",
   "disponibilidadViajarDetectada": "",
   "resumen": "",
-  "experiencia": "• EMPRESA — Cargo | Período: Funciones...\\n• EMPRESA — Cargo | Período: Funciones...",
-  "estudios": "• Título — Institución (Detalle)\\n• Curso — Institución",
+  "experiencia": "• EMPRESA — Cargo: Descripción...\\n• EMPRESA — Cargo: Descripción...",
+  "estudios": "• Título — Institución\\n• Curso — Institución",
   "habilidades": "Habilidad 1 • Habilidad 2 • Habilidad 3",
   "habilidadesDuras": "Habilidad técnica 1 • Habilidad técnica 2",
   "habilidadesBlandas": "Competencia blanda 1 • Competencia blanda 2"
 }`;
 
     const parts = [prompt];
-    if (cvBuffer) {
+    if (!respetarEdicionManual && cvBuffer) {
         if (esBufferPDF(cvBuffer) || cvMimeType === 'application/pdf') {
             parts.push({ inlineData: { data: cvBuffer.toString('base64'), mimeType: 'application/pdf' } });
         } else if (cvMimeType && cvMimeType.startsWith('image/')) {
@@ -776,7 +920,12 @@ Devuelve ESTRICTAMENTE este JSON puro (todos los campos como texto String):
         }
     }
 
-    const respaldoLocal = clasificarCVLocalmente({ textoPlanoExtraido, textoCartaExtraido, datosFormulario });
+    const respaldoLocal = clasificarCVLocalmente({
+        textoPlanoExtraido,
+        textoCartaExtraido,
+        datosFormulario,
+        respetarEdicionManual
+    });
 
     try {
         const respuestaIA = await generarConGeminiSeguro(parts, prompt);
@@ -784,7 +933,7 @@ Devuelve ESTRICTAMENTE este JSON puro (todos los campos como texto String):
             return postProcesarResultadoCV(respuestaIA, respaldoLocal);
         }
     } catch (errIA) {
-        console.warn('Usando clasificador local estructurado:', errIA.message);
+        console.warn('Usando redactor ejecutivo estructurado local:', errIA.message);
     }
     return postProcesarResultadoCV(respaldoLocal, respaldoLocal);
 }
@@ -827,6 +976,7 @@ async function optimizarCandidatoExistente(candidato) {
         cartaBuffer,
         cartaMimeType: candidato.cartaContentType || 'application/pdf',
         textoCartaExtraido,
+        respetarEdicionManual: Boolean(candidato.editadoManualmente),
         datosFormulario: {
             puestoRequerido: candidato.puestoRequerido,
             disponibilidad: candidato.disponibilidad,
@@ -839,7 +989,6 @@ async function optimizarCandidatoExistente(candidato) {
     });
 
     if (resultadoGemini) {
-        // RESPETAMOS SIEMPRE la vacante que puso el postulante o que vos editaste en el Panel (nunca inventamos "Operaciones Logísticas...")
         if (candidato.puestoRequerido) {
             candidato.puestoRequerido = corregirOrtografiaComun(candidato.puestoRequerido.trim());
         } else {
@@ -862,9 +1011,12 @@ async function optimizarCandidatoExistente(candidato) {
         candidato.habilidades = resultadoGemini.habilidades || candidato.habilidades;
         candidato.habilidadesDuras = resultadoGemini.habilidadesDuras || candidato.habilidades;
         candidato.habilidadesBlandas = resultadoGemini.habilidadesBlandas || candidato.habilidadesBlandas;
-        if (resultadoGemini.textoCompletoIntegrado) {
-            candidato.textoExtraidoCV = `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
-        }
+
+        // Si fue editado manualmente, el buscador ATS solo indexa sus datos vigentes (para no matchear cursos abandonados)
+        candidato.textoExtraidoCV = candidato.editadoManualmente
+            ? `${resultadoGemini.textoCompletoIntegrado}`.trim()
+            : `${textoPlanoExtraido}\n${textoCartaExtraido}\n${resultadoGemini.textoCompletoIntegrado}`.trim();
+
         await candidato.save();
         return true;
     }
@@ -918,6 +1070,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
         const resultadoGemini = await fusionarYOptimizarCVConGemini({
             cvBuffer, cvMimeType: cvContentType, textoPlanoExtraido,
             cartaBuffer, cartaMimeType: cartaContentType, textoCartaExtraido,
+            respetarEdicionManual: false,
             datosFormulario: { puestoRequerido, disponibilidad, disponibilidadViajar, resumen, experiencia, estudios, habilidades }
         });
 
@@ -965,6 +1118,7 @@ app.post('/api/enviar-postulacion', upload.any(), async (req, res) => {
             cartaData, cartaContentType, nombreArchivoCarta,
             textoExtraidoCV: `${textoPlanoExtraido || ''}\n${resumen}\n${experiencia}\n${estudios}\n${habilidades}`.trim(),
             fecha: new Date().toLocaleString(),
+            editadoManualmente: false,
             pagado: false
         });
 
@@ -997,6 +1151,7 @@ app.post('/api/candidatos/optimizar-ia/:id', authMiddleware, async (req, res) =>
     }
 });
 
+// ✏️ Al guardar desde Editar Datos, marca `editadoManualmente = true` para que nunca vuelvan a aparecer datos viejos borrados del PDF
 app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
     try {
         const candidato = await buscarCandidatoDB(req.params.id);
@@ -1019,6 +1174,8 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
             candidato.habilidades = limpiarYDeduplicarHabilidades(candidato.habilidades);
             candidato.habilidadesDuras = candidato.habilidades;
         }
+
+        candidato.editadoManualmente = true;
         candidato.textoExtraidoCV = `${candidato.resumen || ''}\n${candidato.experiencia || ''}\n${candidato.estudios || ''}\n${candidato.habilidades || ''}`.trim();
 
         await candidato.save();
@@ -1041,7 +1198,8 @@ app.post('/api/candidatos/editar/:id', authMiddleware, async (req, res) => {
                 experiencia: candidato.experiencia,
                 estudios: candidato.estudios,
                 habilidades: candidato.habilidades,
-                habilidadesDuras: candidato.habilidadesDuras
+                habilidadesDuras: candidato.habilidadesDuras,
+                editadoManualmente: true
             }
         });
     } catch (error) {
@@ -1058,7 +1216,13 @@ app.post('/api/candidatos/actualizar-archivos/:id', authMiddleware, upload.any()
             const cvFile = req.files.find(f => f.fieldname === 'cvFile');
             const fotoPerfil = req.files.find(f => f.fieldname === 'fotoPerfil');
             const cartaFile = req.files.find(f => f.fieldname === 'cartaRecomendacion');
-            if (cvFile) { candidato.cvData = cvFile.buffer.toString('base64'); candidato.cvContentType = cvFile.mimetype; candidato.nombreArchivoCV = cvFile.originalname; }
+            if (cvFile) {
+                candidato.cvData = cvFile.buffer.toString('base64');
+                candidato.cvContentType = cvFile.mimetype;
+                candidato.nombreArchivoCV = cvFile.originalname;
+                // Si se sube un archivo de CV nuevo, habilitamos que vuelva a leer ese PDF nuevo
+                candidato.editadoManualmente = false;
+            }
             if (fotoPerfil) { candidato.fotoData = fotoPerfil.buffer.toString('base64'); candidato.fotoContentType = fotoPerfil.mimetype; }
             if (cartaFile) { candidato.cartaData = cartaFile.buffer.toString('base64'); candidato.cartaContentType = cartaFile.mimetype; candidato.nombreArchivoCarta = cartaFile.originalname; }
             await candidato.save();
@@ -1121,8 +1285,8 @@ app.get('/api/cv-empresa/:id', authMiddleware, async (req, res) => {
         <p>📍 ${candidato.direccion || 'No especificada'} | 📞 ${candidato.telefono || 'S/D'} | 📧 ${candidato.email || 'S/D'} | <strong>DNI:</strong> ${candidato.dni || 'S/D'}</p>
         ${candidato.datosPersonalesExtra ? `<p>${candidato.datosPersonalesExtra}</p>` : ''}
         <p><strong>Puesto al que aplica:</strong> ${candidato.puestoRequerido || 'Sin especificar'} | <strong>Disponibilidad:</strong> ${candidato.disponibilidad || 'Inmediata'} | <strong>Disponibilidad para viajar:</strong> ${candidato.disponibilidadViajar || 'No especificada'}</p></div></div>
-        <div class="section"><h3>Resumen Profesional</h3><p>${candidato.resumen || 'No especificado'}</p></div>
-        <div class="section"><h3>Experiencia Laboral</h3><p style="white-space:pre-line">${candidato.experiencia || 'No especificada'}</p></div>
+        <div class="section"><h3>Resumen Profesional</h3><p style="text-align:justify">${candidato.resumen || 'No especificado'}</p></div>
+        <div class="section"><h3>Experiencia Laboral</h3><p style="white-space:pre-line;text-align:justify">${candidato.experiencia || 'No especificada'}</p></div>
         <div class="section"><h3>Estudios y Formación</h3><p style="white-space:pre-line">${candidato.estudios || 'No especificados'}</p></div>
         <div class="section"><h3>Habilidades Técnicas (Duras)</h3><p>${candidato.habilidadesDuras || candidato.habilidades || 'No especificadas'}</p></div>
         <div class="section"><h3>Habilidades y Competencias (Blandas)</h3><p>${candidato.habilidadesBlandas || 'No especificadas'}</p></div>
@@ -1142,7 +1306,7 @@ app.get('/api/descargar-cv/:id', authMiddleware, async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
         return res.send(Buffer.from(candidato.cvData, 'base64'));
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).send('Error al procesar la descarga.');
     }
 });
 
@@ -1295,7 +1459,7 @@ app.post('/api/autocompletar-cv', upload.single('cvFile'), async (req, res) => {
         } else if (req.file.mimetype.includes('wordprocessingml') || req.file.originalname.endsWith('.docx')) {
             textoPlano = (await mammoth.extractRawText({ buffer: req.file.buffer })).value;
         }
-        const prompt = `Lee este CV completo, corrige cualquier error ortográfico y extrae toda la información linealmente para un sistema ATS en JSON puro (sin habilidades repetidas, sin subtítulos como FORMACIÓN ACADÉMICA o CURSOS, cada experiencia y estudio en renglón separado con viñeta "• ", y en disponibilidadViajar coloca "Sí", "No" o ""):
+        const prompt = `Lee este CV completo, corrige cualquier error ortográfico y extrae toda la información linealmente para un sistema ATS en JSON puro (resumen profesional completo de 5 líneas, cada experiencia separada con formato "• EMPRESA — Cargo: Tareas", cada estudio en su propio renglón con "• ", sin habilidades repetidas, y en disponibilidadViajar coloca "Sí", "No" o ""):
 {"nombre":"","dni":"","email":"","telefono":"","direccion":"","disponibilidadViajar":"","resumen":"","experiencia":"","estudios":"","habilidades":""}
 ${textoPlano ? `Texto auxiliar: ${textoPlano}` : ''}`;
         const parts = [prompt];
@@ -1322,7 +1486,7 @@ app.get('/api/candidatos', authMiddleware, async (req, res) => {
             telefono: 1, direccion: 1, disponibilidad: 1, disponibilidadViajar: 1, datosPersonalesExtra: 1,
             resumen: 1, experiencia: 1, estudios: 1, habilidades: 1, habilidadesDuras: 1, habilidadesBlandas: 1,
             cvContentType: 1, nombreArchivoCV: 1, fotoContentType: 1,
-            cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, pagado: 1,
+            cartaContentType: 1, nombreArchivoCarta: 1, textoExtraidoCV: 1, fecha: 1, editadoManualmente: 1, pagado: 1,
             tieneCV: { $gt: [{ $strLenCP: { $ifNull: ['$cvData', ''] } }, 0] },
             tieneFoto: { $gt: [{ $strLenCP: { $ifNull: ['$fotoData', ''] } }, 0] },
             tieneCarta: { $gt: [{ $strLenCP: { $ifNull: ['$cartaData', ''] } }, 0] }
